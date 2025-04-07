@@ -1,0 +1,11 @@
+{
+  "HomePage": {
+    "search": "Search"
+  },
+  "ResultPage": {
+    "search": "Search"
+  },
+  "TabBar": {
+    "home": "Home"
+  }
+}
