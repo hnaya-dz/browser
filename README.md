@@ -1,53 +1,75 @@
-# Next.js & HeroUI Template
+# HnayaDZ Browser
 
-This is a template for creating applications using Next.js 14 (app directory) and HeroUI (v2).
+Hnaya DZ Browser is a desktop application built with Electron and Next.js, designed to provide a seamless browsing experience.
 
-[Try it on CodeSandbox](https://githubbox.com/heroui-inc/heroui/next-app-template)
+## Features
 
-## Technologies Used
+- **Electron Integration**: Combines the power of Electron with Next.js for a desktop application.
+- **Multi-Platform Support**: Build and run on macOS, Windows, and Linux.
+- **Internationalization**: Supports multiple languages using `i18next`.
+- **Responsive Design**: Utilizes Tailwind CSS for styling.
 
-- [Next.js 14](https://nextjs.org/docs/getting-started)
-- [HeroUI v2](https://heroui.com/)
-- [Tailwind CSS](https://tailwindcss.com/)
-- [Tailwind Variants](https://tailwind-variants.org)
-- [TypeScript](https://www.typescriptlang.org/)
-- [Framer Motion](https://www.framer.com/motion/)
-- [next-themes](https://github.com/pacocoursey/next-themes)
+## Getting Started
 
-## How to Use
+### Prerequisites
 
-### Use the template with create-next-app
+- Node.js (version 14 or higher)
+- Yarn (for package management)
 
-To create a new project based on this template using `create-next-app`, run the following command:
+### Installation
 
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/yourusername/HnayaDZ.git
+   cd HnayaDZ
+   ```
+
+2. Install dependencies:
+   ```bash
+   yarn install
+   ```
+
+### Development
+
+To start the development server, run:
 ```bash
-npx create-next-app -e https://github.com/heroui-inc/next-app-template
+yarn dev
 ```
 
-### Install dependencies
+This command will run both the Next.js development server and the Electron application.
 
-You can use one of them `npm`, `yarn`, `pnpm`, `bun`, Example using `npm`:
+### Building for Production
 
+To build the application for production, run:
 ```bash
-npm install
+yarn build
 ```
 
-### Run the development server
-
+Then, to create a distributable package, run:
 ```bash
-npm run dev
+yarn dist
 ```
 
-### Setup pnpm (optional)
+### Running the Application
 
-If you are using `pnpm`, you need to add the following code to your `.npmrc` file:
-
+To start the application in production mode, use:
 ```bash
-public-hoist-pattern[]=*@heroui/*
+yarn start
 ```
 
-After modifying the `.npmrc` file, you need to run `pnpm install` again to ensure that the dependencies are installed correctly.
+## Scripts
+
+- `dev`: Runs the application in development mode.
+- `electron-dev`: Starts the Electron app with the development URL.
+- `build`: Builds the Next.js application.
+- `export`: Exports the Next.js application.
+- `start`: Runs the application in production mode.
+- `dist`: Builds the application and creates a distributable package.
+
+## Contributing
+
+Contributions are welcome! Please open an issue or submit a pull request.
 
 ## License
 
-Licensed under the [MIT license](https://github.com/heroui-inc/next-app-template/blob/main/LICENSE).
+This project is licensed under the MIT License.
