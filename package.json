@@ -6,13 +6,13 @@
   "private": true,
   "main": "public/electron.js",
   "type": "module",
-  "scripts": {
-   "dev": "concurrently \"yarn next dev\" \"wait-on http://localhost:3000 && yarn electron public/electron.js\""
-    "electron-dev": "cross-env ELECTRON_START_URL=http://localhost:3000 electron public/electron.js",
-    "build": "next build",
-    "export": "next export",
-    "start": "concurrently \"yarn next start\" \"yarn electron public/electron.js\"",
-    "dist": "yarn build && electron-builder --win --ia32"
+ "scripts": {
+  "dev": "concurrently \"yarn next dev\" \"wait-on http://localhost:3000 && electron public/electron.js\"",
+  "electron-dev": "cross-env ELECTRON_START_URL=http://localhost:3000 electron public/electron.js",
+  "build": "next build",
+  "export": "next export",
+  "start": "concurrently \"yarn next start\" \"electron public/electron.js\"",
+  "dist": "yarn build && electron-builder --win --ia32"
   },
   "build": {
     "appId": "dz.hnaya.browser",
