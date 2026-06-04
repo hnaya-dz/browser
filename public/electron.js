@@ -20,11 +20,12 @@ const createWindow = () => {
   mainWindow = new BrowserWindow({
     width: 1920,
     height: 1080,
-    webPreferences: {
-      preload: join(__dirname, "preload.js"),
-      nodeIntegration: true,
-      webviewTag: true,
-    },
+webPreferences: {
+  nodeIntegration: false,
+  contextIsolation: true,
+  sandbox: true,
+  scrollBounce: true,
+}
   });
   if (app.isPackaged) {
     appServe(mainWindow).then(() => {
