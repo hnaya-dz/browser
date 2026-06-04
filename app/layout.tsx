@@ -10,6 +10,7 @@ import { TabProvider } from "@/context/tabcontext";
 import { LoadingProvider } from "@/context/loadingcontext";
 import { LanguageProvider } from "@/context/langcontext";
 import URLBar from "@/components/urlbar";
+import HtmlWrapper from "@/components/html-wrapper";
 
 export const metadata: Metadata = {
   title: {
@@ -17,9 +18,7 @@ export const metadata: Metadata = {
     template: `%s - ${siteConfig.name}`,
   },
   description: siteConfig.description,
-  icons: {
-    icon: "/favicon.ico",
-  },
+  icons: { icon: "/favicon.ico" },
 };
 
 export const viewport: Viewport = {
@@ -29,35 +28,28 @@ export const viewport: Viewport = {
   ],
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html suppressHydrationWarning lang="en">
+    <html suppressHydrationWarning lang="ar" dir="rtl">
       <head />
-      <body
-        className={clsx(
-          "min-h-screen bg-background font-sans antialiased",
-          fontSans.variable,
-        )}
-      >
+      <body className={clsx("min-h-screen bg-background font-sans antialiased", fontSans.variable)}>
         <Providers themeProps={{ attribute: "class", defaultTheme: "dark" }}>
-          <div className="relative flex flex-col">
-            <main className="container">
-              <LanguageProvider>
-                <LoadingProvider>
-                  <TabProvider>
-                    <TabBar />
-                    <Navbar />
-                    <URLBar />
-                    {children}
-                  </TabProvider>
-                </LoadingProvider>
-              </LanguageProvider>
-            </main>
-          </div>
+          <LanguageProvider>
+            <HtmlWrapper>
+              <div className="relative flex flex-col">
+                <main className="container">
+                  <LoadingProvider>
+                    <TabProvider>
+                      <TabBar />
+                      <Navbar />
+                      <URLBar />
+                      {children}
+                    </TabProvider>
+                  </LoadingProvider>
+                </main>
+              </div>
+            </HtmlWrapper>
+          </LanguageProvider>
         </Providers>
       </body>
     </html>
