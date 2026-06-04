@@ -7,7 +7,7 @@
   "main": "public/electron.js",
   "type": "module",
   "scripts": {
-    "dev": "concurrently \"yarn next dev\" \"yarn electron public/electron.js\"",
+   "dev": "concurrently \"yarn next dev\" \"wait-on http://localhost:3000 && yarn electron public/electron.js\""
     "electron-dev": "cross-env ELECTRON_START_URL=http://localhost:3000 electron public/electron.js",
     "build": "next build",
     "export": "next export",
