@@ -1,31 +1,31 @@
-import { app, BrowserWindow, BrowserView, ipcMain } from "electron";
+import { app, BrowserWindow, WebContentsView, ipcMain } from "electron";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
-
+ 
 import serve from "electron-serve";
-
+ 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-
+ 
 const appServe = app.isPackaged ? serve({
   directory: join(__dirname, "../out"),
 }) : null;
-
-
+ 
 let mainWindow = null;
 const browserViews = new Map();
 let activeTabId = null;
-
+ 
 const createWindow = () => {
   mainWindow = new BrowserWindow({
     width: 1920,
     height: 1080,
-webPreferences: {
-  nodeIntegration: false,
-  contextIsolation: true,
-  sandbox: true,
-  scrollBounce: true,
-}
+    webPreferences: {
+      preload: join(__dirname, "preload.js"),
+      nodeIntegration: false,
+      contextIsolation: true,
+      webviewTag: false,
+      sandbox: true,
+    },
   });
   if (app.isPackaged) {
     appServe(mainWindow).then(() => {
@@ -41,11 +41,11 @@ webPreferences: {
     mainWindow = null;
   });
 };
-
+ 
 app.on("ready", () => {
   createWindow();
 });
-
+ 
 app.on('web-contents-created', (event, contents) => {
   contents.setWindowOpenHandler((details) => {
     console.log('Window open handler executed for URL:', details.url);
@@ -53,54 +53,52 @@ app.on('web-contents-created', (event, contents) => {
     return { action: 'deny' };
   });
 });
-
+ 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
     app.quit();
   }
 });
-
+ 
 const updateBrowserViewSize = () => {
   if (mainWindow && activeTabId) {
-    const browserView = browserViews.get(activeTabId);
-    if (browserView) {
+    const view = browserViews.get(activeTabId);
+    if (view) {
       const { width, height } = mainWindow.getContentBounds();
       const marginTop = Math.round(height * 0.12);
       const viewHeight = Math.round(height * 0.88);
-      browserView.setBounds({ x: 0, y: marginTop, width, height: viewHeight });
+      view.setBounds({ x: 0, y: marginTop, width, height: viewHeight });
     }
   }
 };
-
+ 
 ////////////////////////////////////////////////////////////////////////////////
 // Tabs Management
-
+ 
 ipcMain.on("open-tab", (event, newTab) => {
   const { id, url } = newTab;
   if (!url) {
     console.error(`Invalid URL received for tab ${id}:`, url);
     return;
   }
-
+ 
   if (!browserViews.has(id)) {
-    const browserView = new BrowserView({
+    const view = new WebContentsView({
       webPreferences: {
         nodeIntegration: false,
+        contextIsolation: true,
+        sandbox: true,
         scrollBounce: true,
-        transparent: false,
-        preload: join(__dirname, "preload.js"),
-        // contextIsolation: true
       }
     });
-    browserViews.set(id, browserView);
-
+    browserViews.set(id, view);
+ 
     const updateTabInfo = () => {
-      const currentUrl = browserView.webContents.getURL();
-      const title = browserView.webContents.getTitle();
-
+      const currentUrl = view.webContents.getURL();
+      const title = view.webContents.getTitle();
+ 
       mainWindow.webContents.send("update-url", id, currentUrl);
-
-      // Only send title update if it's different from the current URL's domain
+ 
       if (title && title !== currentUrl) {
         try {
           const domain = new URL(currentUrl).hostname.replace('www.', '');
@@ -112,12 +110,11 @@ ipcMain.on("open-tab", (event, newTab) => {
         }
       }
     };
-
-    // Set up all event listeners
-    browserView.webContents.on('page-title-updated', (event, title) => {
+ 
+    view.webContents.on('page-title-updated', (event, title) => {
       mainWindow.webContents.send("update-tab-title", { id, title });
     });
-
+ 
     const navigationEvents = [
       'did-start-loading',
       'did-stop-loading',
@@ -125,45 +122,48 @@ ipcMain.on("open-tab", (event, newTab) => {
       'did-navigate',
       'did-navigate-in-page'
     ];
-
+ 
     navigationEvents.forEach(event => {
-      browserView.webContents.on(event, updateTabInfo);
+      view.webContents.on(event, updateTabInfo);
     });
-
-    browserView.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
+ 
+    view.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
       mainWindow.webContents.send("update-url", id, validatedURL);
       updateTabInfo();
     });
-
-    // Favicon handling
-    browserView.webContents.on('did-finish-load', () => {
-      browserView.webContents.executeJavaScript(`
+ 
+    view.webContents.on('did-finish-load', () => {
+      view.webContents.executeJavaScript(`
         const favicon = document.querySelector('link[rel="icon"], link[rel="shortcut icon"]');
         favicon ? favicon.href : null;
       `).then(faviconUrl => {
         mainWindow.webContents.send("update-tab-favicon", { id, faviconUrl });
       }).catch(console.error);
     });
-
-    browserView.webContents.loadURL(url);
+ 
+    view.webContents.loadURL(url);
   }
-
+ 
   switchTab(id);
 });
-
+ 
 const switchTab = (tabId) => {
   if (!mainWindow) return;
+ 
+  // Cacher l'onglet actif
   if (browserViews.has(activeTabId)) {
-    mainWindow.removeBrowserView(browserViews.get(activeTabId));
+    mainWindow.contentView.removeChildView(browserViews.get(activeTabId));
   }
+ 
+  // Afficher le nouvel onglet
   if (browserViews.has(tabId)) {
     activeTabId = tabId;
-    const browserView = browserViews.get(tabId);
-    mainWindow.setBrowserView(browserView);
+    const view = browserViews.get(tabId);
+    mainWindow.contentView.addChildView(view);
     updateBrowserViewSize();
   }
 };
-
+ 
 ipcMain.on("get-current-url", (event, tabId) => {
   if (browserViews.has(tabId)) {
     const view = browserViews.get(tabId);
@@ -171,28 +171,31 @@ ipcMain.on("get-current-url", (event, tabId) => {
     event.sender.send("current-url", tabId, currentUrl);
   }
 });
-
+ 
 ipcMain.on("switch-tab", (event, tabId) => {
   switchTab(tabId);
 });
-
+ 
 ipcMain.on("close-tab", (event, tabId) => {
   if (browserViews.has(tabId)) {
-    const browserView = browserViews.get(tabId);
-    browserView.webContents.destroy();
+    const view = browserViews.get(tabId);
+    // Retirer de la fenêtre si actif
+    if (activeTabId === tabId) {
+      mainWindow.contentView.removeChildView(view);
+    }
+    view.webContents.destroy();
     browserViews.delete(tabId);
-
+ 
     if (activeTabId === tabId) {
       activeTabId = 1;
       switchTab(activeTabId);
     }
   }
 });
-
+ 
 ////////////////////////////////////////////////////////////////////////////////
 // Navigation Controls
-
-// Update the navigation handlers to work with tabs:
+ 
 ipcMain.on("go-back", () => {
   if (activeTabId && browserViews.has(activeTabId)) {
     const view = browserViews.get(activeTabId);
@@ -203,7 +206,7 @@ ipcMain.on("go-back", () => {
     }
   }
 });
-
+ 
 ipcMain.on("go-forward", () => {
   if (activeTabId && browserViews.has(activeTabId)) {
     const view = browserViews.get(activeTabId);
@@ -212,26 +215,23 @@ ipcMain.on("go-forward", () => {
     }
   }
 });
-
+ 
 ipcMain.on("refresh", () => {
   if (activeTabId && browserViews.has(activeTabId)) {
     const view = browserViews.get(activeTabId);
     view?.webContents?.reload();
   }
 });
-
+ 
 ipcMain.on("navigate", (event, url) => {
   if (activeTabId && browserViews.has(activeTabId)) {
     const view = browserViews.get(activeTabId);
     if (view?.webContents) {
-      // Ensure URL has protocol
       let finalUrl = url;
       if (!url.startsWith('http://') && !url.startsWith('https://')) {
         finalUrl = `https://${url}`;
       }
       view.webContents.loadURL(finalUrl);
-
-      // Immediately update the URL in the UI
       mainWindow.webContents.send("update-url", activeTabId, finalUrl);
     }
   }
