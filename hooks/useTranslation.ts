@@ -1,26 +1,21 @@
 import { useLanguage } from '@/context/langcontext';
 import en from '@/locales/en.json';
 import fr from '@/locales/fr.json';
+import ar from '@/locales/ar.json';
 
-const translations = {
-    en,
-    fr,
-};
+const translations = { en, fr, ar };
 
-type NestedKey<T> = T extends object ? { [K in keyof T]: NestedKey<T[K]> } : never;
-type TranslationKey = keyof typeof en | `${keyof typeof en}.${string}`;
+type TranslationKey = string;
 
 export const useTranslation = () => {
     const { language } = useLanguage();
-    const t = (key: TranslationKey) => {
-        const keys = key.split('.') as (keyof typeof en)[];
+    const t = (key: TranslationKey): string => {
+        const keys = key.split('.');
         let translation = translations[language] as any;
-
-        for (let k of keys) {
-            translation = translation[k];
+        for (const k of keys) {
+            translation = translation?.[k];
             if (!translation) return key;
         }
-
         return translation;
     };
     return { t };
