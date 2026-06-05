@@ -1,145 +1,89 @@
 "use client";
-
 import { useEffect, useState } from "react";
 import { ThemeSwitch } from "@/components/theme-switch";
 import { useRouter } from "next/navigation";
 import { useTabContext } from "@/context/tabcontext";
+import { useTabPosition } from "@/context/tabpositioncontext";
 import LangSwitch from "./lang-switch";
 
 export default function URLBar() {
-    const [url, setUrl] = useState("");
-    const router = useRouter();
-    const { activeTab, tabs } = useTabContext();
+  const [url, setUrl] = useState("");
+  const router = useRouter();
+  const { activeTab, tabs } = useTabContext();
+  const { position } = useTabPosition();
 
-    useEffect(() => {
-        if (typeof window !== "undefined" && window.electronAPI) {
-            // Listen for URL updates for the active tab
-            window.electronAPI.receive("update-url", (tabId, newUrl) => {
-                if (tabId === activeTab) {
-                    setUrl(newUrl);
-                }
-            });
-        }
-    }, [activeTab, router]);
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.electronAPI) {
+      window.electronAPI.receive("update-url", (tabId: number, newUrl: string) => {
+        if (tabId === activeTab) setUrl(newUrl);
+      });
+    }
+  }, [activeTab, router]);
 
-    useEffect(() => {
-        if (typeof window !== "undefined" && window.electronAPI) {
-            // Request the current URL when the tab changes
-            window.electronAPI.send("get-current-url", activeTab);
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.electronAPI) {
+      window.electronAPI.send("get-current-url", activeTab);
+      window.electronAPI.receive("current-url", (tabId: number, currentUrl: string) => {
+        if (tabId === activeTab) setUrl(currentUrl);
+      });
+    }
+  }, [activeTab]);
 
-            // Listen for the response and update the input field
-            window.electronAPI.receive("current-url", (tabId, currentUrl) => {
-                if (tabId === activeTab) {
-                    setUrl(currentUrl);
-                }
-            });
-        }
-    }, [activeTab]);
+  const isValidURL = (input: string) => {
+    try {
+      const p = new URL(input);
+      return p.protocol === "http:" || p.protocol === "https:";
+    } catch { return false; }
+  };
 
-    const isValidURL = (input: string) => {
-        try {
-            const parsedURL = new URL(input);
-            return parsedURL.protocol === "http:" || parsedURL.protocol === "https:";
-        } catch (error) {
-            return false;
-        }
-    };
+  const handleNavigation = () => {
+    if (isValidURL(url)) {
+      window?.electronAPI?.send("navigate", url);
+    } else {
+      window?.electronAPI?.send("close-browser-view");
+      router.push(`/results?q=${encodeURIComponent(url)}`);
+    }
+  };
 
-    const handleEnterKey = (e: React.KeyboardEvent) => {
-        if (e.key === "Enter") {
-            handleNavigation();
-        }
-    };
+  const currentTab = tabs.find(tab => tab.id === activeTab);
+  if (!currentTab || currentTab.isHome) return null;
 
-    const handleNavigation = () => {
-        if (isValidURL(url)) {
-            // Navigate using Electron
-            window?.electronAPI?.send("navigate", url);
-            // Update the tab's URL
-            const currentTab = tabs.find(tab => tab.id === activeTab);
-            if (currentTab) {
-                window?.electronAPI?.send("update-tab", {
-                    id: activeTab,
-                    updates: { url }
-                });
-            }
-        } else {
-            // Treat it as a search query and go to the results page
-            window?.electronAPI?.send("close-browser-view");
-            router.push(`/results?q=${encodeURIComponent(url)}`);
-        }
-    };
+  const rightOffset = position === "right" ? "200px" : "0px";
 
-    // Only show URL bar for non-home tabs
-    const currentTab = tabs.find(tab => tab.id === activeTab);
-    if (!currentTab || currentTab.isHome) return null;
-
-    return (
-        <nav className="fixed mt-[6vh] h-[6vh] bg-white dark:bg-black z-50 w-screen flex items-center px-4 gap-4">
-            <div
-                role="button"
-                tabIndex={0}
-                onClick={() => window?.electronAPI?.send("go-back")}
-            >
-                <img
-                    className="invert dark:invert-0 hover:cursor-pointer hover:scale-110 w-[2vw] h-[3vh]"
-                    src="/icons/arrow.left.svg"
-                    alt="Back"
-                />
-            </div>
-            <div
-                role="button"
-                tabIndex={0}
-                onClick={() => window?.electronAPI?.send("go-forward")}
-            >
-                <img
-                    className="invert dark:invert-0 hover:cursor-pointer hover:scale-110 w-[2vw] h-[3vh]"
-                    src="/icons/arrow.right.svg"
-                    alt="Forward"
-                />
-            </div>
-            <div
-                role="button"
-                tabIndex={0}
-                onClick={() => window?.electronAPI?.send("refresh")}
-            >
-                <img
-                    className="invert dark:invert-0 hover:cursor-pointer hover:scale-110 w-[2vw] h-[3vh]"
-                    src="/icons/arrow.clockwise.svg"
-                    alt="Reload"
-                />
-            </div>
-            {/* <div
-                role="button"
-                tabIndex={0}
-                onClick={() => { window?.electronAPI?.send("go-home"); router.push("/") }}
-            >
-                <img
-                    className="invert dark:invert-0 hover:cursor-pointer hover:scale-110 w-[2vw] h-[3vh]"
-                    src="/icons/house.svg"
-                    alt="Home"
-                />
-            </div> */}
-            <input
-                className="flex-grow p-2 rounded-lg bg-gray-300 text-black h-[3vh]"
-                placeholder="Enter URL or search..."
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                onKeyDown={handleEnterKey}
-            />
-            <div
-                role="button"
-                tabIndex={0}
-                onClick={handleNavigation}
-            >
-                <img
-                    className="invert dark:invert-0 hover:cursor-pointer hover:scale-110 w-[2vw] h-[3vh]"
-                    src="/icons/magnifyingglass.svg"
-                    alt="Search"
-                />
-            </div>
-            <LangSwitch />
-            <ThemeSwitch />
-        </nav>
-    );
+  return (
+    <nav
+      className="fixed mt-[6vh] h-[6vh] z-50 flex items-center px-4 gap-3 bg-black/50 backdrop-blur-md border-b border-white/10"
+      style={{
+        left: 0,
+        right: rightOffset,
+        width: `calc(100vw - ${rightOffset})`,
+      }}
+    >
+      <button onClick={() => window?.electronAPI?.send("go-back")}
+        className="text-white/60 hover:text-white hover:scale-110 transition-all">
+        <img className="invert w-[2vw] h-[3vh]" src="/icons/arrow.left.svg" alt="Back" />
+      </button>
+      <button onClick={() => window?.electronAPI?.send("go-forward")}
+        className="text-white/60 hover:text-white hover:scale-110 transition-all">
+        <img className="invert w-[2vw] h-[3vh]" src="/icons/arrow.right.svg" alt="Forward" />
+      </button>
+      <button onClick={() => window?.electronAPI?.send("refresh")}
+        className="text-white/60 hover:text-white hover:scale-110 transition-all">
+        <img className="invert w-[2vw] h-[3vh]" src="/icons/arrow.clockwise.svg" alt="Reload" />
+      </button>
+      <input
+        className="flex-grow px-3 py-1.5 rounded-lg bg-white/10 text-white border border-white/15 h-[3.5vh] text-sm focus:outline-none focus:border-green-500/60 focus:bg-white/15 placeholder-white/30"
+        placeholder="URL ou recherche..."
+        value={url}
+        onChange={(e) => setUrl(e.target.value)}
+        onKeyDown={(e) => e.key === "Enter" && handleNavigation()}
+      />
+      <button onClick={handleNavigation}
+        className="text-white/60 hover:text-white hover:scale-110 transition-all">
+        <img className="invert w-[2vw] h-[3vh]" src="/icons/magnifyingglass.svg" alt="Search" />
+      </button>
+      <LangSwitch />
+      <ThemeSwitch />
+    </nav>
+  );
 }
