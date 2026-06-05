@@ -1,11 +1,6 @@
 {
-  "HomePage": {
-    "search": "Recherche"
-  },
-  "ResultPage": {
-    "search": "Recherche"
-  },
-  "TabBar": {
-    "home": "Accueil"
-  }
+  "HomePage": { "search": "Rechercher", "discover": "Découvrez le web algérien" },
+  "ResultPage": { "search": "Rechercher" },
+  "TabBar": { "home": "Accueil" },
+  "Nav": { "home": "Accueil", "market": "Hnaya Market", "tube": "Hnaya Tube", "apps": "Hnaya Appstore", "webhost": "Hnaya Webhost" }
 }
