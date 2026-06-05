@@ -1,6 +1,22 @@
 {
-  "HomePage": { "search": "Search", "discover": "Discover the Algerian web" },
-  "ResultPage": { "search": "Search" },
-  "TabBar": { "home": "Home", "newTab": "New tab", "tabsTop": "Tabs on top" },
-  "Nav": { "home": "Home", "market": "Hnaya Market", "tube": "Hnaya Tube", "apps": "Hnaya Appstore", "webhost": "Hnaya Webhost" }
+  "HomePage": {
+    "search": "Search",
+    "discover": "Discover the Algerian web"
+  },
+  "ResultPage": {
+    "search": "Search"
+  },
+  "TabBar": {
+    "home": "Home",
+    "newTab": "New tab",
+    "tabsTop": "Tabs on top",
+    "tabsSide": "Side tabs"
+  },
+  "Nav": {
+    "home": "Home",
+    "market": "Hnaya Market",
+    "tube": "Hnaya Tube",
+    "apps": "Hnaya Appstore",
+    "webhost": "Hnaya Webhost"
+  }
 }
