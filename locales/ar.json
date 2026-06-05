@@ -1,6 +1,6 @@
 {
   "HomePage": { "search": "بحث", "discover": "اكتشف الويب الجزائري" },
   "ResultPage": { "search": "بحث" },
-  "TabBar": { "home": "الرئيسية" },
+  "TabBar": { "home": "الرئيسية", "newTab": "تبويب جديد", "tabsTop": "الألسنة في الأعلى" },
   "Nav": { "home": "هناية", "market": "هناية ماركت", "tube": "هناية تيوب", "apps": "أبستور", "webhost": "ويبهوست" }
 }
