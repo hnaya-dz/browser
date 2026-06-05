@@ -1,189 +1,189 @@
 "use client";
-import { X, Plus, Home, PanelLeft, PanelTop } from "lucide-react";
+import { X, Plus, Home, PanelRight, PanelTop } from "lucide-react";
 import { useTabContext } from "@/context/tabcontext";
+import { useTabPosition } from "@/context/tabpositioncontext";
 import { useLoading } from "@/context/loadingcontext";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useEffect, useRef, useState } from "react";
 
-type TabPosition = "top" | "right";
-
 function useDragSort(onReorder: (from: number, to: number) => void) {
-    const dragIndex = useRef<number | null>(null);
-    const onDragStart = (index: number) => (e: React.DragEvent) => {
-        dragIndex.current = index;
-        e.dataTransfer.effectAllowed = "move";
-    };
-    const onDragOver = (index: number) => (e: React.DragEvent) => {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = "move";
-    };
-    const onDrop = (index: number) => (e: React.DragEvent) => {
-        e.preventDefault();
-        if (dragIndex.current !== null && dragIndex.current !== index) {
-            onReorder(dragIndex.current, index);
-        }
-        dragIndex.current = null;
-    };
-    const onDragEnd = () => { dragIndex.current = null; };
-    return { onDragStart, onDragOver, onDrop, onDragEnd };
+  const dragIndex = useRef<number | null>(null);
+  const onDragStart = (index: number) => (e: React.DragEvent) => {
+    dragIndex.current = index;
+    e.dataTransfer.effectAllowed = "move";
+  };
+  const onDragOver = (index: number) => (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+  };
+  const onDrop = (index: number) => (e: React.DragEvent) => {
+    e.preventDefault();
+    if (dragIndex.current !== null && dragIndex.current !== index) {
+      onReorder(dragIndex.current, index);
+    }
+    dragIndex.current = null;
+  };
+  const onDragEnd = () => { dragIndex.current = null; };
+  return { onDragStart, onDragOver, onDrop, onDragEnd };
 }
 
 export default function TabBar() {
-    const { tabs, activeTab, switchTab, closeTab, addTab, reorderTabs } = useTabContext();
-    const { setIsLoading } = useLoading();
-    const { t } = useTranslation();
-    const isListenerSet = useRef(false);
-    const [faviconErrors, setFaviconErrors] = useState<Record<number, boolean>>({});
-    const [position, setPosition] = useState<TabPosition>("top");
-    const [hoveredTab, setHoveredTab] = useState<number | null>(null);
+  const { tabs, activeTab, switchTab, closeTab, addTab, reorderTabs } = useTabContext();
+  const { position, togglePosition } = useTabPosition();
+  const { setIsLoading } = useLoading();
+  const { t } = useTranslation();
+  const isListenerSet = useRef(false);
+  const [faviconErrors, setFaviconErrors] = useState<Record<number, boolean>>({});
+  const [hoveredTab, setHoveredTab] = useState<number | null>(null);
 
-    useEffect(() => {
-        const saved = localStorage.getItem("tabPosition") as TabPosition | null;
-        if (saved === "top" || saved === "right") setPosition(saved);
-    }, []);
+  useEffect(() => {
+    if (isListenerSet.current) return;
+    isListenerSet.current = true;
+    const handleNewTabUrl = (url: string) => addTab(url);
+    window.electronAPI?.receive("new-tab-url", handleNewTabUrl);
+    return () => { window.electronAPI?.removeListener("new-tab-url", handleNewTabUrl); };
+  }, []);
 
-    const togglePosition = () => {
-        const next: TabPosition = position === "top" ? "right" : "top";
-        setPosition(next);
-        localStorage.setItem("tabPosition", next);
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.key === "t") { e.preventDefault(); addTab("https://hnaya.dz"); }
+      if (e.ctrlKey && e.key === "w") {
+        e.preventDefault();
+        const current = tabs.find(t => t.id === activeTab);
+        if (current && !current.isHome) closeTab(activeTab);
+      }
+      if (e.ctrlKey && e.key === "Tab") {
+        e.preventDefault();
+        const idx = tabs.findIndex(t => t.id === activeTab);
+        const next = tabs[(idx + 1) % tabs.length];
+        if (next) switchTab(next.id);
+      }
     };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [tabs, activeTab, addTab, closeTab, switchTab]);
 
-    useEffect(() => {
-        if (isListenerSet.current) return;
-        isListenerSet.current = true;
-        const handleNewTabUrl = (url: string) => addTab(url);
-        window.electronAPI?.receive("new-tab-url", handleNewTabUrl);
-        return () => { window.electronAPI?.removeListener("new-tab-url", handleNewTabUrl); };
-    }, []);
+  const handleFaviconError = (tabId: number) => {
+    setFaviconErrors(prev => ({ ...prev, [tabId]: true }));
+  };
 
-    useEffect(() => {
-        const handleKey = (e: KeyboardEvent) => {
-            if (e.ctrlKey && e.key === "t") { e.preventDefault(); addTab("https://hnaya.dz"); }
-            if (e.ctrlKey && e.key === "w") {
-                e.preventDefault();
-                const current = tabs.find(t => t.id === activeTab);
-                if (current && !current.isHome) closeTab(activeTab);
-            }
-            if (e.ctrlKey && e.key === "Tab") {
-                e.preventDefault();
-                const idx = tabs.findIndex(t => t.id === activeTab);
-                const next = tabs[(idx + 1) % tabs.length];
-                if (next) switchTab(next.id);
-            }
-        };
-        window.addEventListener("keydown", handleKey);
-        return () => window.removeEventListener("keydown", handleKey);
-    }, [tabs, activeTab, addTab, closeTab, switchTab]);
+  const { onDragStart, onDragOver, onDrop, onDragEnd } = useDragSort(reorderTabs);
 
-    const handleFaviconError = (tabId: number) => {
-        setFaviconErrors(prev => ({ ...prev, [tabId]: true }));
-    };
-
-    const { onDragStart, onDragOver, onDrop, onDragEnd } = useDragSort(reorderTabs);
-
-    const renderTab = (tab: typeof tabs[0], index: number) => {
-        const isActive = activeTab === tab.id;
-        const showFavicon = tab.faviconUrl && !faviconErrors[tab.id];
-        const isHovered = hoveredTab === tab.id;
-
-        return (
-            <div
-                key={tab.id}
-                draggable
-                onDragStart={onDragStart(index)}
-                onDragOver={onDragOver(index)}
-                onDrop={onDrop(index)}
-                onDragEnd={onDragEnd}
-                onMouseEnter={() => setHoveredTab(tab.id)}
-                onMouseLeave={() => setHoveredTab(null)}
-                role="button"
-                tabIndex={0}
-                className={`
-                    relative flex items-center gap-1.5 cursor-pointer select-none group
-                    transition-colors duration-150
-                    ${position === "top"
-                        ? "pl-3 pr-2 py-1 rounded-t-lg max-w-[180px] min-w-[80px] h-[5vh] flex-shrink-0"
-                        : "px-3 py-2 rounded-lg w-full min-h-[40px] flex-shrink-0"
-                    }
-                    ${isActive
-                        ? "bg-white dark:bg-gray-900 shadow-sm border border-b-0 border-gray-300 dark:border-gray-700"
-                        : "bg-transparent hover:bg-gray-200 dark:hover:bg-gray-800 border border-transparent"
-                    }
-                `}
-                onClick={() => {
-                    switchTab(tab.id);
-                    if (tab.isHome) setIsLoading(false);
-                    else setIsLoading(true);
-                }}
-                onKeyDown={(e) => e.key === "Enter" && switchTab(tab.id)}
-            >
-                <span className="flex-shrink-0 w-4 h-4 flex items-center justify-center">
-                    {tab.isHome ? (
-                        <Home size={13} className="text-green-700 dark:text-green-500" />
-                    ) : showFavicon ? (
-                        <img src={tab.faviconUrl} alt="" className="w-4 h-4 object-contain"
-                            onError={() => handleFaviconError(tab.id)} />
-                    ) : (
-                        <span className="w-3 h-3 rounded-full bg-gray-300 dark:bg-gray-600 inline-block" />
-                    )}
-                </span>
-                <span className={`text-xs truncate flex-1 ${isActive ? "text-gray-900 dark:text-gray-100 font-medium" : "text-gray-600 dark:text-gray-400"}`}>
-                    {tab.title || "…"}
-                </span>
-                {!tab.isHome && (
-                    <button
-                        className="flex-shrink-0 w-4 h-4 flex items-center justify-center rounded-full opacity-0 group-hover:opacity-100 hover:bg-gray-300 dark:hover:bg-gray-600 transition-all"
-                        onClick={(e) => { e.stopPropagation(); closeTab(tab.id); }}
-                        aria-label="Fermer l'onglet"
-                    >
-                        <X size={10} strokeWidth={3} className="text-gray-600 dark:text-gray-300" />
-                    </button>
-                )}
-                {isHovered && tab.url && !tab.isHome && (
-                    <div className={`
-                        absolute z-[100] px-2 py-1 rounded-md bg-gray-900 text-white text-[10px] whitespace-nowrap shadow-lg pointer-events-none
-                        ${position === "top" ? "top-full mt-1 left-0" : "left-full ml-2 top-0"}
-                    `}>
-                        {tab.url.length > 60 ? tab.url.slice(0, 60) + "…" : tab.url}
-                    </div>
-                )}
-            </div>
-        );
-    };
-
-    if (position === "top") {
-        return (
-            <div className="fixed z-50 top-0 left-0 h-[6vh] w-screen flex items-center gap-1 px-2 bg-gray-100 dark:bg-gray-950 border-b border-gray-300 dark:border-gray-800 overflow-x-auto overflow-y-hidden hide-scrollbar">
-                {tabs.map((tab, i) => renderTab(tab, i))}
-                <button onClick={() => addTab("https://hnaya.dz")}
-                    className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-lg text-gray-500 hover:text-black dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-800 transition-all ml-1"
-                    title={t("TabBar.newTab")}>
-                    <Plus size={15} strokeWidth={2.5} />
-                </button>
-                <button onClick={togglePosition}
-                    className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-black dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-800 transition-all ml-auto"
-                    title={t("TabBar.tabsTop")}>
-                    <PanelLeft size={15} />
-                </button>
-            </div>
-        );
-    }
+  const renderTab = (tab: typeof tabs[0], index: number) => {
+    const isActive = activeTab === tab.id;
+    const showFavicon = tab.faviconUrl && !faviconErrors[tab.id];
+    const isHovered = hoveredTab === tab.id;
 
     return (
-        <div className="fixed z-50 top-0 right-0 h-screen w-[200px] flex flex-col gap-1 p-2 bg-gray-100 dark:bg-gray-950 border-l border-gray-300 dark:border-gray-800 overflow-y-auto overflow-x-hidden hide-scrollbar">
-            <button onClick={togglePosition}
-                className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-gray-400 hover:text-black dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-800 transition-all mb-1 text-xs"
-                title={t("TabBar.tabsTop")}>
-                <PanelTop size={14} />
-                <span>{t("TabBar.tabsTop")}</span>
-            </button>
-            {tabs.map((tab, i) => renderTab(tab, i))}
-            <button onClick={() => addTab("https://hnaya.dz")}
-                className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-gray-500 hover:text-black dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-800 transition-all mt-1 text-xs"
-                title={t("TabBar.newTab")}>
-                <Plus size={14} strokeWidth={2.5} />
-                <span>{t("TabBar.newTab")}</span>
-            </button>
-        </div>
+      <div
+        key={tab.id}
+        draggable
+        onDragStart={onDragStart(index)}
+        onDragOver={onDragOver(index)}
+        onDrop={onDrop(index)}
+        onDragEnd={onDragEnd}
+        onMouseEnter={() => setHoveredTab(tab.id)}
+        onMouseLeave={() => setHoveredTab(null)}
+        role="button"
+        tabIndex={0}
+        className={`
+          relative flex items-center gap-1.5 cursor-pointer select-none group
+          transition-colors duration-150
+          ${position === "top"
+            ? "pl-3 pr-2 py-1 rounded-t-lg max-w-[180px] min-w-[80px] h-[5vh] flex-shrink-0"
+            : "px-3 py-2 rounded-lg w-full min-h-[40px] flex-shrink-0"
+          }
+          ${isActive
+            ? "bg-white/10 shadow-sm border border-white/20"
+            : "bg-transparent hover:bg-white/8 border border-transparent"
+          }
+        `}
+        onClick={() => {
+          switchTab(tab.id);
+          if (tab.isHome) setIsLoading(false);
+          else setIsLoading(true);
+        }}
+        onKeyDown={(e) => e.key === "Enter" && switchTab(tab.id)}
+      >
+        <span className="flex-shrink-0 w-4 h-4 flex items-center justify-center">
+          {tab.isHome ? (
+            <Home size={13} className="text-green-400" />
+          ) : showFavicon ? (
+            <img src={tab.faviconUrl} alt="" className="w-4 h-4 object-contain"
+              onError={() => handleFaviconError(tab.id)} />
+          ) : (
+            <span className="w-3 h-3 rounded-full bg-white/20 inline-block" />
+          )}
+        </span>
+        <span className={`text-xs truncate flex-1 ${isActive ? "text-white font-medium" : "text-white/60"}`}>
+          {tab.title || "…"}
+        </span>
+        {!tab.isHome && (
+          <button
+            className="flex-shrink-0 w-4 h-4 flex items-center justify-center rounded-full opacity-0 group-hover:opacity-100 hover:bg-white/20 transition-all"
+            onClick={(e) => { e.stopPropagation(); closeTab(tab.id); }}
+            aria-label="Fermer l'onglet"
+          >
+            <X size={10} strokeWidth={3} className="text-white/70" />
+          </button>
+        )}
+        {isHovered && tab.url && !tab.isHome && (
+          <div className={`
+            absolute z-[100] px-2 py-1 rounded-md text-white text-[10px] whitespace-nowrap shadow-lg pointer-events-none
+            bg-black/80 backdrop-blur-sm border border-white/10
+            ${position === "top" ? "top-full mt-1 left-0" : "left-full ml-2 top-0"}
+          `}>
+            {tab.url.length > 60 ? tab.url.slice(0, 60) + "…" : tab.url}
+          </div>
+        )}
+      </div>
     );
+  };
+
+  // ── TOP layout ────────────────────────────────────────────────────────────
+  if (position === "top") {
+    return (
+      <div className="fixed z-50 top-0 left-0 h-[6vh] w-screen flex items-center gap-1 px-2 bg-black/40 backdrop-blur-md border-b border-white/10 overflow-x-auto overflow-y-hidden hide-scrollbar">
+        {tabs.map((tab, i) => renderTab(tab, i))}
+        <button
+          onClick={() => addTab("https://hnaya.dz")}
+          className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-all ml-1"
+          title={t("TabBar.newTab")}
+        >
+          <Plus size={15} strokeWidth={2.5} />
+        </button>
+        {/* Tooltip : "onglets latéraux" car le bouton bascule vers la droite */}
+        <button
+          onClick={togglePosition}
+          className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-lg text-white/30 hover:text-white hover:bg-white/10 transition-all ml-auto"
+          title={t("TabBar.tabsSide")}
+        >
+          <PanelRight size={15} />
+        </button>
+      </div>
+    );
+  }
+
+  // ── RIGHT layout ──────────────────────────────────────────────────────────
+  return (
+    <div className="fixed z-50 top-0 right-0 h-screen w-[200px] flex flex-col gap-1 p-2 bg-black/40 backdrop-blur-md border-l border-white/10 overflow-y-auto overflow-x-hidden hide-scrollbar">
+      <button
+        onClick={togglePosition}
+        className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-white/40 hover:text-white hover:bg-white/10 transition-all mb-1 text-xs"
+        title={t("TabBar.tabsTop")}
+      >
+        <PanelTop size={14} />
+        <span>{t("TabBar.tabsTop")}</span>
+      </button>
+      {tabs.map((tab, i) => renderTab(tab, i))}
+      <button
+        onClick={() => addTab("https://hnaya.dz")}
+        className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-all mt-1 text-xs"
+        title={t("TabBar.newTab")}
+      >
+        <Plus size={14} strokeWidth={2.5} />
+        <span>{t("TabBar.newTab")}</span>
+      </button>
+    </div>
+  );
 }
