@@ -7,9 +7,12 @@
   .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 }
 
-/* Force le fond sombre sur toute l'app — le glassmorphism fonctionne
-   sur dark ET light grâce à ce fond fixe */
-html, body {
+/* ── Fond glassmorphism mode SOMBRE ── */
+html.dark, html.dark body {
   background-color: #001208 !important;
-  color-scheme: dark;
+}
+
+/* ── Fond glassmorphism mode CLAIR ── */
+html:not(.dark), html:not(.dark) body {
+  background-color: #f0f7f4 !important;
 }
