@@ -7,12 +7,11 @@
   .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 }
 
-/* ── Fond glassmorphism mode SOMBRE ── */
-html.dark, html.dark body {
-  background-color: #001208 !important;
-}
+/* ── SOMBRE ── */
+html.dark, html.dark body { background-color: #001208 !important; }
 
-/* ── Fond glassmorphism mode CLAIR ── */
-html:not(.dark), html:not(.dark) body {
-  background-color: #f0f7f4 !important;
-}
+/* ── CLAIR ── */
+html.light, html.light body { background-color: #f0f7f4 !important; }
+
+/* ── COUCHER DE SOLEIL ── */
+html.sunset, html.sunset body { background-color: #1a0005 !important; }
