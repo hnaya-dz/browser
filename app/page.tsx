@@ -41,7 +41,6 @@ export default function Home() {
   const [worldQuery, setWorldQuery] = useState("");
   const scriptInjected = useRef(false);
 
-  // Inject Google CSE script once
   useEffect(() => {
     if (scriptInjected.current) return;
     scriptInjected.current = true;
@@ -51,25 +50,22 @@ export default function Home() {
     document.head.appendChild(script);
   }, []);
 
-  // Intercepter les clics PSE → addTab (même comportement que Startpage)
   useEffect(() => {
-    const interceptGSCLinks = () => {
-      const links = document.querySelectorAll<HTMLAnchorElement>(
-        ".gsc-results a.gs-title, .gsc-webResult a, .gs-title a"
-      );
-      links.forEach((link) => {
-        if (link.dataset.hnayaIntercepted) return;
-        link.dataset.hnayaIntercepted = "true";
-        link.addEventListener("click", (e) => {
-          e.preventDefault();
-          const href = link.href || link.getAttribute("data-ctorig") || "";
-          if (href.startsWith("http")) addTab(href);
+    const intercept = () => {
+      document.querySelectorAll<HTMLAnchorElement>(".gsc-results a.gs-title, .gsc-webResult a, .gs-title a")
+        .forEach((link) => {
+          if (link.dataset.hnayaIntercepted) return;
+          link.dataset.hnayaIntercepted = "true";
+          link.addEventListener("click", (e) => {
+            e.preventDefault();
+            const href = link.href || link.getAttribute("data-ctorig") || "";
+            if (href.startsWith("http")) addTab(href);
+          });
         });
-      });
     };
-    const observer = new MutationObserver(interceptGSCLinks);
+    const observer = new MutationObserver(intercept);
     observer.observe(document.body, { childList: true, subtree: true });
-    interceptGSCLinks();
+    intercept();
     return () => observer.disconnect();
   }, [addTab]);
 
@@ -79,26 +75,17 @@ export default function Home() {
     const tryExecute = (): boolean => {
       const g = (window as any).google;
       if (g?.search?.cse?.element) {
-        const el = g.search.cse.element.getElement("searchresults-only0")
-                || g.search.cse.element.getElement("search0");
+        const el = g.search.cse.element.getElement("searchresults-only0") || g.search.cse.element.getElement("search0");
         if (el) { el.execute(q); return true; }
       }
       const input = document.querySelector<HTMLInputElement>(".gsc-input-box input, input.gsc-input");
       const btn = document.querySelector<HTMLElement>(".gsc-search-button button, .gsc-search-button-v2");
-      if (input && btn) {
-        input.value = q;
-        input.dispatchEvent(new Event("input", { bubbles: true }));
-        btn.click();
-        return true;
-      }
+      if (input && btn) { input.value = q; input.dispatchEvent(new Event("input", { bubbles: true })); btn.click(); return true; }
       return false;
     };
     if (!tryExecute()) {
       let attempts = 0;
-      const interval = setInterval(() => {
-        attempts++;
-        if (tryExecute() || attempts > 10) clearInterval(interval);
-      }, 300);
+      const iv = setInterval(() => { attempts++; if (tryExecute() || attempts > 10) clearInterval(iv); }, 300);
     }
   }, [algerieQuery]);
 
@@ -112,308 +99,341 @@ export default function Home() {
     <>
       <style>{`
 
-        /* ════════════════════════════════════════
-           FOND ANIMÉ — MODE SOMBRE
-        ════════════════════════════════════════ */
+        /* ══════════════════════════════════════════════
+           FOND ANIMÉ — SOMBRE (vert algérien profond)
+        ══════════════════════════════════════════════ */
         .dark .hnaya-bg {
-          position: fixed; inset: 0; z-index: -1; overflow: hidden;
-          background: linear-gradient(135deg, #001a0e 0%, #003320 40%, #001208 70%, #0a0a0a 100%);
+          position:fixed;inset:0;z-index:-1;overflow:hidden;
+          background:linear-gradient(135deg,#001a0e 0%,#003320 40%,#001208 70%,#0a0a0a 100%);
         }
         .dark .hnaya-bg::before {
-          content: '';
-          position: absolute;
-          width: 600px; height: 600px; border-radius: 50%;
-          background: radial-gradient(circle, rgba(0,99,65,0.35) 0%, transparent 70%);
-          top: -100px; left: -100px;
-          animation: pulse-slow 8s ease-in-out infinite alternate;
+          content:'';position:absolute;width:600px;height:600px;border-radius:50%;
+          background:radial-gradient(circle,rgba(0,99,65,0.35) 0%,transparent 70%);
+          top:-100px;left:-100px;animation:pulse-slow 8s ease-in-out infinite alternate;
         }
         .dark .hnaya-bg::after {
-          content: '';
-          position: absolute;
-          width: 400px; height: 400px; border-radius: 50%;
-          background: radial-gradient(circle, rgba(214,29,44,0.2) 0%, transparent 70%);
-          bottom: 50px; right: -80px;
-          animation: pulse-slow 10s ease-in-out infinite alternate-reverse;
+          content:'';position:absolute;width:400px;height:400px;border-radius:50%;
+          background:radial-gradient(circle,rgba(214,29,44,0.2) 0%,transparent 70%);
+          bottom:50px;right:-80px;animation:pulse-slow 10s ease-in-out infinite alternate-reverse;
         }
 
-        /* ════════════════════════════════════════
-           FOND ANIMÉ — MODE CLAIR
-        ════════════════════════════════════════ */
-        html:not(.dark) .hnaya-bg {
-          position: fixed; inset: 0; z-index: -1; overflow: hidden;
-          background: linear-gradient(135deg, #e8f5ee 0%, #f0f7f4 45%, #fef9f0 100%);
+        /* ══════════════════════════════════════════════
+           FOND ANIMÉ — CLAIR (vert pâle)
+        ══════════════════════════════════════════════ */
+        .light .hnaya-bg {
+          position:fixed;inset:0;z-index:-1;overflow:hidden;
+          background:linear-gradient(135deg,#e8f5ee 0%,#f0f7f4 45%,#fef9f0 100%);
         }
-        html:not(.dark) .hnaya-bg::before {
-          content: '';
-          position: absolute;
-          width: 600px; height: 600px; border-radius: 50%;
-          background: radial-gradient(circle, rgba(0,99,65,0.12) 0%, transparent 70%);
-          top: -100px; left: -100px;
-          animation: pulse-slow 8s ease-in-out infinite alternate;
+        .light .hnaya-bg::before {
+          content:'';position:absolute;width:600px;height:600px;border-radius:50%;
+          background:radial-gradient(circle,rgba(0,99,65,0.12) 0%,transparent 70%);
+          top:-100px;left:-100px;animation:pulse-slow 8s ease-in-out infinite alternate;
         }
-        html:not(.dark) .hnaya-bg::after {
-          content: '';
-          position: absolute;
-          width: 400px; height: 400px; border-radius: 50%;
-          background: radial-gradient(circle, rgba(214,29,44,0.08) 0%, transparent 70%);
-          bottom: 50px; right: -80px;
-          animation: pulse-slow 10s ease-in-out infinite alternate-reverse;
+        .light .hnaya-bg::after {
+          content:'';position:absolute;width:400px;height:400px;border-radius:50%;
+          background:radial-gradient(circle,rgba(214,29,44,0.08) 0%,transparent 70%);
+          bottom:50px;right:-80px;animation:pulse-slow 10s ease-in-out infinite alternate-reverse;
+        }
+
+        /* ══════════════════════════════════════════════
+           FOND ANIMÉ — COUCHER DE SOLEIL
+           Chromostereopsis : rouge/orange vibrante sur fond quasi-noir
+           Les couches superposées créent l'effet de profondeur optique
+        ══════════════════════════════════════════════ */
+        .sunset .hnaya-bg {
+          position:fixed;inset:0;z-index:-1;overflow:hidden;
+          background:linear-gradient(160deg,
+            #0d0005 0%,
+            #1a0010 20%,
+            #2d0008 40%,
+            #1a0800 60%,
+            #0d0400 100%
+          );
+        }
+        /* Grande orbe rouge-magenta */
+        .sunset .hnaya-bg::before {
+          content:'';position:absolute;
+          width:800px;height:800px;border-radius:50%;
+          background:radial-gradient(circle,
+            rgba(220,20,60,0.55) 0%,
+            rgba(180,0,80,0.3) 35%,
+            transparent 70%
+          );
+          top:-200px;right:-150px;
+          animation:sunset-pulse-a 7s ease-in-out infinite alternate;
+          mix-blend-mode:screen;
+        }
+        /* Orbe orange brûlante */
+        .sunset .hnaya-bg::after {
+          content:'';position:absolute;
+          width:600px;height:600px;border-radius:50%;
+          background:radial-gradient(circle,
+            rgba(255,100,0,0.6) 0%,
+            rgba(255,60,0,0.35) 40%,
+            transparent 70%
+          );
+          bottom:-100px;left:-100px;
+          animation:sunset-pulse-b 9s ease-in-out infinite alternate-reverse;
+          mix-blend-mode:screen;
+        }
+        @keyframes sunset-pulse-a {
+          from { transform:scale(1) translate(0,0); opacity:0.8; }
+          to   { transform:scale(1.2) translate(-40px,30px); opacity:1; }
+        }
+        @keyframes sunset-pulse-b {
+          from { transform:scale(1) translate(0,0); opacity:0.7; }
+          to   { transform:scale(1.15) translate(30px,-20px); opacity:1; }
+        }
+        /* Orbe dorée centrale — couche supplémentaire sunset */
+        .sunset .hnaya-bg-extra {
+          position:fixed;inset:0;z-index:-1;pointer-events:none;
+          overflow:hidden;
+        }
+        .sunset .hnaya-bg-extra::before {
+          content:'';position:absolute;
+          width:500px;height:500px;border-radius:50%;
+          background:radial-gradient(circle,
+            rgba(255,180,0,0.35) 0%,
+            rgba(255,120,0,0.2) 45%,
+            transparent 70%
+          );
+          top:30%;left:30%;transform:translate(-50%,-50%);
+          animation:sunset-pulse-c 11s ease-in-out infinite alternate;
+          mix-blend-mode:screen;
+        }
+        @keyframes sunset-pulse-c {
+          from { transform:translate(-50%,-50%) scale(1); opacity:0.6; }
+          to   { transform:translate(-40%,-60%) scale(1.3); opacity:0.9; }
+        }
+        /* Ligne d'horizon lumineuse */
+        .sunset .hnaya-bg-extra::after {
+          content:'';position:absolute;
+          width:100%;height:2px;
+          background:linear-gradient(90deg,
+            transparent 0%,
+            rgba(255,100,20,0.6) 20%,
+            rgba(255,200,50,0.9) 50%,
+            rgba(255,100,20,0.6) 80%,
+            transparent 100%
+          );
+          top:65%;
+          animation:horizon-glow 6s ease-in-out infinite alternate;
+          filter:blur(3px);
+          box-shadow:0 0 30px 10px rgba(255,150,0,0.4);
+        }
+        @keyframes horizon-glow {
+          from { opacity:0.6; transform:scaleX(0.9); }
+          to   { opacity:1; transform:scaleX(1.05); }
         }
 
         @keyframes pulse-slow {
-          from { transform: scale(1) translateY(0); opacity: 0.8; }
-          to   { transform: scale(1.15) translateY(-30px); opacity: 1; }
+          from { transform:scale(1) translateY(0); opacity:0.8; }
+          to   { transform:scale(1.15) translateY(-30px); opacity:1; }
         }
 
-        /* ════════════════════════════════════════
-           CARTE GLASS — MODE SOMBRE
-        ════════════════════════════════════════ */
+        /* ══════════════════════════════════════════════
+           CARTE GLASS — 3 THÈMES
+        ══════════════════════════════════════════════ */
         .dark .glass-card {
-          background: rgba(255,255,255,0.06);
-          backdrop-filter: blur(20px);
-          -webkit-backdrop-filter: blur(20px);
-          border: 1px solid rgba(255,255,255,0.12);
-          box-shadow: 0 8px 40px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1);
+          background:rgba(255,255,255,0.06);
+          backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+          border:1px solid rgba(255,255,255,0.12);
+          box-shadow:0 8px 40px rgba(0,0,0,0.4),inset 0 1px 0 rgba(255,255,255,0.1);
         }
-        .dark .glass-divider { border-color: rgba(255,255,255,0.1); }
-
-        /* ════════════════════════════════════════
-           CARTE GLASS — MODE CLAIR
-        ════════════════════════════════════════ */
-        html:not(.dark) .glass-card {
-          background: rgba(255,255,255,0.72);
-          backdrop-filter: blur(20px);
-          -webkit-backdrop-filter: blur(20px);
-          border: 1px solid rgba(0,99,65,0.15);
-          box-shadow: 0 8px 40px rgba(0,99,65,0.08), inset 0 1px 0 rgba(255,255,255,0.9);
+        .light .glass-card {
+          background:rgba(255,255,255,0.72);
+          backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+          border:1px solid rgba(0,99,65,0.15);
+          box-shadow:0 8px 40px rgba(0,99,65,0.08),inset 0 1px 0 rgba(255,255,255,0.9);
         }
-        html:not(.dark) .glass-divider { border-color: rgba(0,99,65,0.12); }
+        .sunset .glass-card {
+          background:rgba(40,5,10,0.55);
+          backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+          border:1px solid rgba(255,80,20,0.25);
+          box-shadow:0 8px 50px rgba(200,20,0,0.3),inset 0 1px 0 rgba(255,150,50,0.15);
+        }
 
-        /* ════════════════════════════════════════
-           TEXTE ADAPTATIF
-        ════════════════════════════════════════ */
-        .dark .glass-title   { color: rgba(255,255,255,0.5); }
-        .dark .glass-tagline { color: rgba(255,255,255,0.35); }
-        html:not(.dark) .glass-title   { color: rgba(0,60,30,0.6); }
-        html:not(.dark) .glass-tagline { color: rgba(0,60,30,0.45); }
+        /* ══════════════════════════════════════════════
+           DIVIDER
+        ══════════════════════════════════════════════ */
+        .dark .glass-divider   { border-color:rgba(255,255,255,0.1); }
+        .light .glass-divider  { border-color:rgba(0,99,65,0.12); }
+        .sunset .glass-divider { border-color:rgba(255,80,20,0.2); }
 
-        /* ════════════════════════════════════════
-           INPUT ADAPTATIF
-        ════════════════════════════════════════ */
+        /* ══════════════════════════════════════════════
+           TEXTES ADAPTATIFS
+        ══════════════════════════════════════════════ */
+        .dark .glass-title    { color:rgba(255,255,255,0.5); }
+        .dark .glass-tagline  { color:rgba(255,255,255,0.3); }
+        .light .glass-title   { color:rgba(0,60,30,0.6); }
+        .light .glass-tagline { color:rgba(0,60,30,0.4); }
+        .sunset .glass-title  { color:rgba(255,160,80,0.7); }
+        .sunset .glass-tagline{ color:rgba(255,120,50,0.5); }
+
+        /* ══════════════════════════════════════════════
+           INPUTS ADAPTATIFS
+        ══════════════════════════════════════════════ */
         .dark .glass-input {
-          background: rgba(255,255,255,0.08);
-          border: 1px solid rgba(255,255,255,0.15);
-          color: #fff;
-          backdrop-filter: blur(10px);
+          background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);
+          color:#fff;backdrop-filter:blur(10px);
         }
-        .dark .glass-input::placeholder { color: rgba(255,255,255,0.35); }
-        .dark .glass-input:focus {
-          outline: none;
-          border-color: rgba(0,180,100,0.6);
-          box-shadow: 0 0 0 3px rgba(0,99,65,0.25);
-          background: rgba(255,255,255,0.12);
-        }
-        html:not(.dark) .glass-input {
-          background: rgba(255,255,255,0.85);
-          border: 1px solid rgba(0,99,65,0.2);
-          color: #1a2e22;
-          backdrop-filter: blur(10px);
-        }
-        html:not(.dark) .glass-input::placeholder { color: rgba(0,60,30,0.4); }
-        html:not(.dark) .glass-input:focus {
-          outline: none;
-          border-color: rgba(0,99,65,0.5);
-          box-shadow: 0 0 0 3px rgba(0,99,65,0.12);
-          background: #fff;
-        }
+        .dark .glass-input::placeholder { color:rgba(255,255,255,0.35); }
+        .dark .glass-input:focus { outline:none;border-color:rgba(0,180,100,0.6);box-shadow:0 0 0 3px rgba(0,99,65,0.25);background:rgba(255,255,255,0.12); }
 
-        /* ════════════════════════════════════════
-           SCOPE BUTTONS ADAPTATIFS
-        ════════════════════════════════════════ */
-        .dark .scope-wrap {
-          background: rgba(255,255,255,0.05);
-          border: 1px solid rgba(255,255,255,0.1);
+        .light .glass-input {
+          background:rgba(255,255,255,0.85);border:1px solid rgba(0,99,65,0.2);
+          color:#1a2e22;backdrop-filter:blur(10px);
         }
-        html:not(.dark) .scope-wrap {
-          background: rgba(0,99,65,0.06);
-          border: 1px solid rgba(0,99,65,0.15);
-        }
-        .dark .scope-btn   { color: rgba(255,255,255,0.5); }
-        html:not(.dark) .scope-btn { color: rgba(0,60,30,0.55); }
-        .dark .scope-btn:hover:not(.active-algerie):not(.active-monde) {
-          background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.85);
-        }
-        html:not(.dark) .scope-btn:hover:not(.active-algerie):not(.active-monde) {
-          background: rgba(0,99,65,0.1); color: #006341;
-        }
-        .scope-btn { background: transparent; border: 1px solid transparent; transition: all 0.2s ease; }
-        .scope-btn.active-algerie { background: rgba(0,99,65,0.4); border-color: rgba(0,180,100,0.5); color: #fff; }
-        html:not(.dark) .scope-btn.active-algerie { background: #006341; border-color: #006341; color: #fff; }
-        .scope-btn.active-monde   { background: rgba(214,29,44,0.4); border-color: rgba(214,29,44,0.5); color: #fff; }
-        html:not(.dark) .scope-btn.active-monde   { background: #d61d2c; border-color: #d61d2c; color: #fff; }
+        .light .glass-input::placeholder { color:rgba(0,60,30,0.4); }
+        .light .glass-input:focus { outline:none;border-color:rgba(0,99,65,0.5);box-shadow:0 0 0 3px rgba(0,99,65,0.12);background:#fff; }
 
-        /* ════════════════════════════════════════
-           BOUTONS D'ACTION (identiques dark/light)
-        ════════════════════════════════════════ */
+        .sunset .glass-input {
+          background:rgba(60,5,5,0.6);border:1px solid rgba(255,80,20,0.3);
+          color:#ffd4a0;backdrop-filter:blur(10px);
+        }
+        .sunset .glass-input::placeholder { color:rgba(255,150,80,0.4); }
+        .sunset .glass-input:focus { outline:none;border-color:rgba(255,120,30,0.7);box-shadow:0 0 0 3px rgba(220,60,0,0.2);background:rgba(80,10,5,0.7); }
+
+        /* ══════════════════════════════════════════════
+           SCOPE BUTTONS
+        ══════════════════════════════════════════════ */
+        .scope-btn { background:transparent;border:1px solid transparent;transition:all 0.2s ease; }
+        .dark .scope-wrap  { background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1); }
+        .light .scope-wrap { background:rgba(0,99,65,0.06);border:1px solid rgba(0,99,65,0.15); }
+        .sunset .scope-wrap{ background:rgba(80,10,0,0.4);border:1px solid rgba(255,80,20,0.2); }
+
+        .dark .scope-btn   { color:rgba(255,255,255,0.5); }
+        .light .scope-btn  { color:rgba(0,60,30,0.55); }
+        .sunset .scope-btn { color:rgba(255,150,80,0.55); }
+
+        .dark .scope-btn:hover:not(.active-algerie):not(.active-monde)   { background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.85); }
+        .light .scope-btn:hover:not(.active-algerie):not(.active-monde)  { background:rgba(0,99,65,0.1);color:#006341; }
+        .sunset .scope-btn:hover:not(.active-algerie):not(.active-monde) { background:rgba(255,80,20,0.15);color:#ffb060; }
+
+        .scope-btn.active-algerie { background:rgba(0,99,65,0.4);border-color:rgba(0,180,100,0.5);color:#fff; }
+        .light .scope-btn.active-algerie { background:#006341;border-color:#006341;color:#fff; }
+        .sunset .scope-btn.active-algerie { background:rgba(220,60,0,0.5);border-color:rgba(255,100,20,0.6);color:#fff; }
+
+        .scope-btn.active-monde { background:rgba(214,29,44,0.4);border-color:rgba(214,29,44,0.5);color:#fff; }
+        .light .scope-btn.active-monde { background:#d61d2c;border-color:#d61d2c;color:#fff; }
+        .sunset .scope-btn.active-monde { background:rgba(150,0,60,0.5);border-color:rgba(200,20,80,0.6);color:#ffb0c0; }
+
+        /* ══════════════════════════════════════════════
+           BOUTONS D'ACTION
+        ══════════════════════════════════════════════ */
         .glass-btn-primary {
-          background: linear-gradient(135deg, #006341, #004d30);
-          border: 1px solid rgba(0,180,100,0.4);
-          box-shadow: 0 4px 20px rgba(0,99,65,0.35);
-          transition: all 0.2s ease;
+          background:linear-gradient(135deg,#006341,#004d30);
+          border:1px solid rgba(0,180,100,0.4);
+          box-shadow:0 4px 20px rgba(0,99,65,0.35);transition:all 0.2s ease;
         }
-        .glass-btn-primary:hover { background: linear-gradient(135deg, #007a50, #006341); transform: translateY(-1px); box-shadow: 0 6px 28px rgba(0,99,65,0.5); }
+        .glass-btn-primary:hover { background:linear-gradient(135deg,#007a50,#006341);transform:translateY(-1px);box-shadow:0 6px 28px rgba(0,99,65,0.5); }
+
+        .sunset .glass-btn-primary {
+          background:linear-gradient(135deg,#c83200,#8a1a00);
+          border:1px solid rgba(255,80,20,0.4);
+          box-shadow:0 4px 20px rgba(200,50,0,0.4);
+        }
+        .sunset .glass-btn-primary:hover { background:linear-gradient(135deg,#e83a00,#c83200);transform:translateY(-1px); }
+
         .glass-btn-red {
-          background: linear-gradient(135deg, #d61d2c, #b61724);
-          border: 1px solid rgba(214,29,44,0.4);
-          box-shadow: 0 4px 20px rgba(214,29,44,0.3);
-          transition: all 0.2s ease;
+          background:linear-gradient(135deg,#d61d2c,#b61724);
+          border:1px solid rgba(214,29,44,0.4);
+          box-shadow:0 4px 20px rgba(214,29,44,0.3);transition:all 0.2s ease;
         }
-        .glass-btn-red:hover { transform: translateY(-1px); box-shadow: 0 6px 28px rgba(214,29,44,0.5); }
+        .glass-btn-red:hover { transform:translateY(-1px);box-shadow:0 6px 28px rgba(214,29,44,0.5); }
+
+        .sunset .glass-btn-red {
+          background:linear-gradient(135deg,#8a0040,#5a0030);
+          border:1px solid rgba(200,20,80,0.4);
+          box-shadow:0 4px 20px rgba(140,0,60,0.4);
+        }
+        .sunset .glass-btn-red:hover { background:linear-gradient(135deg,#aa0050,#8a0040);transform:translateY(-1px); }
+
         .glass-btn-amber {
-          background: linear-gradient(135deg, #b87000, #8a5200);
-          border: 1px solid rgba(184,112,0,0.4);
-          box-shadow: 0 4px 20px rgba(184,112,0,0.3);
-          transition: all 0.2s ease;
+          background:linear-gradient(135deg,#b87000,#8a5200);
+          border:1px solid rgba(184,112,0,0.4);
+          box-shadow:0 4px 20px rgba(184,112,0,0.3);transition:all 0.2s ease;
         }
-        .glass-btn-amber:hover { transform: translateY(-1px); box-shadow: 0 6px 28px rgba(184,112,0,0.5); }
+        .glass-btn-amber:hover { transform:translateY(-1px);box-shadow:0 6px 28px rgba(184,112,0,0.5); }
 
-        /* ════════════════════════════════════════
-           BOUTON DÉCOUVRIR ADAPTATIF
-        ════════════════════════════════════════ */
-        .dark .discover-btn {
-          background: rgba(255,255,255,0.07);
-          border: 1px solid rgba(255,255,255,0.15);
-          color: rgba(255,255,255,0.75);
-          backdrop-filter: blur(12px);
+        .sunset .glass-btn-amber {
+          background:linear-gradient(135deg,#c85000,#8a2800);
+          border:1px solid rgba(255,120,0,0.4);
+          box-shadow:0 4px 20px rgba(200,80,0,0.4);
         }
-        .dark .discover-btn:hover {
-          background: rgba(0,99,65,0.3);
-          border-color: rgba(0,180,100,0.5);
-          color: #fff;
-        }
-        html:not(.dark) .discover-btn {
-          background: rgba(255,255,255,0.6);
-          border: 1px solid rgba(0,99,65,0.2);
-          color: #006341;
-          backdrop-filter: blur(12px);
-        }
-        html:not(.dark) .discover-btn:hover {
-          background: rgba(0,99,65,0.1);
-          border-color: rgba(0,99,65,0.4);
-          color: #004d30;
-        }
-        .discover-btn { transition: all 0.25s ease; }
-        .discover-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 32px rgba(0,99,65,0.2); }
+        .sunset .glass-btn-amber:hover { background:linear-gradient(135deg,#e06000,#c85000);transform:translateY(-1px); }
 
-        /* ════════════════════════════════════════
-           RÉSULTATS GOOGLE CSE
-        ════════════════════════════════════════ */
-        .gsc-search-box, .gsc-search-box-tools { display: none !important; }
-        .gsc-above-wrapper-area { border-bottom: 0 !important; padding: 0 !important; }
-        .gsc-adBlock { display: none !important; }
-        .gsc-control-cse { padding: 0 !important; border: 0 !important; background: transparent !important; }
-        .gsc-results .gsc-cursor-box { text-align: center !important; }
+        /* ══════════════════════════════════════════════
+           BOUTON DÉCOUVRIR
+        ══════════════════════════════════════════════ */
+        .dark .discover-btn   { background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.15);color:rgba(255,255,255,0.75); }
+        .dark .discover-btn:hover   { background:rgba(0,99,65,0.3);border-color:rgba(0,180,100,0.5);color:#fff; }
+        .light .discover-btn  { background:rgba(255,255,255,0.6);border:1px solid rgba(0,99,65,0.2);color:#006341; }
+        .light .discover-btn:hover  { background:rgba(0,99,65,0.1);border-color:rgba(0,99,65,0.4);color:#004d30; }
+        .sunset .discover-btn { background:rgba(60,5,0,0.5);border:1px solid rgba(255,80,20,0.25);color:rgba(255,160,80,0.8); }
+        .sunset .discover-btn:hover { background:rgba(150,30,0,0.4);border-color:rgba(255,120,30,0.5);color:#ffb060; }
+        .discover-btn { backdrop-filter:blur(12px);transition:all 0.25s ease; }
+        .discover-btn:hover { transform:translateY(-2px);box-shadow:0 8px 32px rgba(0,0,0,0.2); }
 
-        /* Résultats mode sombre */
-        .dark .gsc-result-info { color: rgba(255,255,255,0.4) !important; font-size: 11px !important; padding: 0 0 8px !important; }
-        .dark .gsc-webResult.gsc-result {
-          background: rgba(255,255,255,0.06) !important;
-          border: 1px solid rgba(255,255,255,0.1) !important;
-          border-radius: 12px !important; padding: 12px 14px !important; margin: 0 0 10px !important;
-          backdrop-filter: blur(10px) !important;
-        }
-        .dark .gs-title a, .dark .gs-title a b { color: #4ade80 !important; text-decoration: none !important; }
-        .dark .gs-snippet { color: rgba(255,255,255,0.6) !important; }
-        .dark .gsc-cursor-page { color: rgba(255,255,255,0.5) !important; }
-        .dark .gsc-cursor-current-page { color: #4ade80 !important; font-weight: bold !important; }
+        /* ══════════════════════════════════════════════
+           RÉSULTATS CSE
+        ══════════════════════════════════════════════ */
+        .gsc-search-box,.gsc-search-box-tools{display:none!important;}
+        .gsc-above-wrapper-area{border-bottom:0!important;padding:0!important;}
+        .gsc-adBlock{display:none!important;}
+        .gsc-control-cse{padding:0!important;border:0!important;background:transparent!important;}
+        .gs-title,.gs-title b{font-size:16px!important;font-weight:700!important;}
 
-        /* Résultats mode clair */
-        html:not(.dark) .gsc-result-info { color: rgba(0,60,30,0.5) !important; font-size: 11px !important; padding: 0 0 8px !important; }
-        html:not(.dark) .gsc-webResult.gsc-result {
-          background: rgba(255,255,255,0.8) !important;
-          border: 1px solid rgba(0,99,65,0.12) !important;
-          border-radius: 12px !important; padding: 12px 14px !important; margin: 0 0 10px !important;
-          backdrop-filter: blur(8px) !important;
-          box-shadow: 0 2px 12px rgba(0,99,65,0.06) !important;
-        }
-        html:not(.dark) .gs-title a, html:not(.dark) .gs-title a b { color: #006341 !important; text-decoration: none !important; }
-        html:not(.dark) .gs-snippet { color: #374151 !important; }
-        html:not(.dark) .gsc-cursor-page { color: rgba(0,60,30,0.5) !important; }
-        html:not(.dark) .gsc-cursor-current-page { color: #006341 !important; font-weight: bold !important; }
+        .dark .gsc-result-info{color:rgba(255,255,255,0.4)!important;font-size:11px!important;padding:0 0 8px!important;}
+        .dark .gsc-webResult.gsc-result{background:rgba(255,255,255,0.06)!important;border:1px solid rgba(255,255,255,0.1)!important;border-radius:12px!important;padding:12px 14px!important;margin:0 0 10px!important;backdrop-filter:blur(10px)!important;}
+        .dark .gs-title a,.dark .gs-title a b{color:#4ade80!important;text-decoration:none!important;}
+        .dark .gs-snippet{color:rgba(255,255,255,0.6)!important;}
+        .dark .gsc-cursor-page{color:rgba(255,255,255,0.5)!important;}
+        .dark .gsc-cursor-current-page{color:#4ade80!important;font-weight:bold!important;}
 
-        .gs-title, .gs-title b { font-size: 16px !important; font-weight: 700 !important; }
+        .light .gsc-result-info{color:rgba(0,60,30,0.5)!important;font-size:11px!important;padding:0 0 8px!important;}
+        .light .gsc-webResult.gsc-result{background:rgba(255,255,255,0.8)!important;border:1px solid rgba(0,99,65,0.12)!important;border-radius:12px!important;padding:12px 14px!important;margin:0 0 10px!important;backdrop-filter:blur(8px)!important;box-shadow:0 2px 12px rgba(0,99,65,0.06)!important;}
+        .light .gs-title a,.light .gs-title a b{color:#006341!important;text-decoration:none!important;}
+        .light .gs-snippet{color:#374151!important;}
+        .light .gsc-cursor-page{color:rgba(0,60,30,0.5)!important;}
+        .light .gsc-cursor-current-page{color:#006341!important;font-weight:bold!important;}
+
+        .sunset .gsc-result-info{color:rgba(255,150,80,0.5)!important;font-size:11px!important;padding:0 0 8px!important;}
+        .sunset .gsc-webResult.gsc-result{background:rgba(50,5,5,0.6)!important;border:1px solid rgba(255,80,20,0.2)!important;border-radius:12px!important;padding:12px 14px!important;margin:0 0 10px!important;backdrop-filter:blur(12px)!important;box-shadow:0 4px 20px rgba(180,20,0,0.2)!important;}
+        .sunset .gs-title a,.sunset .gs-title a b{color:#ff9060!important;text-decoration:none!important;}
+        .sunset .gs-snippet{color:rgba(255,180,120,0.7)!important;}
+        .sunset .gsc-cursor-page{color:rgba(255,120,60,0.5)!important;}
+        .sunset .gsc-cursor-current-page{color:#ff9060!important;font-weight:bold!important;}
       `}</style>
 
-      {/* Fond animé */}
       <div className="hnaya-bg" />
+      {/* Couche extra pour le sunset (orbe dorée + horizon) */}
+      <div className="hnaya-bg-extra" />
 
       <section
         className="flex flex-col items-center w-screen min-h-[88vh] pt-[15vh] pb-12 px-4"
         dir={isRTL ? "rtl" : "ltr"}
       >
-        {/* Logo */}
-        <img
-          src="/hnaya.png"
-          alt="حنايا"
-          className="h-24 mb-3 object-contain"
-          style={{ filter: "drop-shadow(0 0 24px rgba(0,150,80,0.35))" }}
-        />
+        <img src="/hnaya.png" alt="حنايا" className="h-24 mb-3 object-contain"
+          style={{ filter: "drop-shadow(0 0 24px rgba(0,150,80,0.35))" }} />
 
-        {/* Tagline */}
-        <p className="glass-tagline text-xs tracking-widest uppercase mb-8 font-light">
-          {tr.tagline}
-        </p>
+        <p className="glass-tagline text-xs tracking-widest uppercase mb-8 font-light">{tr.tagline}</p>
 
-        {/* ── Carte de recherche ── */}
         <div className="glass-card rounded-3xl w-full max-w-3xl overflow-hidden">
-
-          {/* Scope switcher */}
           <div className={`flex items-center gap-3 px-5 pt-4 pb-3 glass-divider border-b ${isRTL ? "flex-row-reverse" : ""}`}>
-            <span className="glass-title text-xs font-semibold tracking-wider uppercase">
-              {tr.title}
-            </span>
+            <span className="glass-title text-xs font-semibold tracking-wider uppercase">{tr.title}</span>
             <div className="scope-wrap flex rounded-xl p-1 gap-1">
-              <button
-                onClick={() => setScope("algerie")}
-                className={`scope-btn px-4 py-1.5 rounded-lg text-sm font-bold ${scope === "algerie" ? "active-algerie" : ""}`}
-              >
-                {tr.algerie}
-              </button>
-              <button
-                onClick={() => setScope("monde")}
-                className={`scope-btn px-4 py-1.5 rounded-lg text-sm font-bold ${scope === "monde" ? "active-monde" : ""}`}
-              >
-                {tr.monde}
-              </button>
+              <button onClick={() => setScope("algerie")} className={`scope-btn px-4 py-1.5 rounded-lg text-sm font-bold ${scope === "algerie" ? "active-algerie" : ""}`}>{tr.algerie}</button>
+              <button onClick={() => setScope("monde")} className={`scope-btn px-4 py-1.5 rounded-lg text-sm font-bold ${scope === "monde" ? "active-monde" : ""}`}>{tr.monde}</button>
             </div>
           </div>
 
-          {/* Corps */}
           <div className="p-5">
-
-            {/* Panel Algérie — toujours dans le DOM pour init CSE */}
             <div style={{ display: scope === "algerie" ? "block" : "none" }}>
               <div className={`flex gap-2 mb-4 ${isRTL ? "flex-row-reverse" : ""}`}>
-                <input
-                  type="text"
-                  value={algerieQuery}
-                  onChange={(e) => setAlgerieQuery(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && performAlgerieSearch()}
-                  placeholder={tr.algeriePlaceholder}
-                  className="glass-input flex-1 h-12 px-4 rounded-xl text-[15px]"
-                  dir={isRTL ? "rtl" : "ltr"}
-                />
-                <button onClick={performAlgerieSearch} className="glass-btn-primary h-12 px-5 rounded-xl font-bold text-white text-sm">
-                  {tr.algerieButton}
-                </button>
-                <button
-                  onClick={() => addTab(
-                    algerieQuery.trim()
-                      ? `https://hnaya.dz/boutique/?search=${encodeURIComponent(algerieQuery.trim())}`
-                      : "https://hnaya.dz/boutique/"
-                  )}
-                  className="glass-btn-amber h-12 px-4 rounded-xl font-bold text-white text-sm flex items-center gap-2"
-                >
+                <input type="text" value={algerieQuery} onChange={(e) => setAlgerieQuery(e.target.value)} onKeyDown={(e) => e.key === "Enter" && performAlgerieSearch()} placeholder={tr.algeriePlaceholder} className="glass-input flex-1 h-12 px-4 rounded-xl text-[15px]" dir={isRTL ? "rtl" : "ltr"} />
+                <button onClick={performAlgerieSearch} className="glass-btn-primary h-12 px-5 rounded-xl font-bold text-white text-sm">{tr.algerieButton}</button>
+                <button onClick={() => addTab(algerieQuery.trim() ? `https://hnaya.dz/boutique/?search=${encodeURIComponent(algerieQuery.trim())}` : "https://hnaya.dz/boutique/")} className="glass-btn-amber h-12 px-4 rounded-xl font-bold text-white text-sm flex items-center gap-2">
                   <img src="/icons/market.png" alt="" className="w-5 h-5 object-contain" />
                   {tr.shop}
                 </button>
@@ -421,31 +441,16 @@ export default function Home() {
               <div className="gcse-search" />
             </div>
 
-            {/* Panel Monde */}
             {scope === "monde" && (
               <div className={`flex gap-2 ${isRTL ? "flex-row-reverse" : ""}`}>
-                <input
-                  type="text"
-                  value={worldQuery}
-                  onChange={(e) => setWorldQuery(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && performWorldSearch()}
-                  placeholder={tr.worldPlaceholder}
-                  className="glass-input flex-1 h-12 px-4 rounded-xl text-[15px]"
-                  dir={isRTL ? "rtl" : "ltr"}
-                />
-                <button onClick={performWorldSearch} className="glass-btn-red h-12 px-5 rounded-xl font-bold text-white text-sm">
-                  {tr.worldButton}
-                </button>
+                <input type="text" value={worldQuery} onChange={(e) => setWorldQuery(e.target.value)} onKeyDown={(e) => e.key === "Enter" && performWorldSearch()} placeholder={tr.worldPlaceholder} className="glass-input flex-1 h-12 px-4 rounded-xl text-[15px]" dir={isRTL ? "rtl" : "ltr"} />
+                <button onClick={performWorldSearch} className="glass-btn-red h-12 px-5 rounded-xl font-bold text-white text-sm">{tr.worldButton}</button>
               </div>
             )}
           </div>
         </div>
 
-        {/* Bouton Découvrir */}
-        <button
-          onClick={() => addTab("https://hnaya.dz")}
-          className="discover-btn mt-8 px-8 py-3.5 rounded-2xl font-semibold text-base"
-        >
+        <button onClick={() => addTab("https://hnaya.dz")} className="discover-btn mt-8 px-8 py-3.5 rounded-2xl font-semibold text-base">
           🇩🇿 {tr.discover}
         </button>
       </section>
