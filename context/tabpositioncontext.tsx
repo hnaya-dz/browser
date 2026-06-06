@@ -18,13 +18,19 @@ export function TabPositionProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const saved = localStorage.getItem("tabPosition") as TabPosition | null;
-    if (saved === "top" || saved === "right") setPosition(saved);
+    if (saved === "top" || saved === "right") {
+      setPosition(saved);
+      // ✅ Synchroniser Electron au chargement
+      window.electronAPI?.send("set-tab-position", saved);
+    }
   }, []);
 
   const togglePosition = () => {
     const next: TabPosition = position === "top" ? "right" : "top";
     setPosition(next);
     localStorage.setItem("tabPosition", next);
+    // ✅ Informer Electron pour redimensionner la WebContentsView
+    window.electronAPI?.send("set-tab-position", next);
   };
 
   return (
