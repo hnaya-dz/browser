@@ -1,7 +1,6 @@
 import { app, BrowserWindow, WebContentsView, ipcMain, Menu } from "electron";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
-
 import serve from "electron-serve";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -14,13 +13,10 @@ const appServe = app.isPackaged ? serve({
 let mainWindow = null;
 const browserViews = new Map();
 let activeTabId = null;
-
-// ✅ Largeur réservée pour la barre d'onglets latérale (0 = onglets en haut)
-let tabSideWidth = 0;
+let tabSideWidth = 0;   // 0 = onglets en haut | 200 = onglets latéraux
 
 const createWindow = () => {
   Menu.setApplicationMenu(null);
-
   mainWindow = new BrowserWindow({
     width: 1920,
     height: 1080,
@@ -32,27 +28,21 @@ const createWindow = () => {
       sandbox: true,
     },
   });
-
   if (app.isPackaged) {
-    appServe(mainWindow).then(() => {
-      mainWindow.loadURL("app://index.html");
-    });
+    appServe(mainWindow).then(() => mainWindow.loadURL("app://index.html"));
   } else {
     mainWindow.loadURL("http://localhost:3000");
-    mainWindow.webContents.on("did-fail-load", () => {
-      mainWindow.webContents.reloadIgnoringCache();
-    });
+    mainWindow.webContents.on("did-fail-load", () => mainWindow.webContents.reloadIgnoringCache());
   }
-
   mainWindow.on("closed", () => { mainWindow = null; });
 };
 
 app.on("ready", () => { createWindow(); });
 
-app.on('web-contents-created', (event, contents) => {
+app.on("web-contents-created", (event, contents) => {
   contents.setWindowOpenHandler((details) => {
-    if (mainWindow) mainWindow.webContents.send('new-tab-url', details.url);
-    return { action: 'deny' };
+    if (mainWindow) mainWindow.webContents.send("new-tab-url", details.url);
+    return { action: "deny" };
   });
 });
 
@@ -60,25 +50,49 @@ app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
 });
 
-// ✅ Recalcule les bounds de la WebContentsView active
-// en tenant compte de la barre latérale si active
+// ── Calcul des bounds selon le mode ──────────────────────────────────────────
+//
+// MODE HAUT (tabSideWidth = 0) :
+//   TabBar (6vh) + Navbar/URLBar (6vh) = ~12% du haut réservé
+//   → y = 12%, height = 88%, width = 100%
+//
+// MODE LATÉRAL (tabSideWidth = 200) :
+//   TabBar à droite (200px), Navbar reste en haut (6vh) mais URLBar aussi (6vh)
+//   → La WebContentsView couvre TOUT depuis le haut (y=0)
+//     car la TabBar n'est plus en haut
+//   → width = 100% - 200px, height = 100%, x = 0
+//   Note : Navbar et URLBar flottent au-dessus en position fixed React,
+//          donc la WebContentsView les verra passer dessous — acceptable
+//          car marginTop React gère l'espace visible
+//
 const updateBrowserViewSize = () => {
   if (!mainWindow || !activeTabId) return;
   const view = browserViews.get(activeTabId);
   if (!view) return;
 
   const { width, height } = mainWindow.getContentBounds();
-  const marginTop = Math.round(height * 0.12);
-  const viewHeight = Math.round(height * 0.88);
 
-  // Si onglets latéraux : réduire la largeur de tabSideWidth à droite
-  const viewWidth = width - tabSideWidth;
-
-  view.setBounds({ x: 0, y: marginTop, width: viewWidth, height: viewHeight });
+  if (tabSideWidth > 0) {
+    // ✅ MODE LATÉRAL : couvre tout depuis le haut, laisse 200px à droite
+    view.setBounds({
+      x: 0,
+      y: 0,
+      width: width - tabSideWidth,
+      height: height,
+    });
+  } else {
+    // ✅ MODE HAUT : laisse 12% en haut pour TabBar + Navbar/URLBar
+    const marginTop = Math.round(height * 0.12);
+    view.setBounds({
+      x: 0,
+      y: marginTop,
+      width: width,
+      height: height - marginTop,
+    });
+  }
 };
 
-// ✅ Canal IPC : le renderer informe Electron de la position des onglets
-// Appelé dès que l'utilisateur bascule top ↔ right
+// IPC : le renderer informe Electron de la position des onglets
 ipcMain.on("set-tab-position", (event, position) => {
   tabSideWidth = position === "right" ? 200 : 0;
   updateBrowserViewSize();
@@ -108,7 +122,7 @@ ipcMain.on("open-tab", (event, newTab) => {
       mainWindow.webContents.send("update-url", id, currentUrl);
       if (title && title !== currentUrl) {
         try {
-          const domain = new URL(currentUrl).hostname.replace('www.', '');
+          const domain = new URL(currentUrl).hostname.replace("www.", "");
           if (title !== domain) mainWindow.webContents.send("update-tab-title", { id, title });
         } catch {
           mainWindow.webContents.send("update-tab-title", { id, title });
@@ -116,24 +130,24 @@ ipcMain.on("open-tab", (event, newTab) => {
       }
     };
 
-    view.webContents.on('page-title-updated', (event, title) => {
+    view.webContents.on("page-title-updated", (event, title) => {
       mainWindow.webContents.send("update-tab-title", { id, title });
     });
 
     view.webContents.setWindowOpenHandler((details) => {
-      mainWindow.webContents.send('new-tab-url', details.url);
-      return { action: 'deny' };
+      mainWindow.webContents.send("new-tab-url", details.url);
+      return { action: "deny" };
     });
 
-    ['did-start-loading','did-stop-loading','did-finish-load','did-navigate','did-navigate-in-page']
+    ["did-start-loading","did-stop-loading","did-finish-load","did-navigate","did-navigate-in-page"]
       .forEach(ev => view.webContents.on(ev, updateTabInfo));
 
-    view.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
+    view.webContents.on("did-fail-load", (event, errorCode, errorDescription, validatedURL) => {
       mainWindow.webContents.send("update-url", id, validatedURL);
       updateTabInfo();
     });
 
-    view.webContents.on('did-finish-load', () => {
+    view.webContents.on("did-finish-load", () => {
       view.webContents.executeJavaScript(`
         const favicon = document.querySelector('link[rel="icon"], link[rel="shortcut icon"]');
         favicon ? favicon.href : null;
@@ -163,8 +177,7 @@ const switchTab = (tabId) => {
 
 ipcMain.on("get-current-url", (event, tabId) => {
   if (browserViews.has(tabId)) {
-    const currentUrl = browserViews.get(tabId).webContents.getURL();
-    event.sender.send("current-url", tabId, currentUrl);
+    event.sender.send("current-url", tabId, browserViews.get(tabId).webContents.getURL());
   }
 });
 
@@ -208,7 +221,7 @@ ipcMain.on("navigate", (event, url) => {
   if (activeTabId && browserViews.has(activeTabId)) {
     const view = browserViews.get(activeTabId);
     if (view?.webContents) {
-      const finalUrl = url.startsWith('http') ? url : `https://${url}`;
+      const finalUrl = url.startsWith("http") ? url : `https://${url}`;
       view.webContents.loadURL(finalUrl);
       mainWindow.webContents.send("update-url", activeTabId, finalUrl);
     }
