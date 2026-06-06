@@ -1,22 +1,7 @@
 {
-  "HomePage": {
-    "search": "بحث",
-    "discover": "اكتشف الويب الجزائري"
-  },
-  "ResultPage": {
-    "search": "بحث"
-  },
-  "TabBar": {
-    "home": "الرئيسية",
-    "newTab": "تبويب جديد",
-    "tabsTop": "الألسنة في الأعلى",
-    "tabsSide": "الألسنة الجانبية"
-  },
-  "Nav": {
-    "home": "هناية",
-    "market": "هناية ماركت",
-    "tube": "هناية تيوب",
-    "apps": "أبستور",
-    "webhost": "ويبهوست"
-  }
+  "HomePage": { "search": "بحث", "discover": "اكتشف الويب الجزائري" },
+  "ResultPage": { "search": "بحث" },
+  "TabBar": { "home": "الرئيسية", "newTab": "تبويب جديد", "tabsTop": "الألسنة في الأعلى", "tabsSide": "الألسنة الجانبية" },
+  "Nav": { "home": "حنايا", "market": "حنايا ماركت", "tube": "حنايا تيوب", "apps": "أبستور", "webhost": "ويبهوست" },
+  "Search": { "shop": "بحث للتسوّق" }
 }
