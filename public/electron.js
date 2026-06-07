@@ -251,6 +251,20 @@ ipcMain.on("open-tab", (event, newTab) => {
       return { action: "deny" };
     });
 
+    // Intercepter hnaya-dl:// pour ouvrir le panneau de téléchargement
+    // (les WebContentsViews sandbox ne peuvent pas appeler electronAPI directement)
+    view.webContents.on("will-navigate", (event, navUrl) => {
+      if (navUrl.startsWith("hnaya-dl://")) {
+        event.preventDefault();
+        try {
+          const ytUrl = decodeURIComponent(navUrl.replace("hnaya-dl://", ""));
+          mainWindow.webContents.send("open-download-panel", ytUrl);
+        } catch (e) {
+          console.error("hnaya-dl:// parse error:", e);
+        }
+      }
+    });
+
     ["did-start-loading","did-stop-loading","did-finish-load","did-navigate","did-navigate-in-page"]
       .forEach(ev => view.webContents.on(ev, updateTabInfo));
 
@@ -316,6 +330,11 @@ ipcMain.on("open-tab", (event, newTab) => {
                   btn.style.cssText = 'position:relative;bottom:auto;right:auto;margin:8px 0;';
                   btn.setAttribute('data-yt-url', ytUrl);
                   btn.setAttribute('title', 'Télécharger cette vidéo');
+                  btn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    window.location.href = 'hnaya-dl://' + encodeURIComponent(ytUrl);
+                  });
                   watchEl.insertAdjacentElement('afterend', btn);
                 }
               }
@@ -343,7 +362,9 @@ ipcMain.on("open-tab", (event, newTab) => {
               btn.addEventListener('click', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                window.electronAPI.send('open-download-panel', ytUrl);
+                // Naviguer vers un schéma personnalisé intercepté par Electron
+                // (window.electronAPI n'est pas disponible dans les WebContentsViews sandbox)
+                window.location.href = 'hnaya-dl://' + encodeURIComponent(ytUrl);
               });
               card.appendChild(btn);
             });
