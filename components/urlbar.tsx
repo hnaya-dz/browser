@@ -29,7 +29,6 @@ const IconSearch = () => (
   </svg>
 );
 
-// Hosts supportés par yt-dlp (doit rester en sync avec electron.js)
 const SUPPORTED_HOSTS = [
   "youtube.com","youtu.be","facebook.com","fb.watch",
   "instagram.com","tiktok.com","dailymotion.com",
@@ -44,21 +43,40 @@ function isDownloadable(url: string): boolean {
 }
 
 export default function URLBar() {
-  const [url, setUrl] = useState("");
-  const [showDownload, setShowDownload] = useState(false);
-  const [downloadUrl, setDownloadUrl] = useState("");
-  const router = useRouter();
   const { activeTab, tabs } = useTabContext();
   const { position } = useTabPosition();
+  const router = useRouter();
 
   const currentTab = tabs.find(tab => tab.id === activeTab);
   const isExternalTab = currentTab && !currentTab.isHome;
+
+  // ✅ Initialiser l'URL depuis le tab context (source fiable immédiate)
+  // puis la mettre à jour via IPC lors des navigations
+  const [url, setUrl] = useState(currentTab?.url || "");
+  const [showDownload, setShowDownload] = useState(false);
+  const [downloadUrl, setDownloadUrl] = useState("");
+
+  // Sync url quand l'onglet actif change
+  useEffect(() => {
+    setUrl(currentTab?.url || "");
+  }, [activeTab, currentTab?.url]);
 
   // Bloquer le scroll du body quand un onglet externe est actif
   useEffect(() => {
     document.body.style.overflow = isExternalTab ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };
   }, [isExternalTab]);
+
+  // Écouter les mises à jour d'URL depuis Electron (navigation dans la page)
+  useEffect(() => {
+    const api = (window as any).electronAPI;
+    if (!api) return;
+    const handler = (tabId: number, newUrl: string) => {
+      if (tabId === activeTab) setUrl(newUrl);
+    };
+    api.receive("update-url", handler);
+    return () => api.removeListener("update-url", handler);
+  }, [activeTab]);
 
   // Écouter le canal open-download-panel (depuis injection HnayaTube)
   useEffect(() => {
@@ -71,23 +89,6 @@ export default function URLBar() {
     api.receive("open-download-panel", handler);
     return () => api.removeListener("open-download-panel", handler);
   }, []);
-
-  useEffect(() => {
-    const api = (window as any).electronAPI;
-    if (!api) return;
-    api.receive("update-url", (tabId: number, newUrl: string) => {
-      if (tabId === activeTab) setUrl(newUrl);
-    });
-  }, [activeTab]);
-
-  useEffect(() => {
-    const api = (window as any).electronAPI;
-    if (!api) return;
-    api.send("get-current-url", activeTab);
-    api.receive("current-url", (tabId: number, currentUrl: string) => {
-      if (tabId === activeTab) setUrl(currentUrl);
-    });
-  }, [activeTab]);
 
   const isValidURL = (input: string) => {
     try { const p = new URL(input); return p.protocol === "http:" || p.protocol === "https:"; }
@@ -103,7 +104,7 @@ export default function URLBar() {
     }
   }, [url, router]);
 
-  const handleDownloadClick = useCallback(async () => {
+  const handleDownloadClick = useCallback(() => {
     setDownloadUrl(url);
     setShowDownload(true);
   }, [url]);
@@ -130,12 +131,12 @@ export default function URLBar() {
           .light .urlbar-btn:hover { color:#006341; background:rgba(0,99,65,0.1); }
           .sunset .urlbar-btn { color:rgba(255,150,80,0.6); }
           .sunset .urlbar-btn:hover { color:#ffb060; background:rgba(255,80,20,0.15); }
-          .urlbar-btn-dl { color:rgba(255,255,255,0.7); background:rgba(0,99,65,0.25); border:1px solid rgba(0,180,100,0.3); padding:3px 8px; border-radius:6px; font-size:13px; display:flex; align-items:center; gap:4px; flex-shrink:0; transition:all 0.15s ease; }
-          .urlbar-btn-dl:hover { background:rgba(0,99,65,0.45); color:#fff; transform:scale(1.05); }
-          .light .urlbar-btn-dl { background:rgba(0,99,65,0.1); border-color:rgba(0,99,65,0.25); color:#006341; }
-          .light .urlbar-btn-dl:hover { background:rgba(0,99,65,0.2); }
-          .sunset .urlbar-btn-dl { background:rgba(200,50,0,0.25); border-color:rgba(255,80,20,0.3); color:#ffb060; }
-          .sunset .urlbar-btn-dl:hover { background:rgba(200,50,0,0.45); }
+          .urlbar-btn-dl { color:#fff; background:rgba(0,99,65,0.35); border:1px solid rgba(0,180,100,0.4); padding:4px 10px; border-radius:6px; font-size:12px; font-weight:700; display:flex; align-items:center; gap:4px; flex-shrink:0; transition:all 0.15s ease; cursor:pointer; }
+          .urlbar-btn-dl:hover { background:rgba(0,99,65,0.6); transform:scale(1.05); box-shadow:0 2px 12px rgba(0,150,80,0.4); }
+          .light .urlbar-btn-dl { background:rgba(0,99,65,0.12); border-color:rgba(0,99,65,0.3); color:#006341; }
+          .light .urlbar-btn-dl:hover { background:rgba(0,99,65,0.25); }
+          .sunset .urlbar-btn-dl { background:rgba(200,50,0,0.3); border-color:rgba(255,80,20,0.4); color:#ffb060; }
+          .sunset .urlbar-btn-dl:hover { background:rgba(200,50,0,0.5); }
           .urlbar-input { flex:1; height:3.5vh; padding:0 12px; border-radius:8px; font-size:13px; border:1px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.1); color:#fff; outline:none; transition:all 0.2s ease; }
           .urlbar-input::placeholder { color:rgba(255,255,255,0.3); }
           .urlbar-input:focus { border-color:rgba(0,180,100,0.6); background:rgba(255,255,255,0.15); box-shadow:0 0 0 2px rgba(0,99,65,0.2); }
@@ -163,8 +164,12 @@ export default function URLBar() {
 
         {/* ⬇️ Bouton téléchargement — visible seulement si l'URL est supportée */}
         {canDownload && (
-          <button className="urlbar-btn-dl" onClick={handleDownloadClick} title="Télécharger cette vidéo en MP4">
-            ⬇️ <span style={{ fontSize: 11, fontWeight: 700 }}>MP4</span>
+          <button
+            className="urlbar-btn-dl"
+            onClick={handleDownloadClick}
+            title="Télécharger cette vidéo en MP4"
+          >
+            ⬇️ MP4
           </button>
         )}
 
@@ -172,7 +177,6 @@ export default function URLBar() {
         <ThemeSwitch />
       </nav>
 
-      {/* Panneau de téléchargement */}
       {showDownload && (
         <DownloadPanel
           url={downloadUrl}
