@@ -105,9 +105,17 @@ export default function URLBar() {
   }, [url, router]);
 
   const handleDownloadClick = useCallback(() => {
+    // Masquer la WebContentsView pour que le panneau React soit visible
+    (window as any)?.electronAPI?.send("hide-active-view");
     setDownloadUrl(url);
     setShowDownload(true);
   }, [url]);
+
+  const handleCloseDownload = useCallback(() => {
+    setShowDownload(false);
+    // Restaurer la WebContentsView
+    (window as any)?.electronAPI?.send("show-active-view");
+  }, []);
 
   if (!isExternalTab) return null;
 
@@ -180,7 +188,7 @@ export default function URLBar() {
       {showDownload && (
         <DownloadPanel
           url={downloadUrl}
-          onClose={() => setShowDownload(false)}
+          onClose={handleCloseDownload}
         />
       )}
     </>
