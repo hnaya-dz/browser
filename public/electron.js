@@ -92,6 +92,21 @@ const updateBrowserViewSize = () => {
   }
 };
 
+// ✅ Masquer/afficher la WebContentsView active (pour laisser les modales React visibles)
+ipcMain.on("hide-active-view", () => {
+  if (activeTabId && browserViews.has(activeTabId) && mainWindow) {
+    mainWindow.contentView.removeChildView(browserViews.get(activeTabId));
+  }
+});
+
+ipcMain.on("show-active-view", () => {
+  if (activeTabId && browserViews.has(activeTabId) && mainWindow) {
+    const view = browserViews.get(activeTabId);
+    mainWindow.contentView.addChildView(view);
+    updateBrowserViewSize();
+  }
+});
+
 ipcMain.on("set-tab-position", (event, position) => {
   tabSideWidth = position === "right" ? 200 : 0;
   updateBrowserViewSize();
