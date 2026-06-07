@@ -1,6 +1,8 @@
-import { app, BrowserWindow, WebContentsView, ipcMain, Menu } from "electron";
+import { app, BrowserWindow, WebContentsView, ipcMain, Menu, dialog } from "electron";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
+import { spawn } from "child_process";
+import { existsSync } from "fs";
 import serve from "electron-serve";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -13,7 +15,32 @@ const appServe = app.isPackaged ? serve({
 let mainWindow = null;
 const browserViews = new Map();
 let activeTabId = null;
-let tabSideWidth = 0;   // 0 = onglets en haut | 200 = onglets latéraux
+let tabSideWidth = 0;
+
+// ── Chemin vers yt-dlp.exe ───────────────────────────────────────────────────
+const ytDlpPath = app.isPackaged
+  ? join(process.resourcesPath, "bin", "yt-dlp.exe")
+  : join(__dirname, "bin", "yt-dlp.exe");
+
+// ── Sites supportés par yt-dlp (liste indicative pour la détection UI) ───────
+const SUPPORTED_HOSTS = [
+  "youtube.com", "youtu.be",
+  "facebook.com", "fb.watch",
+  "instagram.com",
+  "tiktok.com",
+  "dailymotion.com",
+  "twitter.com", "x.com",
+  "vimeo.com",
+  "twitch.tv",
+  "reddit.com",
+];
+
+function isDownloadableUrl(url) {
+  try {
+    const host = new URL(url).hostname.replace("www.", "");
+    return SUPPORTED_HOSTS.some(h => host === h || host.endsWith("." + h));
+  } catch { return false; }
+}
 
 const createWindow = () => {
   Menu.setApplicationMenu(null);
@@ -50,52 +77,137 @@ app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
 });
 
-// ── Calcul des bounds selon le mode ──────────────────────────────────────────
-//
-// MODE HAUT (tabSideWidth = 0) :
-//   TabBar (6vh) + Navbar/URLBar (6vh) = ~12% du haut réservé
-//   → y = 12%, height = 88%, width = 100%
-//
-// MODE LATÉRAL (tabSideWidth = 200) :
-//   TabBar à droite (200px), Navbar reste en haut (6vh) mais URLBar aussi (6vh)
-//   → La WebContentsView couvre TOUT depuis le haut (y=0)
-//     car la TabBar n'est plus en haut
-//   → width = 100% - 200px, height = 100%, x = 0
-//   Note : Navbar et URLBar flottent au-dessus en position fixed React,
-//          donc la WebContentsView les verra passer dessous — acceptable
-//          car marginTop React gère l'espace visible
-//
 const updateBrowserViewSize = () => {
   if (!mainWindow || !activeTabId) return;
   const view = browserViews.get(activeTabId);
   if (!view) return;
-
   const { width, height } = mainWindow.getContentBounds();
-
   if (tabSideWidth > 0) {
-    // ✅ MODE LATÉRAL : couvre tout depuis le haut, laisse 200px à droite
-    view.setBounds({
-      x: 0,
-      y: 0,
-      width: width - tabSideWidth,
-      height: height,
-    });
+    view.setBounds({ x: 0, y: 0, width: width - tabSideWidth, height });
   } else {
-    // ✅ MODE HAUT : laisse 12% en haut pour TabBar + Navbar/URLBar
     const marginTop = Math.round(height * 0.12);
-    view.setBounds({
-      x: 0,
-      y: marginTop,
-      width: width,
-      height: height - marginTop,
-    });
+    view.setBounds({ x: 0, y: marginTop, width, height: height - marginTop });
   }
 };
 
-// IPC : le renderer informe Electron de la position des onglets
 ipcMain.on("set-tab-position", (event, position) => {
   tabSideWidth = position === "right" ? 200 : 0;
   updateBrowserViewSize();
+});
+
+////////////////////////////////////////////////////////////////////////////////
+// ── TÉLÉCHARGEMENT (yt-dlp) ──────────────────────────────────────────────────
+
+// 1. Vérifier si l'URL est téléchargeable
+ipcMain.handle("check-downloadable", async (event, url) => {
+  return {
+    downloadable: isDownloadableUrl(url),
+    ytdlpAvailable: existsSync(ytDlpPath),
+  };
+});
+
+// 2. Récupérer les infos vidéo (titre + miniature) via yt-dlp --dump-json
+ipcMain.handle("get-video-info", async (event, url) => {
+  if (!existsSync(ytDlpPath)) {
+    return { error: "yt-dlp introuvable dans public/bin/yt-dlp.exe" };
+  }
+  return new Promise((resolve) => {
+    let output = "";
+    let errOutput = "";
+    const proc = spawn(ytDlpPath, [
+      "--dump-json",
+      "--no-playlist",
+      "--socket-timeout", "15",
+      url,
+    ]);
+    proc.stdout.on("data", d => { output += d.toString(); });
+    proc.stderr.on("data", d => { errOutput += d.toString(); });
+    proc.on("close", (code) => {
+      if (code !== 0) {
+        resolve({ error: errOutput || "Impossible d'obtenir les informations vidéo." });
+        return;
+      }
+      try {
+        const info = JSON.parse(output);
+        resolve({
+          title: info.title || "Vidéo sans titre",
+          thumbnail: info.thumbnail || null,
+          duration: info.duration || null,
+          uploader: info.uploader || info.channel || null,
+          extractor: info.extractor_key || null,
+        });
+      } catch {
+        resolve({ error: "Erreur de parsing des informations vidéo." });
+      }
+    });
+    proc.on("error", () => resolve({ error: "Impossible de lancer yt-dlp." }));
+  });
+});
+
+// 3. Choisir le dossier de destination (dialogue natif Windows)
+ipcMain.handle("choose-download-folder", async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: "Choisir le dossier de téléchargement",
+    properties: ["openDirectory"],
+    defaultPath: app.getPath("downloads"),
+  });
+  if (result.canceled || result.filePaths.length === 0) return null;
+  return result.filePaths[0];
+});
+
+// 4. Lancer le téléchargement avec progression
+// Envoie des événements IPC au renderer : "download-progress" et "download-done"
+ipcMain.on("download-video", (event, { url, outputFolder }) => {
+  if (!existsSync(ytDlpPath)) {
+    event.sender.send("download-done", { success: false, error: "yt-dlp introuvable." });
+    return;
+  }
+
+  const outputTemplate = join(outputFolder, "%(title)s.%(ext)s");
+
+  const proc = spawn(ytDlpPath, [
+    "--format", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+    "--merge-output-format", "mp4",
+    "--output", outputTemplate,
+    "--no-playlist",
+    "--newline",           // une ligne par mise à jour de progression
+    "--progress",
+    url,
+  ]);
+
+  // Parser la progression depuis la sortie yt-dlp
+  // Format typique : [download]  45.3% of   123.45MiB at    1.23MiB/s ETA 00:45
+  const progressRegex = /\[download\]\s+([\d.]+)%\s+of\s+([\d.]+\w+)\s+at\s+([\d.]+\w+\/s)/;
+
+  proc.stdout.on("data", (data) => {
+    const lines = data.toString().split("\n");
+    for (const line of lines) {
+      const match = line.match(progressRegex);
+      if (match) {
+        event.sender.send("download-progress", {
+          percent: parseFloat(match[1]),
+          size: match[2],
+          speed: match[3],
+        });
+      }
+    }
+  });
+
+  proc.stderr.on("data", (data) => {
+    console.error("[yt-dlp stderr]", data.toString());
+  });
+
+  proc.on("close", (code) => {
+    if (code === 0) {
+      event.sender.send("download-done", { success: true, folder: outputFolder });
+    } else {
+      event.sender.send("download-done", { success: false, error: "Téléchargement échoué (code " + code + ")." });
+    }
+  });
+
+  proc.on("error", (err) => {
+    event.sender.send("download-done", { success: false, error: err.message });
+  });
 });
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -154,6 +266,94 @@ ipcMain.on("open-tab", (event, newTab) => {
       `).then(faviconUrl => {
         mainWindow.webContents.send("update-tab-favicon", { id, faviconUrl });
       }).catch(console.error);
+
+      // ── Injection HnayaTube : boutons ⬇️ sur les cartes de la grille ──
+      // Détecte les liens vidéo du snippet [hnayatube] et [hnayatube_watch]
+      const currentUrl = view.webContents.getURL();
+      if (currentUrl.includes("hnaya.dz") && currentUrl.includes("hnayatube")) {
+        view.webContents.executeJavaScript(`
+          (function injectHnayaDownloadButtons() {
+            // Éviter la double injection
+            if (document.querySelector('[data-hnaya-dl-injected]')) return;
+            document.body.setAttribute('data-hnaya-dl-injected', '1');
+
+            const style = document.createElement('style');
+            style.textContent = \`
+              .hnaya-dl-btn {
+                position: absolute;
+                bottom: 8px;
+                right: 8px;
+                z-index: 999;
+                background: rgba(0,0,0,0.75);
+                color: #fff;
+                border: none;
+                border-radius: 6px;
+                padding: 4px 8px;
+                font-size: 13px;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                gap: 4px;
+                backdrop-filter: blur(4px);
+                transition: background 0.2s;
+              }
+              .hnaya-dl-btn:hover { background: rgba(0,99,65,0.9); }
+              .hnaya-dl-card-wrap { position: relative; display: inline-block; }
+            \`;
+            document.head.appendChild(style);
+
+            // Injection sur la page watch ([hnayatube_watch])
+            const watchEl = document.querySelector('[data-video-id]');
+            if (watchEl) {
+              const videoId = watchEl.getAttribute('data-video-id');
+              if (videoId) {
+                const ytUrl = 'https://www.youtube.com/watch?v=' + videoId;
+                const existing = watchEl.querySelector('.hnaya-dl-btn');
+                if (!existing) {
+                  const btn = document.createElement('button');
+                  btn.className = 'hnaya-dl-btn';
+                  btn.innerHTML = '⬇️ Télécharger';
+                  btn.style.cssText = 'position:relative;bottom:auto;right:auto;margin:8px 0;';
+                  btn.setAttribute('data-yt-url', ytUrl);
+                  btn.setAttribute('title', 'Télécharger cette vidéo');
+                  watchEl.insertAdjacentElement('afterend', btn);
+                }
+              }
+            }
+
+            // Injection sur la grille ([hnayatube]) — liens <a> vers la page watch
+            const cards = document.querySelectorAll('a[href*="hnayatube"][href*="?v="], a[href*="/watch?v="], a[href*="?v="]');
+            cards.forEach(card => {
+              if (card.querySelector('.hnaya-dl-btn')) return;
+              const href = card.getAttribute('href') || '';
+              const match = href.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
+              if (!match) return;
+              const videoId = match[1];
+              const ytUrl = 'https://www.youtube.com/watch?v=' + videoId;
+
+              // S'assurer que la carte a position:relative
+              const style = window.getComputedStyle(card);
+              if (style.position === 'static') card.style.position = 'relative';
+
+              const btn = document.createElement('button');
+              btn.className = 'hnaya-dl-btn';
+              btn.innerHTML = '⬇️';
+              btn.setAttribute('data-yt-url', ytUrl);
+              btn.setAttribute('title', 'Télécharger cette vidéo');
+              btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                window.electronAPI.send('open-download-panel', ytUrl);
+              });
+              card.appendChild(btn);
+            });
+
+            // Observer les nouveaux éléments (lazy loading)
+            const observer = new MutationObserver(() => injectHnayaDownloadButtons());
+            observer.observe(document.body, { childList: true, subtree: true });
+          })();
+        `).catch(console.error);
+      }
     });
 
     view.webContents.loadURL(url);
@@ -192,9 +392,6 @@ ipcMain.on("close-tab", (event, tabId) => {
     if (activeTabId === tabId) { activeTabId = 1; switchTab(activeTabId); }
   }
 });
-
-////////////////////////////////////////////////////////////////////////////////
-// Navigation Controls
 
 ipcMain.on("go-back", () => {
   if (activeTabId && browserViews.has(activeTabId)) {
