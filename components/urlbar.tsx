@@ -1,12 +1,12 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { ThemeSwitch } from "@/components/theme-switch";
 import { useRouter } from "next/navigation";
 import { useTabContext } from "@/context/tabcontext";
 import { useTabPosition } from "@/context/tabpositioncontext";
 import LangSwitch from "./lang-switch";
+import DownloadPanel from "./DownloadPanel";
 
-// ── Icônes SVG inline — aucun fichier externe requis ─────────────────────────
 const IconBack = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
     <path d="M19 12H5M5 12l7-7M5 12l7 7"/>
@@ -29,164 +29,156 @@ const IconSearch = () => (
   </svg>
 );
 
+// Hosts supportés par yt-dlp (doit rester en sync avec electron.js)
+const SUPPORTED_HOSTS = [
+  "youtube.com","youtu.be","facebook.com","fb.watch",
+  "instagram.com","tiktok.com","dailymotion.com",
+  "twitter.com","x.com","vimeo.com","twitch.tv","reddit.com",
+];
+
+function isDownloadable(url: string): boolean {
+  try {
+    const host = new URL(url).hostname.replace("www.", "");
+    return SUPPORTED_HOSTS.some(h => host === h || host.endsWith("." + h));
+  } catch { return false; }
+}
+
 export default function URLBar() {
   const [url, setUrl] = useState("");
+  const [showDownload, setShowDownload] = useState(false);
+  const [downloadUrl, setDownloadUrl] = useState("");
   const router = useRouter();
   const { activeTab, tabs } = useTabContext();
   const { position } = useTabPosition();
 
-  // ✅ Bloquer le scroll du body quand un onglet externe est actif
   const currentTab = tabs.find(tab => tab.id === activeTab);
   const isExternalTab = currentTab && !currentTab.isHome;
 
+  // Bloquer le scroll du body quand un onglet externe est actif
   useEffect(() => {
-    if (isExternalTab) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
-    }
+    document.body.style.overflow = isExternalTab ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };
   }, [isExternalTab]);
 
+  // Écouter le canal open-download-panel (depuis injection HnayaTube)
   useEffect(() => {
-    if (typeof window !== "undefined" && window.electronAPI) {
-      window.electronAPI.receive("update-url", (tabId: number, newUrl: string) => {
-        if (tabId === activeTab) setUrl(newUrl);
-      });
-    }
-  }, [activeTab, router]);
+    const api = (window as any).electronAPI;
+    if (!api) return;
+    const handler = (ytUrl: string) => {
+      setDownloadUrl(ytUrl);
+      setShowDownload(true);
+    };
+    api.receive("open-download-panel", handler);
+    return () => api.removeListener("open-download-panel", handler);
+  }, []);
 
   useEffect(() => {
-    if (typeof window !== "undefined" && window.electronAPI) {
-      window.electronAPI.send("get-current-url", activeTab);
-      window.electronAPI.receive("current-url", (tabId: number, currentUrl: string) => {
-        if (tabId === activeTab) setUrl(currentUrl);
-      });
-    }
+    const api = (window as any).electronAPI;
+    if (!api) return;
+    api.receive("update-url", (tabId: number, newUrl: string) => {
+      if (tabId === activeTab) setUrl(newUrl);
+    });
+  }, [activeTab]);
+
+  useEffect(() => {
+    const api = (window as any).electronAPI;
+    if (!api) return;
+    api.send("get-current-url", activeTab);
+    api.receive("current-url", (tabId: number, currentUrl: string) => {
+      if (tabId === activeTab) setUrl(currentUrl);
+    });
   }, [activeTab]);
 
   const isValidURL = (input: string) => {
-    try {
-      const p = new URL(input);
-      return p.protocol === "http:" || p.protocol === "https:";
-    } catch { return false; }
+    try { const p = new URL(input); return p.protocol === "http:" || p.protocol === "https:"; }
+    catch { return false; }
   };
 
-  const handleNavigation = () => {
+  const handleNavigation = useCallback(() => {
     if (isValidURL(url)) {
-      window?.electronAPI?.send("navigate", url);
+      (window as any)?.electronAPI?.send("navigate", url);
     } else {
-      window?.electronAPI?.send("close-browser-view");
+      (window as any)?.electronAPI?.send("close-browser-view");
       router.push(`/results?q=${encodeURIComponent(url)}`);
     }
-  };
+  }, [url, router]);
+
+  const handleDownloadClick = useCallback(async () => {
+    setDownloadUrl(url);
+    setShowDownload(true);
+  }, [url]);
 
   if (!isExternalTab) return null;
 
-  // En mode latéral, la URLBar s'étend sur toute la largeur moins 200px
   const rightOffset = position === "right" ? "200px" : "0px";
-
-  // En mode latéral, la URLBar est tout en haut (mt-0) car TabBar est à droite
-  // En mode haut, elle est sous la TabBar (mt-[6vh])
   const topOffset = position === "right" ? "0px" : "6vh";
+  const canDownload = isDownloadable(url);
 
   return (
-    <nav
-      className="fixed z-50 h-[6vh] flex items-center px-4 gap-2 backdrop-blur-md border-b urlbar-themed"
-      style={{
-        top: topOffset,
-        left: 0,
-        right: rightOffset,
-        width: `calc(100vw - ${rightOffset})`,
-      }}
-    >
-      <style>{`
-        .urlbar-themed {
-          background: rgba(0,0,0,0.45);
-          border-color: rgba(255,255,255,0.1);
-        }
-        .light .urlbar-themed {
-          background: rgba(255,255,255,0.75);
-          border-color: rgba(0,99,65,0.15);
-        }
-        .sunset .urlbar-themed {
-          background: rgba(30,3,0,0.7);
-          border-color: rgba(255,80,20,0.2);
-        }
+    <>
+      <nav
+        className="fixed z-50 h-[6vh] flex items-center px-4 gap-2 backdrop-blur-md border-b urlbar-themed"
+        style={{ top: topOffset, left: 0, right: rightOffset, width: `calc(100vw - ${rightOffset})` }}
+      >
+        <style>{`
+          .urlbar-themed { background:rgba(0,0,0,0.45); border-color:rgba(255,255,255,0.1); }
+          .light .urlbar-themed { background:rgba(255,255,255,0.75); border-color:rgba(0,99,65,0.15); }
+          .sunset .urlbar-themed { background:rgba(30,3,0,0.7); border-color:rgba(255,80,20,0.2); }
+          .urlbar-btn { color:rgba(255,255,255,0.6); transition:all 0.15s ease; padding:4px; border-radius:6px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+          .urlbar-btn:hover { color:#fff; background:rgba(255,255,255,0.1); transform:scale(1.1); }
+          .light .urlbar-btn { color:rgba(0,60,30,0.6); }
+          .light .urlbar-btn:hover { color:#006341; background:rgba(0,99,65,0.1); }
+          .sunset .urlbar-btn { color:rgba(255,150,80,0.6); }
+          .sunset .urlbar-btn:hover { color:#ffb060; background:rgba(255,80,20,0.15); }
+          .urlbar-btn-dl { color:rgba(255,255,255,0.7); background:rgba(0,99,65,0.25); border:1px solid rgba(0,180,100,0.3); padding:3px 8px; border-radius:6px; font-size:13px; display:flex; align-items:center; gap:4px; flex-shrink:0; transition:all 0.15s ease; }
+          .urlbar-btn-dl:hover { background:rgba(0,99,65,0.45); color:#fff; transform:scale(1.05); }
+          .light .urlbar-btn-dl { background:rgba(0,99,65,0.1); border-color:rgba(0,99,65,0.25); color:#006341; }
+          .light .urlbar-btn-dl:hover { background:rgba(0,99,65,0.2); }
+          .sunset .urlbar-btn-dl { background:rgba(200,50,0,0.25); border-color:rgba(255,80,20,0.3); color:#ffb060; }
+          .sunset .urlbar-btn-dl:hover { background:rgba(200,50,0,0.45); }
+          .urlbar-input { flex:1; height:3.5vh; padding:0 12px; border-radius:8px; font-size:13px; border:1px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.1); color:#fff; outline:none; transition:all 0.2s ease; }
+          .urlbar-input::placeholder { color:rgba(255,255,255,0.3); }
+          .urlbar-input:focus { border-color:rgba(0,180,100,0.6); background:rgba(255,255,255,0.15); box-shadow:0 0 0 2px rgba(0,99,65,0.2); }
+          .light .urlbar-input { background:rgba(255,255,255,0.9); border-color:rgba(0,99,65,0.2); color:#1a2e22; }
+          .light .urlbar-input::placeholder { color:rgba(0,60,30,0.35); }
+          .light .urlbar-input:focus { border-color:rgba(0,99,65,0.5); box-shadow:0 0 0 2px rgba(0,99,65,0.12); }
+          .sunset .urlbar-input { background:rgba(50,5,0,0.6); border-color:rgba(255,80,20,0.25); color:#ffd4a0; }
+          .sunset .urlbar-input::placeholder { color:rgba(255,120,60,0.35); }
+          .sunset .urlbar-input:focus { border-color:rgba(255,100,20,0.6); box-shadow:0 0 0 2px rgba(200,60,0,0.2); }
+        `}</style>
 
-        /* Boutons nav */
-        .urlbar-btn {
-          color: rgba(255,255,255,0.6);
-          transition: all 0.15s ease;
-          padding: 4px;
-          border-radius: 6px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          flex-shrink: 0;
-        }
-        .urlbar-btn:hover { color: #fff; background: rgba(255,255,255,0.1); transform: scale(1.1); }
-        .light .urlbar-btn { color: rgba(0,60,30,0.6); }
-        .light .urlbar-btn:hover { color: #006341; background: rgba(0,99,65,0.1); }
-        .sunset .urlbar-btn { color: rgba(255,150,80,0.6); }
-        .sunset .urlbar-btn:hover { color: #ffb060; background: rgba(255,80,20,0.15); }
+        <button className="urlbar-btn" onClick={() => (window as any)?.electronAPI?.send("go-back")} title="Précédent"><IconBack /></button>
+        <button className="urlbar-btn" onClick={() => (window as any)?.electronAPI?.send("go-forward")} title="Suivant"><IconForward /></button>
+        <button className="urlbar-btn" onClick={() => (window as any)?.electronAPI?.send("refresh")} title="Recharger"><IconRefresh /></button>
 
-        /* Input URL */
-        .urlbar-input {
-          flex: 1;
-          height: 3.5vh;
-          padding: 0 12px;
-          border-radius: 8px;
-          font-size: 13px;
-          border: 1px solid rgba(255,255,255,0.15);
-          background: rgba(255,255,255,0.1);
-          color: #fff;
-          outline: none;
-          transition: all 0.2s ease;
-        }
-        .urlbar-input::placeholder { color: rgba(255,255,255,0.3); }
-        .urlbar-input:focus { border-color: rgba(0,180,100,0.6); background: rgba(255,255,255,0.15); box-shadow: 0 0 0 2px rgba(0,99,65,0.2); }
+        <input
+          className="urlbar-input"
+          placeholder="URL ou recherche..."
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && handleNavigation()}
+        />
 
-        .light .urlbar-input {
-          background: rgba(255,255,255,0.9);
-          border-color: rgba(0,99,65,0.2);
-          color: #1a2e22;
-        }
-        .light .urlbar-input::placeholder { color: rgba(0,60,30,0.35); }
-        .light .urlbar-input:focus { border-color: rgba(0,99,65,0.5); box-shadow: 0 0 0 2px rgba(0,99,65,0.12); }
+        <button className="urlbar-btn" onClick={handleNavigation} title="Naviguer"><IconSearch /></button>
 
-        .sunset .urlbar-input {
-          background: rgba(50,5,0,0.6);
-          border-color: rgba(255,80,20,0.25);
-          color: #ffd4a0;
-        }
-        .sunset .urlbar-input::placeholder { color: rgba(255,120,60,0.35); }
-        .sunset .urlbar-input:focus { border-color: rgba(255,100,20,0.6); box-shadow: 0 0 0 2px rgba(200,60,0,0.2); }
-      `}</style>
+        {/* ⬇️ Bouton téléchargement — visible seulement si l'URL est supportée */}
+        {canDownload && (
+          <button className="urlbar-btn-dl" onClick={handleDownloadClick} title="Télécharger cette vidéo en MP4">
+            ⬇️ <span style={{ fontSize: 11, fontWeight: 700 }}>MP4</span>
+          </button>
+        )}
 
-      <button className="urlbar-btn" onClick={() => window?.electronAPI?.send("go-back")} title="Précédent">
-        <IconBack />
-      </button>
-      <button className="urlbar-btn" onClick={() => window?.electronAPI?.send("go-forward")} title="Suivant">
-        <IconForward />
-      </button>
-      <button className="urlbar-btn" onClick={() => window?.electronAPI?.send("refresh")} title="Recharger">
-        <IconRefresh />
-      </button>
+        <LangSwitch />
+        <ThemeSwitch />
+      </nav>
 
-      <input
-        className="urlbar-input"
-        placeholder="URL ou recherche..."
-        value={url}
-        onChange={(e) => setUrl(e.target.value)}
-        onKeyDown={(e) => e.key === "Enter" && handleNavigation()}
-      />
-
-      <button className="urlbar-btn" onClick={handleNavigation} title="Naviguer">
-        <IconSearch />
-      </button>
-      <LangSwitch />
-      <ThemeSwitch />
-    </nav>
+      {/* Panneau de téléchargement */}
+      {showDownload && (
+        <DownloadPanel
+          url={downloadUrl}
+          onClose={() => setShowDownload(false)}
+        />
+      )}
+    </>
   );
 }
