@@ -52,7 +52,8 @@ const createWindow = () => {
       nodeIntegration: false,
       contextIsolation: true,
       webviewTag: false,
-      sandbox: true,
+      // sandbox retiré : bloquait ipcRenderer.invoke depuis le preload
+      // Sécurité maintenue par contextIsolation + contextBridge
     },
   });
   if (app.isPackaged) {
