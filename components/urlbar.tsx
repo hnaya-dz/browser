@@ -105,10 +105,10 @@ export default function URLBar() {
   }, [url, router]);
 
   const handleDownloadClick = useCallback(() => {
-    // Masquer la WebContentsView pour que le panneau React soit visible
     (window as any)?.electronAPI?.send("hide-active-view");
     setDownloadUrl(url);
-    setShowDownload(true);
+    // Délai pour laisser Electron retirer la WebContentsView avant d'afficher le panneau
+    setTimeout(() => setShowDownload(true), 150);
   }, [url]);
 
   const handleCloseDownload = useCallback(() => {
