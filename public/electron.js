@@ -61,7 +61,6 @@ const createWindow = () => {
   } else {
    mainWindow.loadURL("http://localhost:3000");
 mainWindow.webContents.on("did-fail-load", () => mainWindow.webContents.reloadIgnoringCache());
-mainWindow.webContents.openDevTools(); // ← TEMPORAIRE pour diagnostic
   }
   mainWindow.on("closed", () => { mainWindow = null; });
 };
