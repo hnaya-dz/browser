@@ -83,8 +83,17 @@ app.on('web-contents-created', (event, contents) => {
     if (mainWindow) mainWindow.webContents.send('new-tab-url', details.url);
     return { action: 'deny' };
   });
-});
 
+  // ✅ Activer Ctrl+R et Ctrl+Shift+R dans toutes les WebContentsViews
+  contents.on("before-input-event", (event, input) => {
+    if (input.type !== "keyDown") return;
+    if (input.control && input.shift && input.key === "R") {
+      contents.reloadIgnoringCache();
+    } else if (input.control && input.key === "r") {
+      contents.reload();
+    }
+  });
+});
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
 });
