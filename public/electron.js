@@ -1,4 +1,4 @@
-import { app, BrowserWindow, WebContentsView, ipcMain, Menu, dialog } from "electron";
+import { app, BrowserWindow, WebContentsView, ipcMain, Menu, dialog, session } from "electron";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import { spawn } from "child_process";
@@ -72,7 +72,6 @@ const createWindow = () => {
 
 app.on("ready", () => {
   // ✅ Vider le cache Chromium au démarrage
-  const { session } = require("electron");
   session.defaultSession.clearCache().then(() => {
     createWindow();
   });
