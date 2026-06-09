@@ -190,7 +190,13 @@ ipcMain.handle("choose-download-folder", async () => {
   if (result.canceled || result.filePaths.length === 0) return null;
   return result.filePaths[0];
 });
-
+ipcMain.handle("clear-view-cache", async () => {
+  if (activeTabId && browserViews.has(activeTabId)) {
+    const view = browserViews.get(activeTabId);
+    await view.webContents.session.clearCache();
+    view.webContents.reloadIgnoringCache();
+  }
+});
 // 4. Lancer le téléchargement avec progression
 // Envoie des événements IPC au renderer : "download-progress" et "download-done"
 ipcMain.on("download-video", (event, { url, outputFolder }) => {
