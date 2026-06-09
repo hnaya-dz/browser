@@ -470,6 +470,12 @@ ipcMain.on("refresh", () => {
   }
 });
 
+ipcMain.on("reload-ignore-cache", () => {
+  if (activeTabId && browserViews.has(activeTabId)) {
+    browserViews.get(activeTabId)?.webContents?.reloadIgnoringCache();
+  }
+});
+
 ipcMain.on("navigate", (event, url) => {
   if (activeTabId && browserViews.has(activeTabId)) {
     const view = browserViews.get(activeTabId);
