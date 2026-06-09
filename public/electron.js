@@ -70,12 +70,18 @@ const createWindow = () => {
   mainWindow.on("closed", () => { mainWindow = null; });
 };
 
-app.on("ready", () => { createWindow(); });
+app.on("ready", () => {
+  // ✅ Vider le cache Chromium au démarrage
+  const { session } = require("electron");
+  session.defaultSession.clearCache().then(() => {
+    createWindow();
+  });
+});
 
-app.on("web-contents-created", (event, contents) => {
+app.on('web-contents-created', (event, contents) => {
   contents.setWindowOpenHandler((details) => {
-    if (mainWindow) mainWindow.webContents.send("new-tab-url", details.url);
-    return { action: "deny" };
+    if (mainWindow) mainWindow.webContents.send('new-tab-url', details.url);
+    return { action: 'deny' };
   });
 });
 
