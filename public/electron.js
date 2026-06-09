@@ -54,17 +54,18 @@ const createWindow = () => {
       webviewTag: false,
       // sandbox retiré : bloquait ipcRenderer.invoke depuis le preload
       // Sécurité maintenue par contextIsolation + contextBridge
-    },
+},
   });
-// ✅ User-Agent Chrome pour compatibilité avec les sites WordPress
-const chromeUA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
-mainWindow.webContents.setUserAgent(chromeUA);
 
-if (app.isPackaged) {
-  appServe(mainWindow).then(() => mainWindow.loadURL("app://index.html"));
-} else {
-  mainWindow.loadURL("http://localhost:3000");
-  mainWindow.webContents.on("did-fail-load", () => mainWindow.webContents.reloadIgnoringCache());
+  // ✅ User-Agent Chrome pour compatibilité avec les sites WordPress
+  const chromeUA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+  mainWindow.webContents.setUserAgent(chromeUA);
+
+  if (app.isPackaged) {
+    appServe(mainWindow).then(() => mainWindow.loadURL("app://index.html"));
+  } else {
+    mainWindow.loadURL("http://localhost:3000");
+    mainWindow.webContents.on("did-fail-load", () => mainWindow.webContents.reloadIgnoringCache());
   }
   mainWindow.on("closed", () => { mainWindow = null; });
 };
