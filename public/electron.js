@@ -1,4 +1,4 @@
-import { app, BrowserWindow, WebContentsView, ipcMain, Menu, dialog, session } from "electron";
+import { app, BrowserWindow, WebContentsView, ipcMain, Menu, dialog } from "electron";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import { spawn } from "child_process";
@@ -66,16 +66,12 @@ const createWindow = () => {
   } else {
     mainWindow.loadURL("http://localhost:3000");
 mainWindow.webContents.on("did-fail-load", () => mainWindow.webContents.reloadIgnoringCache());
-mainWindow.webContents.openDevTools(); // ← TEMPORAIRE pour diagnostic
   }
   mainWindow.on("closed", () => { mainWindow = null; });
 };
 
 app.on("ready", () => {
-  // ✅ Vider le cache Chromium au démarrage
-  session.defaultSession.clearCache().then(() => {
-    createWindow();
-  });
+  createWindow();
 });
 
 app.on('web-contents-created', (event, contents) => {
@@ -84,15 +80,6 @@ app.on('web-contents-created', (event, contents) => {
     return { action: 'deny' };
   });
 
-  // ✅ Activer Ctrl+R et Ctrl+Shift+R dans toutes les WebContentsViews
-  contents.on("before-input-event", (event, input) => {
-    if (input.type !== "keyDown") return;
-    if (input.control && input.shift && input.key === "R") {
-      contents.reloadIgnoringCache();
-    } else if (input.control && input.key === "r") {
-      contents.reload();
-    }
-  });
 });
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
@@ -190,13 +177,6 @@ ipcMain.handle("choose-download-folder", async () => {
   if (result.canceled || result.filePaths.length === 0) return null;
   return result.filePaths[0];
 });
-ipcMain.handle("clear-view-cache", async () => {
-  if (activeTabId && browserViews.has(activeTabId)) {
-    const view = browserViews.get(activeTabId);
-    await view.webContents.session.clearCache();
-    view.webContents.reloadIgnoringCache();
-  }
-});
 // 4. Lancer le téléchargement avec progression
 // Envoie des événements IPC au renderer : "download-progress" et "download-done"
 ipcMain.on("download-video", (event, { url, outputFolder }) => {
@@ -222,7 +202,8 @@ ipcMain.on("download-video", (event, { url, outputFolder }) => {
   const progressRegex = /\[download\]\s+([\d.]+)%\s+of\s+([\d.]+\w+)\s+at\s+([\d.]+\w+\/s)/;
 
   proc.stdout.on("data", (data) => {
-    const lines = data.toString().split("\n");
+    const lines = data.toString().split("
+");
     for (const line of lines) {
       const match = line.match(progressRegex);
       if (match) {
@@ -474,12 +455,6 @@ ipcMain.on("go-forward", () => {
 ipcMain.on("refresh", () => {
   if (activeTabId && browserViews.has(activeTabId)) {
     browserViews.get(activeTabId)?.webContents?.reload();
-  }
-});
-
-ipcMain.on("reload-ignore-cache", () => {
-  if (activeTabId && browserViews.has(activeTabId)) {
-    browserViews.get(activeTabId)?.webContents?.reloadIgnoringCache();
   }
 });
 
