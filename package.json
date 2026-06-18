@@ -1,28 +1,56 @@
 {
-  "name": "HnayaDZ",
-  "version": "0.0.1",
-  "description": "Hnaya DZ Browser",
-  "author": "Hnaya",
+  "name": "hnaya-dz-browser",
+  "version": "0.1.0",
+  "description": "Hnaya DZ Browser — Navigateur algérien",
+  "author": "Nacib Hamida",
   "private": true,
   "main": "public/electron.js",
   "type": "module",
- "scripts": {
-  "dev": "concurrently \"yarn next dev\" \"wait-on http://localhost:3000 && electron public/electron.js\"",
-  "electron-dev": "cross-env ELECTRON_START_URL=http://localhost:3000 electron public/electron.js",
-  "build": "next build",
-  "export": "next export",
-  "start": "concurrently \"yarn next start\" \"electron public/electron.js\"",
-  "dist": "yarn build && electron-builder --win --ia32"
+  "scripts": {
+    "dev": "concurrently \"yarn next dev\" \"wait-on http://localhost:3000 && electron public/electron.js\"",
+    "build": "next build",
+    "start": "concurrently \"yarn next start\" \"electron public/electron.js\"",
+    "dist": "yarn build && electron-builder --win --x64"
   },
   "build": {
     "appId": "dz.hnaya.browser",
+    "productName": "Hnaya DZ Browser",
+    "copyright": "© 2026 Nacib Hamida",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "out/**/*",
+      "public/electron.js",
+      "public/preload.js",
+      "public/hnaya.png",
+      "public/icons/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "public/bin/yt-dlp.exe",
+        "to": "bin/yt-dlp.exe"
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "public/icons/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Hnaya DZ Browser"
+    },
     "mac": {
       "target": "dmg",
-      "icon": "public/icon.png"
-    },
-    "win": {
-      "target": "nsis",
-      "icon": "public/icon.png"
+      "icon": "public/hnaya.png"
     },
     "linux": {
       "target": "AppImage"
@@ -30,14 +58,11 @@
   },
   "dependencies": {
     "@heroui/button": "2.2.13",
-    "@heroui/code": "2.2.10",
     "@heroui/input": "2.4.13",
-    "@heroui/kbd": "2.2.10",
     "@heroui/link": "2.2.11",
     "@heroui/listbox": "2.3.13",
     "@heroui/navbar": "2.2.12",
     "@heroui/progress": "^2.2.12",
-    "@heroui/snippet": "2.2.14",
     "@heroui/switch": "2.2.12",
     "@heroui/system": "2.4.10",
     "@heroui/theme": "2.4.9",
@@ -46,19 +71,13 @@
     "clsx": "2.1.1",
     "concurrently": "^8.2.2",
     "cross-env": "^7.0.3",
-    "electron-is-dev": "^3.0.1",
     "electron-serve": "^2.1.1",
     "framer-motion": "11.13.1",
-    "i18next": "^24.2.3",
-    "intl-messageformat": "^10.5.0",
     "lucide-react": "^0.483.0",
     "next": "15.0.4",
-    "next-intl": "^4.0.2",
     "next-themes": "^0.4.4",
     "react": "18.3.1",
     "react-dom": "18.3.1",
-    "react-i18next": "^15.4.1",
-    "uuid": "^11.1.0",
     "wait-on": "^8.0.2"
   },
   "devDependencies": {
