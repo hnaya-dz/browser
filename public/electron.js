@@ -61,7 +61,7 @@ const createWindow = () => {
   // ✅ User-Agent Chrome pour compatibilité avec les sites WordPress
   const chromeUA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
   mainWindow.webContents.setUserAgent(chromeUA);
- 
+ mainWindow.webContents.openDevTools(); // TEMPORAIRE — diagnostic PSE en production
   if (app.isPackaged) {
     appServe(mainWindow).then(() => mainWindow.loadURL("app://index.html"));
   } else {
