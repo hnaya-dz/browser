@@ -47,10 +47,14 @@ export function TabProvider({ children }: { children: React.ReactNode }) {
     }, [language]);
 
     useEffect(() => {
+        // ✅ PATCH 5a — updateTitle : ne jamais écraser le titre de l'onglet home
+        // Accepte tout vrai titre envoyé par page-title-updated
         const updateTitle = (event: any, { id, title }: { id: number; title: string }) => {
-            setTabs(prevTabs => prevTabs.map(tab =>
-                tab.id === id ? { ...tab, title: title || tab.url || "New Tab" } : tab
-            ));
+            setTabs(prevTabs => prevTabs.map(tab => {
+                if (tab.id !== id) return tab;
+                if (tab.isHome) return tab; // l'onglet home garde toujours son titre traduit
+                return { ...tab, title: title || tab.url || "New Tab" };
+            }));
         };
 
         const updateFavicon = (event: any, { id, faviconUrl }: { id: number; faviconUrl: string }) => {
@@ -59,23 +63,20 @@ export function TabProvider({ children }: { children: React.ReactNode }) {
             ));
         };
 
+        // ✅ PATCH 5b — updateUrl : toujours mettre le domaine comme titre temporaire
+        // L'ancienne condition (title === "New Tab" || title === domain) était trop restrictive
+        // et bloquait la mise à jour quand le titre initial était déjà "hnaya.dz"
         const updateUrl = (event: any, tabId: number, newUrl: string) => {
             setTabs(prevTabs => prevTabs.map(tab => {
-                if (tab.id === tabId) {
-                    let title = tab.title;
-                    try {
-                        if (newUrl) {
-                            const domain = new URL(newUrl).hostname.replace('www.', '');
-                            if (!tab.isHome && (tab.title === "New Tab" || tab.title === tab.url?.replace('www.', ''))) {
-                                title = domain;
-                            }
-                        }
-                    } catch (e) {
-                        console.error("Invalid URL:", newUrl);
-                    }
-                    return { ...tab, url: newUrl, title: tab.isHome ? tab.title : title };
+                if (tab.id !== tabId) return tab;
+                if (tab.isHome) return { ...tab, url: newUrl };
+                try {
+                    // Domaine = titre temporaire en attendant que page-title-updated arrive
+                    const domain = new URL(newUrl).hostname.replace('www.', '');
+                    return { ...tab, url: newUrl, title: domain };
+                } catch {
+                    return { ...tab, url: newUrl };
                 }
-                return tab;
             }));
         };
 
