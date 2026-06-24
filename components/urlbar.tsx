@@ -6,6 +6,10 @@ import { useTabContext } from "@/context/tabcontext";
 import { useTabPosition } from "@/context/tabpositioncontext";
 import LangSwitch from "./lang-switch";
 import DownloadPanel from "./DownloadPanel";
+// ✅ PATCH 1 — import depuis shared/ (supprime la duplication avec electron.js)
+import { isDownloadableUrl as isDownloadable, getSiteName } from "@/shared/supportedHosts";
+
+// ── SUPPRIMÉ : SUPPORTED_HOSTS et isDownloadable (maintenant dans shared/supportedHosts.ts) ──
 
 const IconBack = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -29,19 +33,6 @@ const IconSearch = () => (
   </svg>
 );
 
-const SUPPORTED_HOSTS = [
-  "youtube.com","youtu.be","facebook.com","fb.watch",
-  "instagram.com","tiktok.com","dailymotion.com",
-  "twitter.com","x.com","vimeo.com","twitch.tv","reddit.com",
-];
-
-function isDownloadable(url: string): boolean {
-  try {
-    const host = new URL(url).hostname.replace("www.", "");
-    return SUPPORTED_HOSTS.some(h => host === h || host.endsWith("." + h));
-  } catch { return false; }
-}
-
 export default function URLBar() {
   const { activeTab, tabs } = useTabContext();
   const { position } = useTabPosition();
@@ -50,8 +41,6 @@ export default function URLBar() {
   const currentTab = tabs.find(tab => tab.id === activeTab);
   const isExternalTab = currentTab && !currentTab.isHome;
 
-  // ✅ Initialiser l'URL depuis le tab context (source fiable immédiate)
-  // puis la mettre à jour via IPC lors des navigations
   const [url, setUrl] = useState(currentTab?.url || "");
   const [showDownload, setShowDownload] = useState(false);
   const [downloadUrl, setDownloadUrl] = useState("");
@@ -95,25 +84,27 @@ export default function URLBar() {
     catch { return false; }
   };
 
+  // ✅ PATCH 10 — texte libre → Startpage dans la WebContentsView (comportement navigateur)
+  // Au lieu de rediriger vers /results?q=..., la recherche s'ouvre dans la même vue
   const handleNavigation = useCallback(() => {
     if (isValidURL(url)) {
       (window as any)?.electronAPI?.send("navigate", url);
     } else {
-      (window as any)?.electronAPI?.send("close-browser-view");
-      router.push(`/results?q=${encodeURIComponent(url)}`);
+      const searchUrl = `https://www.startpage.com/sp/search?query=${encodeURIComponent(url)}`;
+      (window as any)?.electronAPI?.send("navigate", searchUrl);
     }
-  }, [url, router]);
+  }, [url]);
 
-  const handleDownloadClick = useCallback(() => {
-    (window as any)?.electronAPI?.send("hide-active-view");
+  // ✅ PATCH 2 — invoke synchrone : attend la confirmation Electron avant d'afficher le panneau
+  // Remplace : send("hide-active-view") + setTimeout(150ms)
+  const handleDownloadClick = useCallback(async () => {
+    await (window as any)?.electronAPI?.invoke("hide-active-view-sync");
     setDownloadUrl(url);
-    // Délai pour laisser Electron retirer la WebContentsView avant d'afficher le panneau
-    setTimeout(() => setShowDownload(true), 150);
+    setShowDownload(true);
   }, [url]);
 
   const handleCloseDownload = useCallback(() => {
     setShowDownload(false);
-    // Restaurer la WebContentsView
     (window as any)?.electronAPI?.send("show-active-view");
   }, []);
 
@@ -122,6 +113,8 @@ export default function URLBar() {
   const rightOffset = position === "right" ? "200px" : "0px";
   const topOffset = position === "right" ? "0px" : "6vh";
   const canDownload = isDownloadable(url);
+  // ✅ PATCH 1b — nom du site dans le bouton (ex: "⬇️ YouTube" au lieu de "⬇️ MP4")
+  const siteName = getSiteName(url);
 
   return (
     <>
@@ -162,22 +155,22 @@ export default function URLBar() {
 
         <input
           className="urlbar-input"
-          placeholder="URL ou recherche..."
+          placeholder="URL ou recherche Startpage..."
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleNavigation()}
         />
 
-        <button className="urlbar-btn" onClick={handleNavigation} title="Naviguer"><IconSearch /></button>
+        <button className="urlbar-btn" onClick={handleNavigation} title="Naviguer ou rechercher"><IconSearch /></button>
 
         {/* ⬇️ Bouton téléchargement — visible seulement si l'URL est supportée */}
         {canDownload && (
           <button
             className="urlbar-btn-dl"
             onClick={handleDownloadClick}
-            title="Télécharger cette vidéo en MP4"
+            title={`Télécharger cette vidéo ${siteName}`}
           >
-            ⬇️ MP4
+            ⬇️ {siteName}
           </button>
         )}
 
