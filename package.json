@@ -12,6 +12,9 @@
     "start": "concurrently \"yarn next start\" \"electron public/electron.js\"",
     "dist": "yarn build && electron-builder --win --x64"
   },
+  "scripts": {
+  "kill-dev": "taskkill /IM electron.exe /F & taskkill /IM node.exe /F"
+}
   "build": {
     "appId": "dz.hnaya.browser",
     "productName": "Hnaya DZ Browser",
