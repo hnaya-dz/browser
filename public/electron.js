@@ -31,18 +31,17 @@ const ytDlpPath = app.isPackaged
 
 const createWindow = () => {
   Menu.setApplicationMenu(null);
-  mainWindow = new BrowserWindow({
-    width: 1920,
-    height: 1080,
-    webPreferences: {
-      preload: join(__dirname, "preload.js"),
-      nodeIntegration: false,
-      contextIsolation: true,
-      webviewTag: false,
-      // sandbox retiré : bloquait ipcRenderer.invoke depuis le preload
-      // Sécurité maintenue par contextIsolation + contextBridge
-    },
-  });
+mainWindow = new BrowserWindow({
+  width: 1920,
+  height: 1080,
+  icon: join(__dirname, "../public/icons/icon.ico"), // ✅ icône de l'application
+  webPreferences: {
+    preload: join(__dirname, "preload.js"),
+    nodeIntegration: false,
+    contextIsolation: true,
+    webviewTag: false,
+  },
+});
 
   // ✅ User-Agent Chrome pour compatibilité avec les sites WordPress
   const chromeUA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
