@@ -57,7 +57,7 @@ export function TabProvider({ children }: { children: React.ReactNode }) {
             }));
         };
 
-        const updateFavicon = (event: any, { id, faviconUrl }: { id: number; faviconUrl: string }) => {
+        const updateFavicon = ({ id, faviconUrl }: { id: number; faviconUrl: string }) => {
             setTabs(prevTabs => prevTabs.map(tab =>
                 tab.id === id ? { ...tab, faviconUrl } : tab
             ));
