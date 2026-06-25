@@ -66,7 +66,7 @@ export function TabProvider({ children }: { children: React.ReactNode }) {
         // ✅ PATCH 5b — updateUrl : toujours mettre le domaine comme titre temporaire
         // L'ancienne condition (title === "New Tab" || title === domain) était trop restrictive
         // et bloquait la mise à jour quand le titre initial était déjà "hnaya.dz"
-        const updateUrl = (event: any, tabId: number, newUrl: string) => {
+        const updateUrl = (tabId: number, newUrl: string) => {
             setTabs(prevTabs => prevTabs.map(tab => {
                 if (tab.id !== tabId) return tab;
                 if (tab.isHome) return { ...tab, url: newUrl };
