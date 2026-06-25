@@ -18,5 +18,28 @@
     "tube": "Hnaya Tube",
     "apps": "Hnaya Appstore",
     "webhost": "Hnaya Webhost"
+  },
+  "Download": {
+    "analyzing": "Analyse de la vidéo…",
+    "title": "Télécharger la vidéo",
+    "downloading": "Téléchargement en cours…",
+    "done": "✅ Téléchargement terminé !",
+    "error": "⚠️ Erreur",
+    "connecting": "Connexion à yt-dlp…",
+    "fast": "Rapide",
+    "fastDesc": "MP4 720p",
+    "hq": "Haute qualité",
+    "hqDesc": "Meilleure résolution",
+    "folder": "Dossier de destination",
+    "noFolder": "Aucun dossier sélectionné",
+    "choose": "📁 Choisir",
+    "downloadFast": "⚡ Télécharger en MP4 720p",
+    "downloadHQ": "🎬 Télécharger en haute qualité",
+    "doNotClose": "Ne fermez pas ce panneau pendant le téléchargement",
+    "savedIn": "Enregistré dans :",
+    "close": "Fermer",
+    "unavailable": "API Electron non disponible.",
+    "unexpected": "Réponse inattendue de yt-dlp.",
+    "analysisError": "Erreur lors de l'analyse."
   }
 }
