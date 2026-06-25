@@ -313,7 +313,7 @@ ipcMain.on("open-tab", (event, newTab) => {
 
       // ── Injection HnayaTube : boutons ⬇️ sur les cartes de la grille ──
       const currentUrl = view.webContents.getURL();
-      if (currentUrl.includes("hnaya.dz") && currentUrl.includes("hnayatube")) {
+      if (currentUrl.includes("hnaya.dz") && currentUrl.includes("hnayatube-watch")) {
         view.webContents.executeJavaScript(`
           (function injectHnayaDownloadButtons() {
             if (document.querySelector('[data-hnaya-dl-injected]')) return;
@@ -344,29 +344,21 @@ ipcMain.on("open-tab", (event, newTab) => {
             \`;
             document.head.appendChild(style);
 
-            const watchEl = document.querySelector('[data-video-id]');
-            if (watchEl) {
-              const videoId = watchEl.getAttribute('data-video-id');
-              if (videoId) {
-                const ytUrl = 'https://www.youtube.com/watch?v=' + videoId;
-                const existing = watchEl.querySelector('.hnaya-dl-btn');
-                if (!existing) {
-                  const btn = document.createElement('button');
-                  btn.className = 'hnaya-dl-btn';
-                  btn.innerHTML = '⬇️ Télécharger';
-                  btn.style.cssText = 'position:relative;bottom:auto;right:auto;margin:8px 0;';
-                  btn.setAttribute('data-yt-url', ytUrl);
-                  btn.setAttribute('title', 'Télécharger cette vidéo');
-                  btn.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    window.location.href = 'hnaya-dl://' + encodeURIComponent(ytUrl);
-                  });
-                  watchEl.insertAdjacentElement('afterend', btn);
-                }
-              }
-            }
-
+            const urlParams = new URLSearchParams(window.location.search);
+const videoId = urlParams.get('v');
+if (videoId) {
+  const ytUrl = 'https://www.youtube.com/watch?v=' + videoId;
+  if (!document.querySelector('.hnaya-dl-btn')) {
+    const btn = document.createElement('button');
+    btn.className = 'hnaya-dl-btn';
+    btn.innerHTML = '⬇️ Télécharger';
+    btn.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:9999;padding:10px 16px;font-size:14px;font-weight:700;background:rgba(0,99,65,0.9);color:#fff;border:none;border-radius:10px;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.3);';
+    btn.addEventListener('click', () => {
+      window.location.href = 'hnaya-dl://' + encodeURIComponent(ytUrl);
+    });
+    document.body.appendChild(btn);
+  }
+}
             
           })();
         `).catch(console.error);
