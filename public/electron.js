@@ -290,17 +290,30 @@ ipcMain.on("open-tab", (event, newTab) => {
     // Intercepter hnaya-dl:// pour ouvrir le panneau de téléchargement
     // (les WebContentsViews sandbox ne peuvent pas appeler electronAPI directement)
     view.webContents.on("will-navigate", (event, navUrl) => {
-      if (navUrl.startsWith("hnaya-dl://")) {
-        event.preventDefault();
-        try {
-          const ytUrl = decodeURIComponent(navUrl.replace("hnaya-dl://", ""));
-          mainWindow.webContents.send("open-download-panel", ytUrl);
-        } catch (e) {
-          console.error("hnaya-dl:// parse error:", e);
-        }
-      }
-    });
+  if (navUrl.startsWith("hnaya-dl://")) {
+    event.preventDefault();
+    try {
+      const ytUrl = decodeURIComponent(navUrl.replace("hnaya-dl://", ""));
+      mainWindow.webContents.send("open-download-panel", ytUrl);
+    } catch (e) {
+      console.error("hnaya-dl:// parse error:", e);
+    }
+  }
+});
 
+// ✅ did-navigate couvre les cas où will-navigate ne se déclenche pas (sandbox + location.href)
+view.webContents.on("did-navigate", (event, navUrl) => {
+  if (navUrl.startsWith("hnaya-dl://")) {
+    try {
+      const ytUrl = decodeURIComponent(navUrl.replace("hnaya-dl://", ""));
+      mainWindow.webContents.send("open-download-panel", ytUrl);
+      // Revenir en arrière pour ne pas bloquer la page
+      view.webContents.goBack();
+    } catch (e) {
+      console.error("hnaya-dl:// did-navigate parse error:", e);
+    }
+  }
+});
     ["did-start-loading","did-stop-loading","did-finish-load","did-navigate","did-navigate-in-page"]
       .forEach(ev => view.webContents.on(ev, updateTabInfo));
 
