@@ -1,4 +1,3 @@
-
 import { app, BrowserWindow, WebContentsView, ipcMain, Menu, dialog } from "electron";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
@@ -176,7 +175,7 @@ ipcMain.handle("choose-download-folder", async () => {
 });
 
 // 4. Lancer le téléchargement avec progression
-ipcMain.on("download-video", (event, { url, outputFolder }) => {
+ipcMain.on("download-video", (event, { url, outputFolder, quality }) => {
   if (!existsSync(ytDlpPath)) {
     event.sender.send("download-done", { success: false, error: "yt-dlp introuvable." });
     return;
@@ -184,10 +183,14 @@ ipcMain.on("download-video", (event, { url, outputFolder }) => {
 
   const outputTemplate = join(outputFolder, "%(title)s.%(ext)s");
 
-  // ✅ PATCH 9 — format préemballé MP4 (un seul fichier sans ffmpeg, 720p max)
+  // ⚡ Mode rapide : MP4 720p préemballé, un seul fichier, sans ffmpeg
+  // 🎬 Haute qualité : meilleure vidéo + meilleur audio (nécessite ffmpeg pour fusionner)
+  const formatArgs = quality === "hq"
+    ? ["--format", "bestvideo+bestaudio/best", "--merge-output-format", "mp4"]
+    : ["--format", "best[ext=mp4][vcodec!*=av01]/bestvideo[ext=mp4][height<=720][vcodec!*=av01]+bestaudio[ext=m4a]/best[height<=720]", "--no-part"];
+
   const proc = spawn(ytDlpPath, [
-    "--format", "best[ext=mp4][vcodec!*=av01]/bestvideo[ext=mp4][height<=720][vcodec!*=av01]+bestaudio[ext=m4a]/best[height<=720]",
-    "--no-part",
+    ...formatArgs,
     "--output", outputTemplate,
     "--no-playlist",
     "--newline",
@@ -303,50 +306,54 @@ ipcMain.on("open-tab", (event, newTab) => {
       updateTabInfo();
     });
 view.webContents.on("did-finish-load", () => {
-  // Favicon
-  view.webContents.executeJavaScript(`
-    const favicon = document.querySelector('link[rel="icon"], link[rel="shortcut icon"]');
-    favicon ? favicon.href : null;
-  `).then(faviconUrl => {
-    mainWindow.webContents.send("update-tab-favicon", { id, faviconUrl });
-  }).catch(console.error);
+      // Favicon
+      view.webContents.executeJavaScript(`
+        const favicon = document.querySelector('link[rel="icon"], link[rel="shortcut icon"]');
+        favicon ? favicon.href : null;
+      `).then(faviconUrl => {
+        mainWindow.webContents.send("update-tab-favicon", { id, faviconUrl });
+      }).catch(console.error);
 
-  // Injection bouton téléchargement sur hnayatube-watch
-  const currentUrl = view.webContents.getURL();
-  if (currentUrl.includes("hnaya.dz") && currentUrl.includes("hnayatube-watch")) {
-    view.webContents.executeJavaScript(`
-      (function() {
-        if (document.querySelector('.hnaya-dl-btn')) return;
-        const urlParams = new URLSearchParams(window.location.search);
-        const videoId = urlParams.get('v');
-        if (!videoId) return;
-        const ytUrl = 'https://www.youtube.com/watch?v=' + videoId;
-        const btn = document.createElement('button');
-        btn.className = 'hnaya-dl-btn';
-        btn.innerHTML = '⬇️ Télécharger';
-        btn.style.cssText = [
-          'position:fixed',
-          'bottom:20px',
-          'right:20px',
-          'z-index:99999',
-          'padding:10px 16px',
-          'font-size:14px',
-          'font-weight:700',
-          'background:rgba(0,99,65,0.95)',
-          'color:#fff',
-          'border:none',
-          'border-radius:10px',
-          'cursor:pointer',
-          'box-shadow:0 4px 15px rgba(0,0,0,0.4)'
-        ].join(';');
-        btn.addEventListener('click', () => {
-          window.location.href = 'hnaya-dl://' + encodeURIComponent(ytUrl);
-        });
-        document.body.appendChild(btn);
-      })();
-    `).catch(console.error);
-  }
-});
+      // Injection bouton téléchargement sur hnayatube-watch
+      // La page charge via JS — on attend 2s pour que le contenu soit rendu
+      const currentUrl = view.webContents.getURL();
+      if (currentUrl.includes("hnaya.dz") && currentUrl.includes("hnayatube-watch")) {
+        setTimeout(() => {
+          view.webContents.executeJavaScript(`
+            (function() {
+              if (document.querySelector('.hnaya-dl-btn')) return;
+              const urlParams = new URLSearchParams(window.location.search);
+              const videoId = urlParams.get('v');
+              if (!videoId) return;
+              const ytUrl = 'https://www.youtube.com/watch?v=' + videoId;
+              const btn = document.createElement('button');
+              btn.className = 'hnaya-dl-btn';
+              btn.innerHTML = '⬇️ Télécharger';
+              btn.style.cssText = [
+                'position:fixed',
+                'bottom:20px',
+                'right:20px',
+                'z-index:99999',
+                'padding:10px 16px',
+                'font-size:14px',
+                'font-weight:700',
+                'background:rgba(0,99,65,0.95)',
+                'color:#fff',
+                'border:none',
+                'border-radius:10px',
+                'cursor:pointer',
+                'box-shadow:0 4px 15px rgba(0,0,0,0.4)',
+                'font-family:system-ui,sans-serif'
+              ].join(';');
+              btn.addEventListener('click', () => {
+                window.location.href = 'hnaya-dl://' + encodeURIComponent(ytUrl);
+              });
+              document.body.appendChild(btn);
+            })();
+          `).catch(console.error);
+        }, 2000);
+      }
+    });
  
     view.webContents.loadURL(url);
   }
