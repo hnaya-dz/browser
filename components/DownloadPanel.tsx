@@ -99,16 +99,16 @@ const QUALITY_OPTIONS: { id: Quality; label: string; desc: string; icon: string;
   {
     id: "fast",
     label: "Rapide",
-    desc: "MP4 720p — un seul fichier",
+    desc: "MP4 720p — 1 fichier",
     icon: "⚡",
-    note: "Visionnage normal, compatible partout",
+    note: "Fichier léger",
   },
   {
     id: "hq",
     label: "Haute qualité",
     desc: "Meilleure vidéo + meilleur audio",
     icon: "🎬",
-    note: "Nécessite ffmpeg · pour créateurs de contenu",
+    note: "Pour créateurs de contenu",
   },
 ];
 
