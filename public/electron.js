@@ -302,69 +302,52 @@ ipcMain.on("open-tab", (event, newTab) => {
       mainWindow.webContents.send("update-url", id, validatedURL);
       updateTabInfo();
     });
+view.webContents.on("did-finish-load", () => {
+  // Favicon
+  view.webContents.executeJavaScript(`
+    const favicon = document.querySelector('link[rel="icon"], link[rel="shortcut icon"]');
+    favicon ? favicon.href : null;
+  `).then(faviconUrl => {
+    mainWindow.webContents.send("update-tab-favicon", { id, faviconUrl });
+  }).catch(console.error);
 
-    view.webContents.on("did-finish-load", () => {
-      view.webContents.executeJavaScript(`
-        const favicon = document.querySelector('link[rel="icon"], link[rel="shortcut icon"]');
-        favicon ? favicon.href : null;
-      `).then(faviconUrl => {
-        mainWindow.webContents.send("update-tab-favicon", { id, faviconUrl });
-      }).catch(console.error);
-
-      // ── Injection HnayaTube : boutons ⬇️ sur les cartes de la grille ──
-      const currentUrl = view.webContents.getURL();
-      if (currentUrl.includes("hnaya.dz") && currentUrl.includes("hnayatube-watch")) {
-        view.webContents.executeJavaScript(`
-          (function injectHnayaDownloadButtons() {
-            if (document.querySelector('[data-hnaya-dl-injected]')) return;
-            document.body.setAttribute('data-hnaya-dl-injected', '1');
-
-            const style = document.createElement('style');
-            style.textContent = \`
-              .hnaya-dl-btn {
-                position: absolute;
-                bottom: 8px;
-                right: 8px;
-                z-index: 999;
-                background: rgba(0,0,0,0.75);
-                color: #fff;
-                border: none;
-                border-radius: 6px;
-                padding: 4px 8px;
-                font-size: 13px;
-                cursor: pointer;
-                display: flex;
-                align-items: center;
-                gap: 4px;
-                backdrop-filter: blur(4px);
-                transition: background 0.2s;
-              }
-              .hnaya-dl-btn:hover { background: rgba(0,99,65,0.9); }
-              .hnaya-dl-card-wrap { position: relative; display: inline-block; }
-            \`;
-            document.head.appendChild(style);
-
-            const urlParams = new URLSearchParams(window.location.search);
-const videoId = urlParams.get('v');
-if (videoId) {
-  const ytUrl = 'https://www.youtube.com/watch?v=' + videoId;
-  if (!document.querySelector('.hnaya-dl-btn')) {
-    const btn = document.createElement('button');
-    btn.className = 'hnaya-dl-btn';
-    btn.innerHTML = '⬇️ Télécharger';
-    btn.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:9999;padding:10px 16px;font-size:14px;font-weight:700;background:rgba(0,99,65,0.9);color:#fff;border:none;border-radius:10px;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.3);';
-    btn.addEventListener('click', () => {
-      window.location.href = 'hnaya-dl://' + encodeURIComponent(ytUrl);
-    });
-    document.body.appendChild(btn);
+  // Injection bouton téléchargement sur hnayatube-watch
+  const currentUrl = view.webContents.getURL();
+  if (currentUrl.includes("hnaya.dz") && currentUrl.includes("hnayatube-watch")) {
+    view.webContents.executeJavaScript(`
+      (function() {
+        if (document.querySelector('.hnaya-dl-btn')) return;
+        const urlParams = new URLSearchParams(window.location.search);
+        const videoId = urlParams.get('v');
+        if (!videoId) return;
+        const ytUrl = 'https://www.youtube.com/watch?v=' + videoId;
+        const btn = document.createElement('button');
+        btn.className = 'hnaya-dl-btn';
+        btn.innerHTML = '⬇️ Télécharger';
+        btn.style.cssText = [
+          'position:fixed',
+          'bottom:20px',
+          'right:20px',
+          'z-index:99999',
+          'padding:10px 16px',
+          'font-size:14px',
+          'font-weight:700',
+          'background:rgba(0,99,65,0.95)',
+          'color:#fff',
+          'border:none',
+          'border-radius:10px',
+          'cursor:pointer',
+          'box-shadow:0 4px 15px rgba(0,0,0,0.4)'
+        ].join(';');
+        btn.addEventListener('click', () => {
+          window.location.href = 'hnaya-dl://' + encodeURIComponent(ytUrl);
+        });
+        document.body.appendChild(btn);
+      })();
+    `).catch(console.error);
   }
-}
-            
-          })();
-        `).catch(console.error);
-      }
-    });
-
+});
+ 
     view.webContents.loadURL(url);
   }
 
