@@ -106,7 +106,7 @@ const QUALITY_OPTIONS: { id: Quality; label: string; desc: string; icon: string;
   {
     id: "hq",
     label: "Haute qualité",
-    desc: "Meilleure vidéo + meilleur audio",
+    desc: "Meilleure résolution",
     icon: "🎬",
     note: "Pour créateurs de contenu",
   },
