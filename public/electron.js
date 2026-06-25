@@ -304,7 +304,16 @@ ipcMain.on("open-tab", (event, newTab) => {
     }
   }
 });
-
+// ✅ Intercepter postMessage depuis la WebContentsView (sandbox)
+view.webContents.on("ipc-message", (event, channel, ...args) => {
+  if (channel === "hnaya-dl") {
+    const ytUrl = args[0];
+    if (mainWindow) mainWindow.contentView.removeChildView(view);
+    setTimeout(() => {
+      mainWindow.webContents.send("open-download-panel", ytUrl);
+    }, 150);
+  }
+});
 view.webContents.on("did-navigate", (event, navUrl) => {
   if (navUrl.startsWith("hnaya-dl://")) {
     try {
@@ -368,7 +377,7 @@ view.webContents.on("did-finish-load", () => {
                 'font-family:system-ui,sans-serif'
               ].join(';');
               btn.addEventListener('click', () => {
-                window.location.href = 'hnaya-dl://' + encodeURIComponent(ytUrl);
+              window.parent.postMessage({ type: 'hnaya-dl', url: ytUrl }, '*');
               });
               document.body.appendChild(btn);
             })();
