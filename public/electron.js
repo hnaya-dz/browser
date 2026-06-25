@@ -294,21 +294,27 @@ ipcMain.on("open-tab", (event, newTab) => {
     event.preventDefault();
     try {
       const ytUrl = decodeURIComponent(navUrl.replace("hnaya-dl://", ""));
-      mainWindow.webContents.send("open-download-panel", ytUrl);
+      // ✅ Cacher la WebContentsView AVANT d'afficher le panneau (même logique que urlbar.tsx)
+      if (mainWindow) mainWindow.contentView.removeChildView(view);
+      setTimeout(() => {
+        mainWindow.webContents.send("open-download-panel", ytUrl);
+      }, 150);
     } catch (e) {
       console.error("hnaya-dl:// parse error:", e);
     }
   }
 });
 
-// ✅ did-navigate couvre les cas où will-navigate ne se déclenche pas (sandbox + location.href)
 view.webContents.on("did-navigate", (event, navUrl) => {
   if (navUrl.startsWith("hnaya-dl://")) {
     try {
       const ytUrl = decodeURIComponent(navUrl.replace("hnaya-dl://", ""));
-      mainWindow.webContents.send("open-download-panel", ytUrl);
-      // Revenir en arrière pour ne pas bloquer la page
-      view.webContents.goBack();
+      // ✅ Même correction pour did-navigate
+      if (mainWindow) mainWindow.contentView.removeChildView(view);
+      setTimeout(() => {
+        mainWindow.webContents.send("open-download-panel", ytUrl);
+        view.webContents.goBack();
+      }, 150);
     } catch (e) {
       console.error("hnaya-dl:// did-navigate parse error:", e);
     }
