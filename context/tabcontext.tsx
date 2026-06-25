@@ -49,7 +49,7 @@ export function TabProvider({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         // ✅ PATCH 5a — updateTitle : ne jamais écraser le titre de l'onglet home
         // Accepte tout vrai titre envoyé par page-title-updated
-        const updateTitle = (event: any, { id, title }: { id: number; title: string }) => {
+        const updateTitle = ({ id, title }: { id: number; title: string }) => {
             setTabs(prevTabs => prevTabs.map(tab => {
                 if (tab.id !== id) return tab;
                 if (tab.isHome) return tab; // l'onglet home garde toujours son titre traduit
