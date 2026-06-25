@@ -11,6 +11,7 @@ const ALLOWED_INVOKE = [
 
 const ALLOWED_SEND = [
   "navigate",
+  "hnaya-dl",
   "go-back",
   "go-forward",
   "refresh",
