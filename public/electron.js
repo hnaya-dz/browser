@@ -367,33 +367,7 @@ ipcMain.on("open-tab", (event, newTab) => {
               }
             }
 
-            const cards = document.querySelectorAll('a[href*="hnayatube"][href*="?v="], a[href*="/watch?v="], a[href*="?v="]');
-            cards.forEach(card => {
-              if (card.querySelector('.hnaya-dl-btn')) return;
-              const href = card.getAttribute('href') || '';
-              const match = href.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
-              if (!match) return;
-              const videoId = match[1];
-              const ytUrl = 'https://www.youtube.com/watch?v=' + videoId;
-
-              const style = window.getComputedStyle(card);
-              if (style.position === 'static') card.style.position = 'relative';
-
-              const btn = document.createElement('button');
-              btn.className = 'hnaya-dl-btn';
-              btn.innerHTML = '⬇️';
-              btn.setAttribute('data-yt-url', ytUrl);
-              btn.setAttribute('title', 'Télécharger cette vidéo');
-              btn.addEventListener('click', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                window.location.href = 'hnaya-dl://' + encodeURIComponent(ytUrl);
-              });
-              card.appendChild(btn);
-            });
-
-            const observer = new MutationObserver(() => injectHnayaDownloadButtons());
-            observer.observe(document.body, { childList: true, subtree: true });
+            
           })();
         `).catch(console.error);
       }
