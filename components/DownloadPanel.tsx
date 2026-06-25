@@ -247,9 +247,7 @@ export default function DownloadPanel({ url, onClose }: DownloadPanelProps) {
 
               {/* ✅ Choix de qualité */}
               <div>
-                <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 8, color: theme.textMuted, textTransform: "uppercase", letterSpacing: 1 }}>
-                  Qualité
-                </div>
+                
                 <div style={{ display: "flex", gap: 8 }}>
                   {QUALITY_OPTIONS.map((opt) => {
                     const isActive = quality === opt.id;
@@ -270,7 +268,6 @@ export default function DownloadPanel({ url, onClose }: DownloadPanelProps) {
                       >
                         <div style={{ fontSize: 15, marginBottom: 3 }}>{opt.icon} <span style={{ fontSize: 13, fontWeight: 700 }}>{opt.label}</span></div>
                         <div style={{ fontSize: 11, color: theme.textMuted, fontWeight: 500 }}>{opt.desc}</div>
-                        <div style={{ fontSize: 10, color: theme.textMuted, marginTop: 3, opacity: 0.7 }}>{opt.note}</div>
                       </button>
                     );
                   })}
