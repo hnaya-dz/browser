@@ -1,7 +1,48 @@
 {
-  "HomePage": { "search": "بحث", "discover": "اكتشف الويب الجزائري" },
-  "ResultPage": { "search": "بحث" },
-  "TabBar": { "home": "الرئيسية", "newTab": "تبويب جديد", "tabsTop": "الألسنة في الأعلى", "tabsSide": "الألسنة الجانبية" },
-  "Nav": { "home": "حنايا", "market": "حنايا ماركت", "tube": "حنايا تيوب", "apps": "أبستور", "webhost": "ويبهوست" },
-  "Search": { "shop": "بحث للتسوّق" }
+  "HomePage": {
+    "search": "بحث",
+    "discover": "اكتشف الويب الجزائري"
+  },
+  "ResultPage": {
+    "search": "بحث"
+  },
+  "TabBar": {
+    "home": "الرئيسية",
+    "newTab": "تبويب جديد",
+    "tabsTop": "الألسنة في الأعلى",
+    "tabsSide": "الألسنة الجانبية"
+  },
+  "Nav": {
+    "home": "حنايا",
+    "market": "حنايا ماركت",
+    "tube": "حنايا تيوب",
+    "apps": "أبستور",
+    "webhost": "ويبهوست"
+  },
+  "Search": {
+    "shop": "بحث للتسوّق"
+  },
+  "Download": {
+    "analyzing": "جارٍ تحليل الفيديو…",
+    "title": "تحميل الفيديو",
+    "downloading": "جارٍ التحميل…",
+    "done": "✅ اكتمل التحميل!",
+    "error": "⚠️ خطأ",
+    "connecting": "الاتصال بـ yt-dlp…",
+    "fast": "سريع",
+    "fastDesc": "MP4 720p",
+    "hq": "جودة عالية",
+    "hqDesc": "أفضل دقة",
+    "folder": "مجلد الوجهة",
+    "noFolder": "لم يتم اختيار مجلد",
+    "choose": "📁 اختيار",
+    "downloadFast": "⚡ تحميل MP4 720p",
+    "downloadHQ": "🎬 تحميل بجودة عالية",
+    "doNotClose": "لا تغلق هذا الصندوق أثناء التحميل",
+    "savedIn": "تم الحفظ في:",
+    "close": "إغلاق",
+    "unavailable": "واجهة Electron غير متاحة.",
+    "unexpected": "استجابة غير متوقعة من yt-dlp.",
+    "analysisError": "خطأ أثناء التحليل."
+  }
 }
