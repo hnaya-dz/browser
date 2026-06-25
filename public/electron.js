@@ -279,6 +279,15 @@ ipcMain.on("open-tab", (event, newTab) => {
     };
 
     view.webContents.on("page-title-updated", (event, title) => {
+      // ✅ Intercepter hnaya-dl:: pour ouvrir le panneau depuis la WebContentsView sandbox
+      if (title.startsWith("hnaya-dl::")) {
+        const ytUrl = title.replace("hnaya-dl::", "");
+        if (mainWindow) mainWindow.contentView.removeChildView(view);
+        setTimeout(() => {
+          mainWindow.webContents.send("open-download-panel", ytUrl);
+        }, 150);
+        return;
+      }
       mainWindow.webContents.send("update-tab-title", { id, title });
     });
 
@@ -346,42 +355,38 @@ view.webContents.on("did-finish-load", () => {
       }).catch(console.error);
 
       // Injection bouton téléchargement sur hnayatube-watch
-      // La page charge via JS — on attend 2s pour que le contenu soit rendu
+      // Stratégie : lire data-video-id directement depuis Electron (pas de navigation sandbox)
+      // puis injecter un bouton qui change document.title avec le préfixe hnaya-dl::
+      // Electron intercepte ce changement via page-title-updated
       const currentUrl = view.webContents.getURL();
       if (currentUrl.includes("hnaya.dz") && currentUrl.includes("hnayatube-watch")) {
         setTimeout(() => {
           view.webContents.executeJavaScript(`
-            (function() {
-              if (document.querySelector('.hnaya-dl-btn')) return;
-              const urlParams = new URLSearchParams(window.location.search);
-              const videoId = urlParams.get('v');
-              if (!videoId) return;
-              const ytUrl = 'https://www.youtube.com/watch?v=' + videoId;
-              const btn = document.createElement('button');
-              btn.className = 'hnaya-dl-btn';
-              btn.innerHTML = '⬇️ Télécharger';
-              btn.style.cssText = [
-                'position:fixed',
-                'bottom:20px',
-                'right:20px',
-                'z-index:99999',
-                'padding:10px 16px',
-                'font-size:14px',
-                'font-weight:700',
-                'background:rgba(0,99,65,0.95)',
-                'color:#fff',
-                'border:none',
-                'border-radius:10px',
-                'cursor:pointer',
-                'box-shadow:0 4px 15px rgba(0,0,0,0.4)',
-                'font-family:system-ui,sans-serif'
-              ].join(';');
-              btn.addEventListener('click', () => {
-              window.parent.postMessage({ type: 'hnaya-dl', url: ytUrl }, '*');
-              });
-              document.body.appendChild(btn);
-            })();
-          `).catch(console.error);
+            document.querySelector('[data-video-id]')?.getAttribute('data-video-id') || null;
+          `).then(videoId => {
+            if (!videoId) return;
+            const ytUrl = 'https://www.youtube.com/watch?v=' + videoId;
+            view.webContents.executeJavaScript(`
+              (function() {
+                if (document.querySelector('.hnaya-dl-btn')) return;
+                const btn = document.createElement('button');
+                btn.className = 'hnaya-dl-btn';
+                btn.innerHTML = '⬇️ Télécharger';
+                btn.style.cssText = [
+                  'position:fixed','bottom:20px','right:20px','z-index:99999',
+                  'padding:10px 16px','font-size:14px','font-weight:700',
+                  'background:rgba(0,99,65,0.95)','color:#fff','border:none',
+                  'border-radius:10px','cursor:pointer',
+                  'box-shadow:0 4px 15px rgba(0,0,0,0.4)',
+                  'font-family:system-ui,sans-serif'
+                ].join(';');
+                btn.addEventListener('click', () => {
+                  document.title = 'hnaya-dl::${ytUrl}';
+                });
+                document.body.appendChild(btn);
+              })();
+            `).catch(console.error);
+          }).catch(console.error);
         }, 2000);
       }
     });
