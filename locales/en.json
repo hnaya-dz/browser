@@ -50,6 +50,9 @@
     "removeImage": "Remove image",
     "dropHere": "Drag an image here or click to choose",
     "supportedFormats": "JPG, PNG, WEBP",
-    "overlayOpacity": "Overlay opacity"
+    "overlayOpacity": "Overlay opacity",
+    "apply": "Apply",
+    "formatError": "Unsupported format.",
+    "sizeError": "Image too large (max {max} MB)."
   }
 }
