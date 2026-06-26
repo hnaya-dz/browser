@@ -50,6 +50,9 @@
     "removeImage": "Supprimer l'image",
     "dropHere": "Glissez une image ici ou cliquez pour choisir",
     "supportedFormats": "JPG, PNG, WEBP",
-    "overlayOpacity": "Opacité de la couche"
+    "overlayOpacity": "Opacité de la couche",
+    "apply": "Appliquer",
+    "formatError": "Format non supporté.",
+    "sizeError": "Image trop grande (max {max} Mo)."
   }
 }
