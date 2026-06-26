@@ -41,5 +41,15 @@
     "unavailable": "API Electron non disponible.",
     "unexpected": "Réponse inattendue de yt-dlp.",
     "analysisError": "Erreur lors de l'analyse."
+  },
+  "Theme": {
+    "custom": "Personnalisé",
+    "customLabel": "Fond personnalisé",
+    "chooseImage": "Choisir une image",
+    "changeImage": "Changer l'image",
+    "removeImage": "Supprimer l'image",
+    "dropHere": "Glissez une image ici ou cliquez pour choisir",
+    "supportedFormats": "JPG, PNG, WEBP",
+    "overlayOpacity": "Opacité de la couche"
   }
 }
