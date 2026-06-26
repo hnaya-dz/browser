@@ -1,7 +1,12 @@
 "use client";
-import { FC } from "react";
+import { FC, useState } from "react";
 import { useTheme } from "next-themes";
 import { useIsSSR } from "@react-aria/ssr";
+import { useCustomTheme } from "@/context/customthemecontext";
+import dynamic from "next/dynamic";
+
+// Chargement dynamique pour éviter le SSR
+const CustomThemePanel = dynamic(() => import("./CustomThemePanel"), { ssr: false });
 
 export interface ThemeSwitchProps {
   className?: string;
@@ -10,39 +15,48 @@ export interface ThemeSwitchProps {
 export const ThemeSwitch: FC<ThemeSwitchProps> = ({ className }) => {
   const { theme, setTheme } = useTheme();
   const isSSR = useIsSSR();
+  const { customBg } = useCustomTheme();
+  const [showPanel, setShowPanel] = useState(false);
 
   const currentTheme = isSSR ? "dark" : (theme ?? "dark");
 
   const cycleTheme = () => {
     if (currentTheme === "dark") setTheme("light");
     else if (currentTheme === "light") setTheme("sunset");
+    else if (currentTheme === "sunset") setShowPanel(true); // → ouvre le panneau custom
+    else if (currentTheme === "custom") setShowPanel(true); // → rouvrir le panneau
     else setTheme("dark");
   };
 
-  const icon = currentTheme === "dark"
-    ? "🌙"
-    : currentTheme === "light"
-    ? "☀️"
-    : "🌅";
+  const icon = currentTheme === "dark"    ? "🌙"
+             : currentTheme === "light"   ? "☀️"
+             : currentTheme === "sunset"  ? "🌅"
+             : customBg                   ? "🖼️"
+             : "🎨";
 
-  const label = currentTheme === "dark"
-    ? "Mode sombre"
-    : currentTheme === "light"
-    ? "Mode clair"
-    : "Coucher de soleil";
+  const label = currentTheme === "dark"   ? "Mode sombre"
+              : currentTheme === "light"  ? "Mode clair"
+              : currentTheme === "sunset" ? "Coucher de soleil"
+              : "Fond personnalisé";
 
   return (
-    <button
-      onClick={cycleTheme}
-      title={label}
-      className={`
-        text-lg w-8 h-8 flex items-center justify-center rounded-lg
-        hover:bg-white/10 transition-all duration-200 hover:scale-110
-        ${className ?? ""}
-      `}
-      aria-label={label}
-    >
-      {icon}
-    </button>
+    <>
+      <button
+        onClick={cycleTheme}
+        title={label}
+        className={`
+          text-lg w-8 h-8 flex items-center justify-center rounded-lg
+          hover:bg-white/10 transition-all duration-200 hover:scale-110
+          ${className ?? ""}
+        `}
+        aria-label={label}
+      >
+        {icon}
+      </button>
+
+      {showPanel && (
+        <CustomThemePanel onClose={() => setShowPanel(false)} />
+      )}
+    </>
   );
 };
