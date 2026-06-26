@@ -44,5 +44,15 @@
     "unavailable": "واجهة Electron غير متاحة.",
     "unexpected": "استجابة غير متوقعة من yt-dlp.",
     "analysisError": "خطأ أثناء التحليل."
+  },
+  "Theme": {
+    "custom": "مخصص",
+    "customLabel": "خلفية مخصصة",
+    "chooseImage": "اختر صورة",
+    "changeImage": "تغيير الصورة",
+    "removeImage": "إزالة الصورة",
+    "dropHere": "اسحب صورة هنا أو انقر للاختيار",
+    "supportedFormats": "JPG، PNG، WEBP",
+    "overlayOpacity": "شفافية الطبقة"
   }
 }
