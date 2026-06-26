@@ -107,6 +107,7 @@ export default function CustomThemePanel({ onClose }: CustomThemePanelProps) {
         top: "50%",
         left: "50%",
         transform: "translate(-50%, -50%)",
+        marginTop: "20px",
         zIndex: 10000,
         width: 420,
         maxWidth: "92vw",
