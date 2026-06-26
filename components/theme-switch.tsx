@@ -5,7 +5,6 @@ import { useIsSSR } from "@react-aria/ssr";
 import { useCustomTheme } from "@/context/customthemecontext";
 import dynamic from "next/dynamic";
 
-// Chargement dynamique pour éviter le SSR
 const CustomThemePanel = dynamic(() => import("./CustomThemePanel"), { ssr: false });
 
 export interface ThemeSwitchProps {
@@ -21,18 +20,18 @@ export const ThemeSwitch: FC<ThemeSwitchProps> = ({ className }) => {
   const currentTheme = isSSR ? "dark" : (theme ?? "dark");
 
   const cycleTheme = () => {
-    if (currentTheme === "dark") setTheme("light");
-    else if (currentTheme === "light") setTheme("sunset");
-    else if (currentTheme === "sunset") setShowPanel(true); // → ouvre le panneau custom
-    else if (currentTheme === "custom") setShowPanel(true); // → rouvrir le panneau
+    if (currentTheme === "dark")        setTheme("light");
+    else if (currentTheme === "light")  setTheme("sunset");
+    else if (currentTheme === "sunset") setShowPanel(true);  // ouvre le panneau
+    else if (currentTheme === "custom") setShowPanel(true);  // rouvre le panneau
     else setTheme("dark");
   };
 
-  const icon = currentTheme === "dark"    ? "🌙"
-             : currentTheme === "light"   ? "☀️"
-             : currentTheme === "sunset"  ? "🌅"
-             : customBg                   ? "🖼️"
-             : "🎨";
+  const icon  = currentTheme === "dark"   ? "🌙"
+              : currentTheme === "light"  ? "☀️"
+              : currentTheme === "sunset" ? "🌅"
+              : customBg                  ? "🖼️"
+              : "🎨";
 
   const label = currentTheme === "dark"   ? "Mode sombre"
               : currentTheme === "light"  ? "Mode clair"
