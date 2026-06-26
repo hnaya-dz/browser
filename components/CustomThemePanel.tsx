@@ -30,14 +30,12 @@ export default function CustomThemePanel({ onClose }: CustomThemePanelProps) {
   const [error, setError] = useState("");
   const [preview, setPreview] = useState<string | null>(customBg);
   const [localOpacity, setLocalOpacity] = useState(overlayOpacity);
-  const [applied, setApplied] = useState(false);
 
   const themeName = getThemeName();
   const dir = isRTL ? "rtl" : "ltr";
 
   const processFile = useCallback((file: File) => {
     setError("");
-    setApplied(false);
     if (!file.type.startsWith("image/")) {
       setError(t("Theme.formatError") + " " + t("Theme.supportedFormats"));
       return;
@@ -68,21 +66,20 @@ export default function CustomThemePanel({ onClose }: CustomThemePanelProps) {
 
   const handleRemove = useCallback(() => {
     setPreview(null);
-    setApplied(false);
     setCustomBg(null);
     setTheme("dark");
     if (inputRef.current) inputRef.current.value = "";
-  }, [setCustomBg, setTheme]);
+    onClose(); // ✅ fermer après suppression
+  }, [setCustomBg, setTheme, onClose]);
 
-  // ✅ Bouton Appliquer — valide les changements et ferme le panneau
+  // ✅ Appliquer l'image ET l'opacité, puis fermer
   const handleApply = useCallback(() => {
     if (preview) {
-      setCustomBg(preview);
-      setOverlayOpacity(localOpacity);
-      setTheme("custom");
+      setCustomBg(preview);           // → déclenche useEffect dans context → CSS var
+      setOverlayOpacity(localOpacity); // → déclenche useEffect dans context → CSS var
+      setTheme("custom");             // → next-themes ajoute class="custom" sur <html>
     }
-    setApplied(true);
-    setTimeout(() => onClose(), 300);
+    onClose(); // ✅ toujours fermer, même sans image
   }, [preview, localOpacity, setCustomBg, setOverlayOpacity, setTheme, onClose]);
 
   // Couleurs selon le thème actif
@@ -95,155 +92,158 @@ export default function CustomThemePanel({ onClose }: CustomThemePanelProps) {
 
   return (
     <>
-      {/* Overlay */}
+      {/* ✅ Overlay cliquable qui ferme le panneau + centre le contenu */}
       <div
-        style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)" }}
-        onClick={onClose}
-      />
+        style={{
+          position: "fixed",
+          inset: 0,
+          zIndex: 9999,
+          background: "rgba(0,0,0,0.55)",
+          backdropFilter: "blur(4px)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "80px 16px 16px", // ✅ 80px en haut = sous la navbar + tabbar
+        }}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) onClose(); // ✅ fermer en cliquant hors du panneau
+        }}
+      >
+        {/* Panneau — pas de position:fixed propre, centré par le flexbox parent */}
+        <div dir={dir} style={{
+          width: 420,
+          maxWidth: "92vw",
+          maxHeight: "80vh",
+          overflowY: "auto",
+          background: bg,
+          border: `1px solid ${border}`,
+          borderRadius: 20,
+          padding: 22,
+          color: text,
+          boxShadow: "0 24px 80px rgba(0,0,0,0.7)",
+          display: "flex",
+          flexDirection: "column",
+          gap: 16,
+        }}>
 
-      {/* ✅ Panneau — centré avec top:50% mais limité pour rester dans l'écran */}
-      <div dir={dir} style={{
-        position: "fixed",
-        top: "50%",
-        left: "50%",
-        transform: "translate(-50%, -50%)",
-        marginTop: "20px",
-        zIndex: 10000,
-        width: 420,
-        maxWidth: "92vw",
-        maxHeight: "85vh",       // ✅ ne dépasse jamais l'écran
-        overflowY: "auto",       // ✅ scroll interne si contenu trop long
-        background: bg,
-        border: `1px solid ${border}`,
-        borderRadius: 20,
-        padding: 22,
-        color: text,
-        boxShadow: "0 24px 80px rgba(0,0,0,0.7)",
-        display: "flex",
-        flexDirection: "column",
-        gap: 16,
-      }}>
+          {/* Header */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <span style={{ fontSize: 15, fontWeight: 700 }}>🖼️ {t("Theme.customLabel")}</span>
+            <button
+              onClick={onClose} // ✅ fermer via le ✕
+              style={{ background: "none", border: "none", color: muted, fontSize: 20, cursor: "pointer", lineHeight: 1 }}
+            >✕</button>
+          </div>
 
-        {/* Header */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <span style={{ fontSize: 15, fontWeight: 700 }}>🖼️ {t("Theme.customLabel")}</span>
-          <button onClick={onClose} style={{ background: "none", border: "none", color: muted, fontSize: 20, cursor: "pointer", lineHeight: 1 }}>✕</button>
-        </div>
-
-        {/* Zone de dépôt / aperçu */}
-        <div
-          onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
-          onDragLeave={() => setDragging(false)}
-          onDrop={handleDrop}
-          onClick={() => !preview && inputRef.current?.click()}
-          style={{
-            position: "relative",
-            borderRadius: 12,
-            border: `2px dashed ${dragging ? accent : border}`,
-            background: dragging ? `${accent}18` : "rgba(255,255,255,0.04)",
-            minHeight: 140,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            cursor: preview ? "default" : "pointer",
-            overflow: "hidden",
-            transition: "all 0.15s",
-          }}
-        >
-          {preview ? (
-            <>
+          {/* Zone de dépôt / aperçu */}
+          <div
+            onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={handleDrop}
+            onClick={() => !preview && inputRef.current?.click()}
+            style={{
+              position: "relative",
+              borderRadius: 12,
+              border: `2px dashed ${dragging ? accent : border}`,
+              background: dragging ? `${accent}18` : "rgba(255,255,255,0.04)",
+              minHeight: 130,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              cursor: preview ? "default" : "pointer",
+              overflow: "hidden",
+              transition: "all 0.15s",
+            }}
+          >
+            {preview ? (
               <img
                 src={preview}
                 alt="aperçu"
-                style={{ width: "100%", height: 140, objectFit: "cover", display: "block" }}
+                style={{ width: "100%", height: 130, objectFit: "cover", display: "block" }}
               />
-              {themeName === "custom" && (
-                <div style={{
-                  position: "absolute", top: 8, left: 8,
-                  background: accent, color: "#fff",
-                  fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 99
-                }}>✓ {t("Theme.apply")}</div>
-              )}
-            </>
-          ) : (
-            <div style={{ textAlign: "center", padding: "0 20px" }}>
-              <div style={{ fontSize: 28, marginBottom: 6 }}>🖼️</div>
-              <div style={{ fontSize: 13, color: muted }}>{t("Theme.dropHere")}</div>
-              <div style={{ fontSize: 11, color: muted, marginTop: 3 }}>{t("Theme.supportedFormats")} · max {MAX_SIZE_MB} Mo</div>
-            </div>
+            ) : (
+              <div style={{ textAlign: "center", padding: "0 20px" }}>
+                <div style={{ fontSize: 28, marginBottom: 6 }}>🖼️</div>
+                <div style={{ fontSize: 13, color: muted }}>{t("Theme.dropHere")}</div>
+                <div style={{ fontSize: 11, color: muted, marginTop: 3 }}>
+                  {t("Theme.supportedFormats")} · max {MAX_SIZE_MB} Mo
+                </div>
+              </div>
+            )}
+          </div>
+
+          {error && (
+            <div style={{ fontSize: 12, color: "#ff6060", textAlign: "center" }}>{error}</div>
           )}
-        </div>
 
-        {error && (
-          <div style={{ fontSize: 12, color: "#ff6060", textAlign: "center" }}>{error}</div>
-        )}
-
-        {/* Boutons choisir / supprimer */}
-        <div style={{ display: "flex", gap: 8 }}>
-          <button
-            onClick={() => inputRef.current?.click()}
-            style={{
-              flex: 1, padding: "9px 0", borderRadius: 10, border: `1px solid ${border}`,
-              background: "rgba(255,255,255,0.07)", color: text,
-              fontWeight: 600, fontSize: 13, cursor: "pointer"
-            }}
-          >
-            {preview ? t("Theme.changeImage") : t("Theme.chooseImage")}
-          </button>
-
-          {preview && (
+          {/* Boutons choisir / supprimer */}
+          <div style={{ display: "flex", gap: 8 }}>
             <button
-              onClick={handleRemove}
+              onClick={() => inputRef.current?.click()}
               style={{
-                padding: "9px 14px", borderRadius: 10,
-                border: "1px solid rgba(255,80,80,0.3)",
-                background: "rgba(255,80,80,0.1)", color: "#ff8080",
+                flex: 1, padding: "9px 0", borderRadius: 10,
+                border: `1px solid ${border}`,
+                background: "rgba(255,255,255,0.07)", color: text,
                 fontWeight: 600, fontSize: 13, cursor: "pointer"
               }}
             >
-              {t("Theme.removeImage")}
+              {preview ? t("Theme.changeImage") : t("Theme.chooseImage")}
             </button>
-          )}
-        </div>
 
-        {/* Curseur opacité */}
-        {preview && (
-          <div>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: muted, marginBottom: 6 }}>
-              <span>{t("Theme.overlayOpacity")}</span>
-              <span>{Math.round(localOpacity * 100)}%</span>
-            </div>
-            <input
-              type="range" min={0} max={0.9} step={0.05}
-              value={localOpacity}
-              onChange={(e) => setLocalOpacity(parseFloat(e.target.value))}
-              style={{ width: "100%", accentColor: accent }}
-            />
+            {preview && (
+              <button
+                onClick={handleRemove}
+                style={{
+                  padding: "9px 14px", borderRadius: 10,
+                  border: "1px solid rgba(255,80,80,0.3)",
+                  background: "rgba(255,80,80,0.1)", color: "#ff8080",
+                  fontWeight: 600, fontSize: 13, cursor: "pointer"
+                }}
+              >
+                {t("Theme.removeImage")}
+              </button>
+            )}
           </div>
-        )}
 
-        {/* ✅ Bouton Appliquer — valide et ferme */}
-        {preview && (
+          {/* Curseur opacité — seulement si image choisie */}
+          {preview && (
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: muted, marginBottom: 6 }}>
+                <span>{t("Theme.overlayOpacity")}</span>
+                <span>{Math.round(localOpacity * 100)}%</span>
+              </div>
+              <input
+                type="range" min={0} max={0.9} step={0.05}
+                value={localOpacity}
+                onChange={(e) => setLocalOpacity(parseFloat(e.target.value))}
+                style={{ width: "100%", accentColor: accent }}
+              />
+            </div>
+          )}
+
+          {/* ✅ Bouton Appliquer — toujours visible, ferme dans tous les cas */}
           <button
             onClick={handleApply}
             style={{
               width: "100%", padding: 12, borderRadius: 10, border: "none",
-              background: applied
-                ? "rgba(0,160,80,0.4)"
-                : `linear-gradient(135deg,${accent},${accent}cc)`,
-              color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer",
+              background: preview
+                ? `linear-gradient(135deg,${accent},${accent}bb)`
+                : "rgba(128,128,128,0.25)",
+              color: preview ? "#fff" : muted,
+              fontWeight: 700, fontSize: 14,
+              cursor: "pointer",
               transition: "all 0.2s",
             }}
           >
-            {applied ? "✓" : t("Theme.apply")}
+            {preview ? t("Theme.apply") : t("Theme.close")}
           </button>
-        )}
 
-        <input
-          ref={inputRef}
-          type="file"
-          accept="image/jpeg,image/png,image/webp"
-          style={{ display: "none" }}
-          onChange={handleFile}
-        />
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            style={{ display: "none" }}
+            onChange={handleFile}
+          />
+        </div>
       </div>
     </>
   );
