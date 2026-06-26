@@ -53,6 +53,9 @@
     "removeImage": "إزالة الصورة",
     "dropHere": "اسحب صورة هنا أو انقر للاختيار",
     "supportedFormats": "JPG، PNG، WEBP",
-    "overlayOpacity": "شفافية الطبقة"
+    "overlayOpacity": "شفافية الطبقة",
+    "apply": "تطبيق",
+    "formatError": "تنسيق غير مدعوم.",
+    "sizeError": "الصورة كبيرة جداً (الحد الأقصى {max} ميغابايت)."
   }
 }
