@@ -41,5 +41,15 @@
     "unavailable": "Electron API not available.",
     "unexpected": "Unexpected response from yt-dlp.",
     "analysisError": "Error during analysis."
+  },
+  "Theme": {
+    "custom": "Custom",
+    "customLabel": "Custom background",
+    "chooseImage": "Choose image",
+    "changeImage": "Change image",
+    "removeImage": "Remove image",
+    "dropHere": "Drag an image here or click to choose",
+    "supportedFormats": "JPG, PNG, WEBP",
+    "overlayOpacity": "Overlay opacity"
   }
 }
