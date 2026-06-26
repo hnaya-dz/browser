@@ -15,3 +15,31 @@ html.light, html.light body { background-color: #f0f7f4 !important; }
 
 /* ── COUCHER DE SOLEIL ── */
 html.sunset, html.sunset body { background-color: #1a0005 !important; }
+
+/* ── PERSONNALISÉ ── */
+html.custom {
+  background-image: var(--custom-bg) !important;
+  background-size: cover !important;
+  background-position: center !important;
+  background-attachment: fixed !important;
+  background-color: #001208 !important;
+}
+
+html.custom body {
+  background-color: transparent !important;
+}
+
+/* Couche semi-transparente pour la lisibilité du texte */
+html.custom body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background: rgba(0, 0, 0, var(--custom-overlay-opacity, 0.45));
+  pointer-events: none;
+}
+
+html.custom body > * {
+  position: relative;
+  z-index: 1;
+}
