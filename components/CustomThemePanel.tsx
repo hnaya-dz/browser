@@ -39,7 +39,10 @@ export default function CustomThemePanel({ onClose }: CustomThemePanelProps) {
   const processFile = useCallback((file: File) => {
     setError("");
     // ✅ Vérifier le type réel (pas seulement l'extension)
-    const allowed = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+    // ✅ Formats supportés : JPEG/JPG, PNG, WEBP
+  // GIF non recommandé : les grands GIF animés dépassent souvent 5Mo et peuvent planter localStorage
+  // BMP/TIFF non supportés car trop lourds pour localStorage (base64 × 1.33)
+  const allowed = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
     if (!allowed.includes(file.type)) {
       setError(t("Theme.formatError") + " " + t("Theme.supportedFormats"));
       return;
@@ -208,7 +211,11 @@ export default function CustomThemePanel({ onClose }: CustomThemePanelProps) {
             <input
               type="range" min={0} max={0.9} step={0.05}
               value={localOpacity}
-              onChange={(e) => setLocalOpacity(parseFloat(e.target.value))}
+              onChange={(e) => {
+                const v = parseFloat(e.target.value);
+                setLocalOpacity(v);
+                setOverlayOpacity(v); // ✅ aperçu en temps réel sur la page
+              }}
               style={{ width: "100%", accentColor: accent }}
             />
           </div>
