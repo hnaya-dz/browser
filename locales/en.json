@@ -77,5 +77,14 @@
     "confirmDelete": "Delete this entry?",
     "injected": "Autofilled",
     "injectError": "Fields not found on this page"
+  },
+  "URLBar": {
+    "download": "Download",
+    "downloadTitle": "Download the video from this page",
+    "hintDownload": "Click to download the video from this page",
+    "vaultTitle": "Passwords",
+    "vaultTitleFound": "You have a saved password for this site",
+    "hintVault": "Save your passwords here",
+    "hintVaultFound": "Credentials available — click to autofill"
   }
 }
