@@ -411,15 +411,11 @@ export default function Home() {
            apparaître l'image de fond
         ══════════════════════════════════════════════ */
         .custom .glass-card {
-          background:rgba(0,0,0,0.35);
-          backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
-          border:1px solid rgba(255,255,255,0.15);
-          box-shadow:0 8px 40px rgba(0,0,0,0.5),inset 0 1px 0 rgba(255,255,255,0.1);
-        }
-        .custom .glass-title   { color:rgba(255,255,255,0.55); }
-        .custom .glass-tagline { color:rgba(255,255,255,0.35); }
-        .custom .glass-divider { border-color:rgba(255,255,255,0.12); }
-
+  background:rgba(0,0,0,0.15);
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  border:1px solid rgba(255,255,255,0.08);
+  box-shadow:0 8px 40px rgba(0,0,0,0.2),inset 0 1px 0 rgba(255,255,255,0.05);
+}
         .custom .glass-input {
           background:rgba(0,0,0,0.4);
           border:1px solid rgba(255,255,255,0.25);
