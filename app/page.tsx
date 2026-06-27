@@ -404,6 +404,56 @@ export default function Home() {
         .sunset .gs-snippet{color:rgba(255,180,120,0.7)!important;}
         .sunset .gsc-cursor-page{color:rgba(255,120,60,0.5)!important;}
         .sunset .gsc-cursor-current-page{color:#ff9060!important;font-weight:bold!important;}
+
+        /* ══════════════════════════════════════════════
+           THÈME PERSONNALISÉ — même style que .dark
+           mais avec fond transparent pour laisser
+           apparaître l'image de fond
+        ══════════════════════════════════════════════ */
+        .custom .glass-card {
+          background:rgba(0,0,0,0.35);
+          backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+          border:1px solid rgba(255,255,255,0.15);
+          box-shadow:0 8px 40px rgba(0,0,0,0.5),inset 0 1px 0 rgba(255,255,255,0.1);
+        }
+        .custom .glass-title   { color:rgba(255,255,255,0.55); }
+        .custom .glass-tagline { color:rgba(255,255,255,0.35); }
+        .custom .glass-divider { border-color:rgba(255,255,255,0.12); }
+
+        .custom .glass-input {
+          background:rgba(0,0,0,0.4);
+          border:1px solid rgba(255,255,255,0.25);
+          color:#fff;backdrop-filter:blur(12px);
+        }
+        .custom .glass-input::placeholder { color:rgba(255,255,255,0.4); }
+        .custom .glass-input:focus {
+          outline:none;
+          border-color:rgba(0,180,100,0.7);
+          box-shadow:0 0 0 3px rgba(0,99,65,0.3);
+          background:rgba(0,0,0,0.5);
+        }
+
+        .custom .scope-wrap { background:rgba(0,0,0,0.35);border:1px solid rgba(255,255,255,0.15); }
+        .custom .scope-btn  { color:rgba(255,255,255,0.55); }
+        .custom .scope-btn:hover:not(.active-algerie):not(.active-monde) { background:rgba(255,255,255,0.1);color:#fff; }
+        .custom .scope-btn.active-algerie { background:rgba(0,99,65,0.5);border-color:rgba(0,180,100,0.6);color:#fff; }
+        .custom .scope-btn.active-monde   { background:rgba(214,29,44,0.5);border-color:rgba(214,29,44,0.6);color:#fff; }
+
+        .custom .discover-btn {
+          background:rgba(0,0,0,0.4);
+          border:1px solid rgba(255,255,255,0.2);
+          color:rgba(255,255,255,0.75);
+        }
+        .custom .discover-btn:hover { background:rgba(0,99,65,0.35);border-color:rgba(0,180,100,0.4);color:#fff; }
+
+        /* Résultats PSE en thème custom */
+        .custom .gsc-control-cse{background:transparent!important;border:none!important;}
+        .custom .gsc-result-info{color:rgba(255,255,255,0.5)!important;font-size:11px!important;padding:0 0 8px!important;}
+        .custom .gsc-webResult.gsc-result{background:rgba(0,0,0,0.45)!important;border:1px solid rgba(255,255,255,0.12)!important;border-radius:12px!important;padding:12px 14px!important;margin:0 0 10px!important;backdrop-filter:blur(12px)!important;}
+        .custom .gs-title a,.custom .gs-title a b{color:#7dffb3!important;text-decoration:none!important;}
+        .custom .gs-snippet{color:rgba(255,255,255,0.65)!important;}
+        .custom .gsc-cursor-page{color:rgba(255,255,255,0.45)!important;}
+        .custom .gsc-cursor-current-page{color:#fff!important;font-weight:bold!important;}
       `}</style>
 
       <div className="hnaya-bg" />
