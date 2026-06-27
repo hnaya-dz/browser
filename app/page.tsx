@@ -417,8 +417,8 @@ export default function Home() {
   box-shadow:0 8px 40px rgba(0,0,0,0.2),inset 0 1px 0 rgba(255,255,255,0.05);
 }
         .custom .glass-input {
-          background:rgba(0,0,0,0.4);
-          border:1px solid rgba(255,255,255,0.25);
+          background:rgba(0,0,0,0.3);
+          border:1px solid rgba(255,255,255,0.15);
           color:#fff;backdrop-filter:blur(12px);
         }
         .custom .glass-input::placeholder { color:rgba(255,255,255,0.4); }
