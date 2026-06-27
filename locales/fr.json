@@ -55,5 +55,27 @@
     "formatError": "Format non supporté.",
     "sizeError": "Image trop grande (max {max} Mo).",
     "close": "Fermer"
+  },
+  "Vault": {
+    "title": "Coffre-fort de mots de passe",
+    "add": "Ajouter",
+    "back": "Retour",
+    "save": "Enregistrer",
+    "saved": "Enregistré",
+    "cancel": "Annuler",
+    "delete": "Supprimer",
+    "inject": "Remplissage automatique",
+    "export": "Exporter la sauvegarde",
+    "site": "Site",
+    "url": "URL",
+    "login": "Identifiant / Email",
+    "password": "Mot de passe",
+    "noLogin": "Sans identifiant",
+    "loading": "Chargement",
+    "empty": "Aucun mot de passe enregistré",
+    "unavailable": "Le chiffrement n'est pas disponible sur cet appareil",
+    "confirmDelete": "Supprimer cette entrée ?",
+    "injected": "Rempli automatiquement",
+    "injectError": "Champs introuvables sur cette page"
   }
 }
