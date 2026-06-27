@@ -77,5 +77,14 @@
     "confirmDelete": "Supprimer cette entrée ?",
     "injected": "Rempli automatiquement",
     "injectError": "Champs introuvables sur cette page"
+  },
+  "URLBar": {
+    "download": "Télécharger",
+    "downloadTitle": "Télécharger la vidéo de cette page",
+    "hintDownload": "Cliquez pour télécharger la vidéo de cette page",
+    "vaultTitle": "Mots de passe",
+    "vaultTitleFound": "Vous avez un mot de passe enregistré pour ce site",
+    "hintVault": "Enregistrez vos mots de passe ici",
+    "hintVaultFound": "Identifiants disponibles — cliquez pour remplir automatiquement"
   }
 }
