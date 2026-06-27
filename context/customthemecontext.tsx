@@ -5,11 +5,11 @@ const STORAGE_KEY = "hnaya-custom-bg";
 const OPACITY_KEY = "hnaya-custom-opacity";
 
 interface CustomThemeContextProps {
-  customBg: string | null;          // data URL base64 de l'image
-  overlayOpacity: number;           // 0–0.9, opacité de la couche sombre par-dessus
+  customBg: string | null;
+  overlayOpacity: number;
   setCustomBg: (dataUrl: string | null) => void;
   setOverlayOpacity: (v: number) => void;
-  isCustomActive: boolean;          // true si thème = "custom" ET image choisie
+  isCustomActive: boolean;
 }
 
 const CustomThemeContext = createContext<CustomThemeContextProps>({
@@ -36,6 +36,13 @@ export function CustomThemeProvider({ children }: { children: React.ReactNode })
 
   const setCustomBg = useCallback((dataUrl: string | null) => {
     setCustomBgState(dataUrl);
+    // Appliquer immédiatement la variable CSS (sans attendre le useEffect)
+    const html = document.documentElement;
+    if (dataUrl) {
+      html.style.setProperty("--custom-bg", `url("${dataUrl}")`);
+    } else {
+      html.style.removeProperty("--custom-bg");
+    }
     try {
       if (dataUrl) localStorage.setItem(STORAGE_KEY, dataUrl);
       else localStorage.removeItem(STORAGE_KEY);
@@ -44,10 +51,12 @@ export function CustomThemeProvider({ children }: { children: React.ReactNode })
 
   const setOverlayOpacity = useCallback((v: number) => {
     setOverlayOpacityState(v);
+    // ✅ Appliquer immédiatement pour que le curseur soit réactif en temps réel
+    document.documentElement.style.setProperty("--custom-overlay-opacity", String(v));
     try { localStorage.setItem(OPACITY_KEY, String(v)); } catch {}
   }, []);
 
-  // Appliquer le fond sur <html> quand l'image change
+  // Synchroniser au changement de customBg (chargement localStorage)
   useEffect(() => {
     const html = document.documentElement;
     if (customBg) {
@@ -57,6 +66,7 @@ export function CustomThemeProvider({ children }: { children: React.ReactNode })
     }
   }, [customBg]);
 
+  // Synchroniser l'opacité au chargement
   useEffect(() => {
     document.documentElement.style.setProperty(
       "--custom-overlay-opacity",
@@ -64,10 +74,14 @@ export function CustomThemeProvider({ children }: { children: React.ReactNode })
     );
   }, [overlayOpacity]);
 
-  const isCustomActive = !!customBg;
-
   return (
-    <CustomThemeContext.Provider value={{ customBg, overlayOpacity, setCustomBg, setOverlayOpacity, isCustomActive }}>
+    <CustomThemeContext.Provider value={{
+      customBg,
+      overlayOpacity,
+      setCustomBg,
+      setOverlayOpacity,
+      isCustomActive: !!customBg,
+    }}>
       {children}
     </CustomThemeContext.Provider>
   );
