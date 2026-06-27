@@ -53,6 +53,7 @@
     "overlayOpacity": "Overlay opacity",
     "apply": "Apply",
     "formatError": "Unsupported format.",
-    "sizeError": "Image too large (max {max} MB)."
+    "sizeError": "Image too large (max {max} MB).",
+    "close": "Close"
   }
 }
