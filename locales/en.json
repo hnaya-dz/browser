@@ -55,5 +55,27 @@
     "formatError": "Unsupported format.",
     "sizeError": "Image too large (max {max} MB).",
     "close": "Close"
+  },
+  "Vault": {
+    "title": "Password vault",
+    "add": "Add",
+    "back": "Back",
+    "save": "Save",
+    "saved": "Saved",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "inject": "Autofill",
+    "export": "Export backup",
+    "site": "Site",
+    "url": "URL",
+    "login": "Username / Email",
+    "password": "Password",
+    "noLogin": "No username",
+    "loading": "Loading",
+    "empty": "No passwords saved yet",
+    "unavailable": "Encryption is not available on this device",
+    "confirmDelete": "Delete this entry?",
+    "injected": "Autofilled",
+    "injectError": "Fields not found on this page"
   }
 }
