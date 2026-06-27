@@ -53,6 +53,7 @@
     "overlayOpacity": "Opacité de la couche",
     "apply": "Appliquer",
     "formatError": "Format non supporté.",
-    "sizeError": "Image trop grande (max {max} Mo)."
+    "sizeError": "Image trop grande (max {max} Mo).",
+    "close": "Fermer"
   }
 }
