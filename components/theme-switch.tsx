@@ -22,16 +22,17 @@ export const ThemeSwitch: FC<ThemeSwitchProps> = ({ className }) => {
   const cycleTheme = () => {
     if (currentTheme === "dark")        setTheme("light");
     else if (currentTheme === "light")  setTheme("sunset");
-    else if (currentTheme === "sunset") setShowPanel(true);  // ouvre le panneau
-    else if (currentTheme === "custom") setShowPanel(true);  // rouvre le panneau
+    else if (currentTheme === "sunset") setShowPanel(true);
+    else if (currentTheme === "custom") setShowPanel(true);
     else setTheme("dark");
   };
 
-  const icon  = currentTheme === "dark"   ? "🌙"
-              : currentTheme === "light"  ? "☀️"
+  // ✅ L'icône indique le thème ACTUEL (pas le suivant)
+  // Logique originale restaurée : on montre où on est, pas où on va
+  const icon  = currentTheme === "light"  ? "☀️"
               : currentTheme === "sunset" ? "🌅"
-              : customBg                  ? "🖼️"
-              : "🎨";
+              : currentTheme === "custom" ? (customBg ? "🖼️" : "🎨")
+              : "🌙"; // dark par défaut
 
   const label = currentTheme === "dark"   ? "Mode sombre"
               : currentTheme === "light"  ? "Mode clair"
