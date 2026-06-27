@@ -6,6 +6,7 @@ import { existsSync } from "fs";
 import serve from "electron-serve";
 // ✅ PATCH 1 — import depuis shared/ (supprime la duplication avec urlbar.tsx)
 import { isDownloadableUrl } from "../shared/supportedHosts.js";
+import { registerVaultIpc } from "./vault-ipc.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -62,6 +63,12 @@ if (!app.isPackaged) {
 
 app.on("ready", () => {
   createWindow();
+  // ✅ Initialiser le gestionnaire de mots de passe
+  registerVaultIpc(
+    () => mainWindow,
+    () => browserViews,
+    () => activeTabId
+  );
 });
 
 app.on('web-contents-created', (event, contents) => {
