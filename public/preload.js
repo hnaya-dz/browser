@@ -14,6 +14,7 @@ const ALLOWED_INVOKE = [
   "vault-inject",
   "vault-save-from-page",
   "vault-export",
+  "get-active-tab-url",
 ];
 
 const ALLOWED_SEND = [
