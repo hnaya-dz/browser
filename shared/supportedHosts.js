@@ -16,8 +16,41 @@ export const SUPPORTED_HOSTS = [
 
 export function isDownloadableUrl(url) {
   try {
-    const host = new URL(url).hostname.replace("www.", "");
-    return SUPPORTED_HOSTS.some(h => host === h || host.endsWith("." + h));
+    const u = new URL(url);
+    const host = u.hostname.replace("www.", "");
+
+    if (host === "youtube.com" || host === "youtu.be") return true;
+    if (host === "tiktok.com" || host.endsWith(".tiktok.com")) return true;
+    if (host === "dailymotion.com") return true;
+    if (host === "vimeo.com") return true;
+    if (host === "twitch.tv") return true;
+
+    if (host === "facebook.com" || host === "fb.watch") {
+      return (
+        u.pathname.includes("/watch") ||
+        u.pathname.includes("/videos") ||
+        u.pathname.includes("/reel") ||
+        host === "fb.watch"
+      );
+    }
+
+    if (host === "instagram.com") {
+      return (
+        u.pathname.includes("/reel") ||
+        u.pathname.includes("/p/") ||
+        u.pathname.includes("/tv/")
+      );
+    }
+
+    if (host === "twitter.com" || host === "x.com") {
+      return u.pathname.includes("/status/");
+    }
+
+    if (host === "reddit.com") {
+      return u.pathname.includes("/r/") && u.pathname.includes("/comments/");
+    }
+
+    return false;
   } catch { return false; }
 }
 
