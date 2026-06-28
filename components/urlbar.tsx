@@ -48,6 +48,7 @@ export default function URLBar() {
   // Sync url quand l'onglet actif change
   useEffect(() => {
     setUrl(currentTab?.url || "");
+    setRealViewUrl(currentTab?.url || "");
   }, [activeTab, currentTab?.url]);
 
   // Bloquer le scroll du body quand un onglet externe est actif
@@ -61,7 +62,10 @@ export default function URLBar() {
     const api = (window as any).electronAPI;
     if (!api) return;
     const handler = (tabId: number, newUrl: string) => {
-      if (tabId === activeTab) setUrl(newUrl);
+      if (tabId === activeTab) {
+        setUrl(newUrl);
+        setRealViewUrl(newUrl); // ✅ sync la vraie URL pour isDownloadable
+      }
     };
     api.receive("update-url", handler);
     return () => api.removeListener("update-url", handler);
@@ -98,8 +102,13 @@ export default function URLBar() {
   // ✅ PATCH 2 — invoke synchrone : attend la confirmation Electron avant d'afficher le panneau
   // Remplace : send("hide-active-view") + setTimeout(150ms)
   const handleDownloadClick = useCallback(async () => {
+    setShowDlHint(false);
+    localStorage.setItem(HINT_DL_KEY, "1");
+    if (dlHintTimer.current) clearTimeout(dlHintTimer.current);
+    // ✅ Récupérer la vraie URL de la WebContentsView (pas localhost du renderer)
+    const realUrl = await (window as any)?.electronAPI?.invoke("get-active-tab-url");
     await (window as any)?.electronAPI?.invoke("hide-active-view-sync");
-    setDownloadUrl(url);
+    setDownloadUrl(realUrl || url);
     setShowDownload(true);
   }, [url]);
 
@@ -112,7 +121,8 @@ export default function URLBar() {
 
   const rightOffset = position === "right" ? "200px" : "0px";
   const topOffset = position === "right" ? "0px" : "6vh";
-  const canDownload = isDownloadable(url);
+  // ✅ Utiliser la vraie URL de la vue (pas l'input qui peut être en cours d'édition)
+  const canDownload = isDownloadable(realViewUrl || url);
   // ✅ PATCH 1b — nom du site dans le bouton (ex: "⬇️ YouTube" au lieu de "⬇️ MP4")
   const siteName = getSiteName(url);
 
