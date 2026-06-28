@@ -104,6 +104,14 @@ ipcMain.on("hide-active-view", () => {
 
 // ✅ PATCH 2 — version synchrone avec confirmation Promise
 // urlbar.tsx attend ce retour avant d'afficher le panneau (remplace le setTimeout 150ms)
+// ✅ Retourner la vraie URL de la WebContentsView active (pas localhost)
+ipcMain.handle("get-active-tab-url", async () => {
+  if (activeTabId && browserViews.has(activeTabId)) {
+    return browserViews.get(activeTabId).webContents.getURL();
+  }
+  return null;
+});
+
 ipcMain.handle("hide-active-view-sync", async () => {
   if (activeTabId && browserViews.has(activeTabId) && mainWindow) {
     mainWindow.contentView.removeChildView(browserViews.get(activeTabId));
@@ -144,6 +152,7 @@ ipcMain.handle("get-video-info", async (event, url) => {
     let output = "";
     let errOutput = "";
     const proc = spawn(ytDlpPath, [
+      "--no-update-check",
       "--no-update-check",
       "--dump-json",
       "--no-playlist",
