@@ -152,8 +152,6 @@ ipcMain.handle("get-video-info", async (event, url) => {
     let output = "";
     let errOutput = "";
     const proc = spawn(ytDlpPath, [
-      "--no-update-check",
-      "--no-update-check",
       "--dump-json",
       "--no-playlist",
       "--socket-timeout", "15",
