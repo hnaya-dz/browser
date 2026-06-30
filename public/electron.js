@@ -1,4 +1,4 @@
-import { app, BrowserWindow, WebContentsView, ipcMain, Menu, dialog } from "electron";
+import { app, BrowserWindow, WebContentsView, ipcMain, Menu, dialog, shell } from "electron";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import { spawn } from "child_process";
@@ -8,6 +8,15 @@ import serve from "electron-serve";
 import { isDownloadableUrl } from "../shared/supportedHosts.js";
 import { registerVaultIpc } from "./vault-ipc.js";
 import { checkForUpdate } from "./update-check.js";
+
+// ✅ Détecte les URLs d'authentification Google qu'Electron ne peut pas gérer
+// (Google bloque volontairement l'OAuth dans les WebViews embarquées depuis 2021)
+function isGoogleAuthUrl(url) {
+  try {
+    const host = new URL(url).hostname;
+    return host === "accounts.google.com";
+  } catch { return false; }
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -135,6 +144,11 @@ app.on("ready", async () => {
 
 app.on('web-contents-created', (event, contents) => {
   contents.setWindowOpenHandler((details) => {
+    // ✅ Google OAuth → navigateur système (Electron est bloqué par Google)
+    if (isGoogleAuthUrl(details.url)) {
+      shell.openExternal(details.url);
+      return { action: 'deny' };
+    }
     if (mainWindow) mainWindow.webContents.send('new-tab-url', details.url);
     return { action: 'deny' };
   });
@@ -377,6 +391,11 @@ ipcMain.on("open-tab", (event, newTab) => {
     });
 
     view.webContents.setWindowOpenHandler((details) => {
+      // ✅ Google OAuth → navigateur système
+      if (isGoogleAuthUrl(details.url)) {
+        shell.openExternal(details.url);
+        return { action: "deny" };
+      }
       mainWindow.webContents.send("new-tab-url", details.url);
       return { action: "deny" };
     });
@@ -384,6 +403,12 @@ ipcMain.on("open-tab", (event, newTab) => {
     // Intercepter hnaya-dl:// pour ouvrir le panneau de téléchargement
     // (les WebContentsViews sandbox ne peuvent pas appeler electronAPI directement)
     view.webContents.on("will-navigate", (event, navUrl) => {
+  // ✅ Google OAuth en navigation directe (pas une popup) → navigateur système
+  if (isGoogleAuthUrl(navUrl)) {
+    event.preventDefault();
+    shell.openExternal(navUrl);
+    return;
+  }
   if (navUrl.startsWith("hnaya-dl://")) {
     event.preventDefault();
     try {
