@@ -7,6 +7,7 @@ import serve from "electron-serve";
 // ✅ PATCH 1 — import depuis shared/ (supprime la duplication avec urlbar.tsx)
 import { isDownloadableUrl } from "../shared/supportedHosts.js";
 import { registerVaultIpc } from "./vault-ipc.js";
+import { checkForUpdate } from "./update-check.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -166,6 +167,14 @@ ipcMain.on("hide-active-view", () => {
 // ✅ PATCH 2 — version synchrone avec confirmation Promise
 // urlbar.tsx attend ce retour avant d'afficher le panneau (remplace le setTimeout 150ms)
 // ✅ Retourner la vraie URL de la WebContentsView active (pas localhost)
+ipcMain.handle("check-for-update", async (event, lang) => {
+  return checkForUpdate(lang || "fr");
+});
+
+ipcMain.handle("get-app-version", async () => {
+  return app.getVersion();
+});
+
 ipcMain.handle("get-active-tab-url", async () => {
   if (activeTabId && browserViews.has(activeTabId)) {
     return browserViews.get(activeTabId).webContents.getURL();
