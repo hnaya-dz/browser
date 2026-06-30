@@ -7,11 +7,11 @@
   "main": "public/electron.js",
   "type": "module",
   "scripts": {
-  "dev": "concurrently \"yarn next dev\" \"wait-on http://localhost:3000 && electron public/electron.js\"",
-  "build": "next build",
-  "start": "concurrently \"yarn next start\" \"electron public/electron.js\"",
-  "dist": "yarn build && electron-builder --win --x64",
-  "kill-dev": "taskkill /IM electron.exe /F & taskkill /IM node.exe /F"
+    "dev": "concurrently \"yarn next dev\" \"wait-on http://localhost:3000 && electron public/electron.js\"",
+    "build": "next build",
+    "start": "concurrently \"yarn next start\" \"electron public/electron.js\"",
+    "dist": "yarn build && electron-builder --win --x64",
+    "kill-dev": "taskkill /IM electron.exe /F & taskkill /IM node.exe /F"
   },
   "build": {
     "appId": "dz.hnaya.browser",
@@ -27,17 +27,13 @@
       "public/hnaya.png",
       "public/icons/**/*"
     ],
-    "extraResources": [
-      {
-        "from": "public/bin/yt-dlp.exe",
-        "to": "bin/yt-dlp.exe"
-      }
-    ],
     "win": {
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "icon": "public/icons/icon.ico"
@@ -51,10 +47,17 @@
     },
     "mac": {
       "target": "dmg",
-      "icon": "public/hnaya.png"
+      "icon": "public/hnaya.png",
+      "arch": [
+        "x64",
+        "arm64"
+      ]
     },
     "linux": {
-      "target": "AppImage"
+      "target": "AppImage",
+      "arch": [
+        "x64"
+      ]
     }
   },
   "dependencies": {
