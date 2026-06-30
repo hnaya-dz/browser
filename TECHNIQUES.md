@@ -306,3 +306,89 @@ Sans cette condition, les DevTools s'ouvrent automatiquement chez les utilisateu
 | Deux fichiers `shared/supportedHosts.*` | `shared/` | `ERR_MODULE_NOT_FOUND` au lancement d'Electron |
 | `setUserAgent` Chrome | `electron.js` | Widgets WordPress et iframes YouTube dégradés |
 | `if (!app.isPackaged)` sur DevTools | `electron.js` | DevTools ouverts chez les utilisateurs finaux |
+
+---
+
+## 10. Téléchargement automatique multi-OS de yt-dlp — `public/electron.js`
+
+### Le problème
+
+Le binaire `yt-dlp.exe` était commité dans `public/bin/` et hardcodé pour Windows
+(`process.resourcesPath, "bin", "yt-dlp.exe"`). Cette approche ne fonctionne que sur
+Windows. Sur macOS ou Linux, `existsSync(ytDlpPath)` retourne systématiquement faux
+et le téléchargement de vidéos échoue silencieusement — aucun message d'erreur clair
+n'indique à l'utilisateur que c'est un problème de plateforme.
+
+### Ce qui est en place
+
+```js
+function getYtDlpBinaryName() {
+  if (process.platform === "win32") return "yt-dlp.exe";
+  return "yt-dlp"; // macOS et Linux — pas d'extension
+}
+
+function getYtDlpDownloadUrl() {
+  const base = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/";
+  if (process.platform === "win32") return base + "yt-dlp.exe";
+  if (process.platform === "darwin") return base + "yt-dlp_macos";
+  return base + "yt-dlp"; // Linux
+}
+
+async function ensureYtDlp() {
+  if (existsSync(ytDlpPath)) return true;
+  // ... télécharge avec gestion des redirections GitHub (jusqu'à 5)
+  // ... pose chmod 755 sur macOS/Linux (requis pour exécuter le binaire)
+}
+```
+
+Appelé au démarrage dans `app.on("ready", ...)`, en arrière-plan, sans bloquer le
+lancement de la fenêtre principale.
+
+### Pourquoi cette approche
+
+- **Auto-téléchargement plutôt que binaires multiples committés** : embarquer 3
+  binaires (Windows/Mac/Linux) dans le repo Git alourdit chaque clone et chaque
+  build, même pour les utilisateurs qui n'utiliseront qu'un seul OS.
+- **`.gitignore` sur `public/bin/`** : le dossier contiendra un binaire différent
+  selon l'OS de la machine de développement — il ne doit jamais être commité, sinon
+  un développeur Mac écraserait le `.exe` Windows d'un collègue au prochain commit.
+- **Toujours la dernière version** : contrairement à un binaire figé dans le repo,
+  chaque nouvelle installation télécharge la version yt-dlp à jour — résout
+  automatiquement les avertissements de version obsolète et les ruptures de
+  compatibilité avec les sites cibles (YouTube change son API régulièrement).
+- **`chmod 755` obligatoire hors Windows** : sans ce bit d'exécution, macOS et
+  Linux refusent de lancer le binaire téléchargé (erreur "Permission denied").
+
+### ⚠️ Ne pas faire
+
+- **Ne pas committer `public/bin/yt-dlp*`** dans Git — le `.gitignore` l'exclut
+  intentionnellement. Si un binaire s'y retrouve par erreur, le supprimer avec
+  `git rm --cached public/bin/yt-dlp.exe`.
+- **Ne pas retirer le `chmod 755`** sur la branche macOS/Linux du téléchargement —
+  sans lui, le binaire téléchargé est inutilisable sur ces OS même s'il existe.
+- **Ne pas supprimer la limite de 5 redirections** dans `download()` — GitHub
+  redirige systématiquement `releases/latest/download/...` vers une URL S3 signée ;
+  sans limite, une boucle de redirection infinie bloquerait l'application.
+- **Ne pas rendre `ensureYtDlp()` bloquant** pour `createWindow()` — il doit
+  s'exécuter en arrière-plan pour ne pas retarder l'affichage de la fenêtre au
+  premier lancement, le téléchargement peut prendre plusieurs secondes selon la
+  connexion.
+- **Ne pas oublier `extraResources` retiré de `package.json`** — si réintroduit
+  pour Windows uniquement, `electron-builder` échouera silencieusement à inclure
+  un fichier qui n'existe plus dans `public/bin/` au moment du build (puisqu'il
+  n'est plus committé).
+
+### Canal IPC ajouté
+
+| Canal | Direction | Description |
+|---|---|---|
+| `ytdlp-setup-status` | main → renderer | `{ status: "downloading" \| "ready" \| "error" }` — diffusé pendant le premier lancement si yt-dlp est absent |
+
+Ce canal utilise `receive()` côté renderer, qui n'a **pas** besoin d'être ajouté à
+une whitelist (contrairement à `send`/`invoke`) — voir section 1 de ce document.
+
+### Ligne à ajouter au tableau récapitulatif final de TECHNIQUES.md
+
+| Configuration | Fichier | Risque si supprimée |
+|---|---|---|
+| `ensureYtDlp()` multi-OS + `.gitignore public/bin/` | `electron.js` + `.gitignore` + `package.json` | yt-dlp inutilisable sur Mac/Linux, ou binaires committés écrasés entre développeurs |
