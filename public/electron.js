@@ -22,10 +22,61 @@ let tabSideWidth = 0;
 // Référence au process yt-dlp en cours (pour l'annulation)
 let activeDownloadProc = null;
 
-// ── Chemin vers yt-dlp.exe ───────────────────────────────────────────────────
-const ytDlpPath = app.isPackaged
-  ? join(process.resourcesPath, "bin", "yt-dlp.exe")
-  : join(__dirname, "bin", "yt-dlp.exe");
+// ── Chemin vers yt-dlp (multi-OS) ────────────────────────────────────────────
+// ⚠️ NE PAS modifier sans relire TECHNIQUES.md — affecte Windows/macOS/Linux
+function getYtDlpBinaryName() {
+  if (process.platform === "win32") return "yt-dlp.exe";
+  return "yt-dlp"; // macOS et Linux utilisent le même binaire universel sans extension
+}
+
+const ytDlpBinDir = app.isPackaged
+  ? join(process.resourcesPath, "bin")
+  : join(__dirname, "bin");
+
+const ytDlpPath = join(ytDlpBinDir, getYtDlpBinaryName());
+
+// URL de téléchargement officielle selon l'OS — yt-dlp publie un binaire par plateforme
+function getYtDlpDownloadUrl() {
+  const base = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/";
+  if (process.platform === "win32") return base + "yt-dlp.exe";
+  if (process.platform === "darwin") return base + "yt-dlp_macos";
+  return base + "yt-dlp"; // Linux
+}
+
+// Télécharge yt-dlp au premier lancement si absent (gère redirections GitHub)
+async function ensureYtDlp() {
+  if (existsSync(ytDlpPath)) return true;
+
+  const https = await import("https");
+  const { mkdirSync, chmodSync, createWriteStream } = await import("fs");
+  mkdirSync(ytDlpBinDir, { recursive: true });
+
+  const url = getYtDlpDownloadUrl();
+
+  return new Promise((resolve) => {
+    const download = (downloadUrl, redirectCount = 0) => {
+      if (redirectCount > 5) { resolve(false); return; }
+      https.default.get(downloadUrl, (res) => {
+        if (res.statusCode === 301 || res.statusCode === 302) {
+          download(res.headers.location, redirectCount + 1);
+          return;
+        }
+        if (res.statusCode !== 200) { resolve(false); return; }
+        const file = createWriteStream(ytDlpPath);
+        res.pipe(file);
+        file.on("finish", () => {
+          file.close();
+          // macOS/Linux nécessitent le bit d'exécution
+          if (process.platform !== "win32") {
+            try { chmodSync(ytDlpPath, 0o755); } catch {}
+          }
+          resolve(true);
+        });
+      }).on("error", () => resolve(false));
+    };
+    download(url);
+  });
+}
 
 // ── SUPPRIMÉ : SUPPORTED_HOSTS et isDownloadableUrl (maintenant dans shared/supportedHosts.ts) ──
 
@@ -61,7 +112,7 @@ if (!app.isPackaged) {
   mainWindow.on("closed", () => { mainWindow = null; });
 };
 
-app.on("ready", () => {
+app.on("ready", async () => {
   createWindow();
   // ✅ Initialiser le gestionnaire de mots de passe
   registerVaultIpc(
@@ -69,6 +120,16 @@ app.on("ready", () => {
     () => browserViews,
     () => activeTabId
   );
+  // ✅ Télécharger yt-dlp en arrière-plan si absent (premier lancement uniquement)
+  if (!existsSync(ytDlpPath)) {
+    mainWindow?.webContents.once("did-finish-load", () => {
+      mainWindow?.webContents.send("ytdlp-setup-status", { status: "downloading" });
+    });
+  }
+  ensureYtDlp().then(ok => {
+    mainWindow?.webContents.send("ytdlp-setup-status", { status: ok ? "ready" : "error" });
+    if (!ok) console.error("[yt-dlp] Échec du téléchargement automatique.");
+  });
 });
 
 app.on('web-contents-created', (event, contents) => {
