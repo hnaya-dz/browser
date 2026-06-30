@@ -191,7 +191,10 @@ ipcMain.handle("get-app-version", async () => {
 
 ipcMain.handle("get-active-tab-url", async () => {
   if (activeTabId && browserViews.has(activeTabId)) {
-    return browserViews.get(activeTabId).webContents.getURL();
+    const url = browserViews.get(activeTabId).webContents.getURL();
+    // ✅ Ne jamais retourner une URL Google Auth — yt-dlp ne doit jamais la recevoir
+    if (isGoogleAuthUrl(url)) return null;
+    return url;
   }
   return null;
 });
@@ -371,7 +374,11 @@ ipcMain.on("open-tab", (event, newTab) => {
     const updateTabInfo = () => {
       const currentUrl = view.webContents.getURL();
       const title = view.webContents.getTitle();
-      mainWindow.webContents.send("update-url", id, currentUrl);
+      // ✅ Ne jamais propager une URL Google Auth au renderer — pollue
+      // realViewUrl côté React (urlbar.tsx) et casse isDownloadable/téléchargement
+      if (!isGoogleAuthUrl(currentUrl)) {
+        mainWindow.webContents.send("update-url", id, currentUrl);
+      }
       if (title && title !== currentUrl) {
         mainWindow.webContents.send("update-tab-title", { id, title });
       }
@@ -434,6 +441,17 @@ view.webContents.on("ipc-message", (event, channel, ...args) => {
   }
 });
 view.webContents.on("did-navigate", (event, navUrl) => {
+  // ✅ Filet de sécurité — Google peut rediriger en cascade et échapper à will-navigate
+  // (cas observé : accounts.google.com/v3/signin/rejected via gsi/select popup)
+  if (isGoogleAuthUrl(navUrl)) {
+    shell.openExternal(navUrl);
+    if (view.webContents.canGoBack()) {
+      view.webContents.goBack();
+    } else {
+      view.webContents.loadURL("about:blank");
+    }
+    return;
+  }
   if (navUrl.startsWith("hnaya-dl://")) {
     try {
       const ytUrl = decodeURIComponent(navUrl.replace("hnaya-dl://", ""));
