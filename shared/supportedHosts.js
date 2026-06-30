@@ -1,6 +1,5 @@
 // shared/supportedHosts.js
 // Version JavaScript pure — importée par public/electron.js (Node ESM ne peut pas importer du .ts)
-// Le fichier .ts est importé par Next.js/TypeScript (urlbar.tsx via @/shared/supportedHosts)
 
 export const SUPPORTED_HOSTS = [
   "youtube.com", "youtu.be",
@@ -20,7 +19,12 @@ export function isDownloadableUrl(url) {
     const host = u.hostname.replace("www.", "");
 
     if (host === "youtube.com" || host === "youtu.be") return true;
-    if (host === "tiktok.com" || host.endsWith(".tiktok.com")) return true;
+
+    // ✅ TikTok — seulement les pages vidéo
+    if (host === "tiktok.com" || host.endsWith(".tiktok.com")) {
+      return u.pathname.includes("/video/");
+    }
+
     if (host === "dailymotion.com") return true;
     if (host === "vimeo.com") return true;
     if (host === "twitch.tv") return true;
