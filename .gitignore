@@ -36,3 +36,7 @@ next-env.d.ts
 
 # electron
 /dist
+
+# yt-dlp — téléchargé automatiquement au premier lancement (multi-OS)
+# Ne jamais committer ce dossier, il contiendra un binaire différent par OS de dev
+public/bin/
