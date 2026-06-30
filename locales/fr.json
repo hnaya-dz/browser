@@ -86,5 +86,9 @@
     "vaultTitleFound": "Vous avez un mot de passe enregistré pour ce site",
     "hintVault": "Enregistrez vos mots de passe ici",
     "hintVaultFound": "Identifiants disponibles — cliquez pour remplir automatiquement"
+  },
+  "Update": {
+    "available": "Mise à jour disponible",
+    "download": "Télécharger"
   }
 }
