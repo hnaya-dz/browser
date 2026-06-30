@@ -1,0 +1,9 @@
+{
+  "version": "0.2.0",
+  "url": "https://github.com/hnaya-dz/browser/releases/latest",
+  "notes": {
+    "ar": "تحميل الفيديو من منصات متعددة، خزنة كلمات المرور، خلفية مخصصة",
+    "fr": "Téléchargement vidéo multi-plateformes, gestionnaire de mots de passe, thème personnalisé",
+    "en": "Multi-platform video download, password manager, custom theme"
+  }
+}
