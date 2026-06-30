@@ -14,7 +14,6 @@ export const SUPPORTED_HOSTS = [
   "reddit.com",
 ];
 
-// shared/supportedHosts.ts
 export function isDownloadableUrl(url: string): boolean {
   try {
     const u = new URL(url);
@@ -23,8 +22,10 @@ export function isDownloadableUrl(url: string): boolean {
     // YouTube — toujours téléchargeable
     if (host === "youtube.com" || host === "youtu.be") return true;
 
-    // TikTok — toujours téléchargeable
-    if (host === "tiktok.com" || host.endsWith(".tiktok.com")) return true;
+    // ✅ TikTok — seulement les pages vidéo (/@user/video/ID), pas la page d'accueil
+    if (host === "tiktok.com" || host.endsWith(".tiktok.com")) {
+      return u.pathname.includes("/video/");
+    }
 
     // Dailymotion — toujours téléchargeable
     if (host === "dailymotion.com") return true;
@@ -41,7 +42,7 @@ export function isDownloadableUrl(url: string): boolean {
         u.pathname.includes("/watch") ||
         u.pathname.includes("/videos") ||
         u.pathname.includes("/reel") ||
-        host === "fb.watch" // lien court = toujours une vidéo
+        host === "fb.watch"
       );
     }
 
@@ -54,7 +55,7 @@ export function isDownloadableUrl(url: string): boolean {
       );
     }
 
-    // Twitter/X — seulement les tweets avec vidéo (contiennent /status/)
+    // Twitter/X — seulement les tweets avec vidéo
     if (host === "twitter.com" || host === "x.com") {
       return u.pathname.includes("/status/");
     }
@@ -68,7 +69,7 @@ export function isDownloadableUrl(url: string): boolean {
   } catch { return false; }
 }
 
-// Retourne le nom lisible du site (ex: "YouTube", "TikTok") pour l'affichage dans le bouton ⬇️
+// Retourne le nom lisible du site pour l'affichage dans le bouton ⬇️
 export function getSiteName(url: string): string {
   try {
     const host = new URL(url).hostname.replace("www.", "");
