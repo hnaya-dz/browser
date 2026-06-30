@@ -15,6 +15,8 @@ const ALLOWED_INVOKE = [
   "vault-save-from-page",
   "vault-export",
   "get-active-tab-url",
+  "check-for-update",
+  "get-app-version",
 ];
 
 const ALLOWED_SEND = [
