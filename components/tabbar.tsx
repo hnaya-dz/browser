@@ -44,11 +44,15 @@ export default function TabBar() {
   const updateScrollState = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
-    // ✅ Laisser un tick pour que le DOM soit peint avant de mesurer
-    requestAnimationFrame(() => {
+    const measure = () => {
       const scrollable = el.scrollWidth > el.clientWidth + 2;
       setCanScrollLeft(el.scrollLeft > 2);
       setCanScrollRight(scrollable && el.scrollLeft + el.clientWidth < el.scrollWidth - 2);
+    };
+    // Double délai : RAF + setTimeout pour couvrir tous les cas de rendu asynchrone
+    requestAnimationFrame(() => {
+      measure();
+      setTimeout(measure, 50);  // filet de sécurité si RAF est trop tôt
     });
   }, []);
 
