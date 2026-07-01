@@ -445,8 +445,8 @@ view.webContents.on("did-navigate", (event, navUrl) => {
   // (cas observé : accounts.google.com/v3/signin/rejected via gsi/select popup)
   if (isGoogleAuthUrl(navUrl)) {
     shell.openExternal(navUrl);
-    if (view.webContents.canGoBack()) {
-      view.webContents.goBack();
+    if (view.webContents.navigationHistory?.canGoBack()) {
+      view.webContents.navigationHistory.goBack();
     } else {
       view.webContents.loadURL("about:blank");
     }
@@ -559,7 +559,7 @@ ipcMain.on("close-tab", (event, tabId) => {
 ipcMain.on("go-back", () => {
   if (activeTabId && browserViews.has(activeTabId)) {
     const view = browserViews.get(activeTabId);
-    if (view?.webContents?.canGoBack()) view.webContents.goBack();
+    if (view?.webContents?.navigationHistory?.canGoBack()) view.webContents.navigationHistory.goBack();
     else mainWindow.webContents.send("close-browser-view-and-go-home");
   }
 });
@@ -567,7 +567,7 @@ ipcMain.on("go-back", () => {
 ipcMain.on("go-forward", () => {
   if (activeTabId && browserViews.has(activeTabId)) {
     const view = browserViews.get(activeTabId);
-    if (view?.webContents?.canGoForward()) view.webContents.goForward();
+    if (view?.webContents?.navigationHistory?.canGoForward()) view.webContents.navigationHistory.goForward();
   }
 });
 
