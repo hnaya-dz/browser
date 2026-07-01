@@ -27,39 +27,6 @@ function useDragSort(onReorder: (from: number, to: number) => void) {
   return { onDragStart, onDragOver, onDrop, onDragEnd };
 }
 
-// ✅ Hook scroll horizontal avec détection débordement
-function useTabScroll() {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const [canScrollLeft, setCanScrollLeft] = useState(false);
-  const [canScrollRight, setCanScrollRight] = useState(false);
-
-  const updateScrollState = useCallback(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    setCanScrollLeft(el.scrollLeft > 4);
-    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
-  }, []);
-
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    updateScrollState();
-    el.addEventListener("scroll", updateScrollState);
-    const ro = new ResizeObserver(updateScrollState);
-    ro.observe(el);
-    return () => { el.removeEventListener("scroll", updateScrollState); ro.disconnect(); };
-  }, [updateScrollState]);
-
-  const scrollLeft = () => {
-    scrollRef.current?.scrollBy({ left: -160, behavior: "smooth" });
-  };
-  const scrollRight = () => {
-    scrollRef.current?.scrollBy({ left: 160, behavior: "smooth" });
-  };
-
-  return { scrollRef, canScrollLeft, canScrollRight, scrollLeft, scrollRight };
-}
-
 export default function TabBar() {
   const { tabs, activeTab, switchTab, closeTab, addTab, reorderTabs } = useTabContext();
   const { position, togglePosition } = useTabPosition();
@@ -68,17 +35,61 @@ export default function TabBar() {
   const isListenerSet = useRef(false);
   const [faviconErrors, setFaviconErrors] = useState<Record<number, boolean>>({});
   const [hoveredTab, setHoveredTab] = useState<number | null>(null);
-  const { scrollRef, canScrollLeft, canScrollRight, scrollLeft, scrollRight } = useTabScroll();
 
-  // ✅ Scroller automatiquement vers l'onglet actif quand il change
+  // ── Scroll horizontal avec flèches ──────────────────────────────
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const updateScrollState = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    // ✅ Laisser un tick pour que le DOM soit peint avant de mesurer
+    requestAnimationFrame(() => {
+      const scrollable = el.scrollWidth > el.clientWidth + 2;
+      setCanScrollLeft(el.scrollLeft > 2);
+      setCanScrollRight(scrollable && el.scrollLeft + el.clientWidth < el.scrollWidth - 2);
+    });
+  }, []);
+
+  // ✅ Recalculer quand le nombre d'onglets change (ajout / suppression)
+  useEffect(() => {
+    updateScrollState();
+  }, [tabs.length, updateScrollState]);
+
+  // ✅ Recalculer au scroll et au resize
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    const activeEl = el.querySelector("[data-active='true']") as HTMLElement;
-    if (activeEl) {
-      activeEl.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
-    }
-  }, [activeTab]);
+    updateScrollState();
+    el.addEventListener("scroll", updateScrollState);
+    const ro = new ResizeObserver(updateScrollState);
+    ro.observe(el);
+    // MutationObserver pour détecter ajout/suppression d'onglets dans le DOM
+    const mo = new MutationObserver(updateScrollState);
+    mo.observe(el, { childList: true, subtree: false });
+    return () => {
+      el.removeEventListener("scroll", updateScrollState);
+      ro.disconnect();
+      mo.disconnect();
+    };
+  }, [updateScrollState]);
+
+  // ✅ Scroller vers l'onglet actif quand il change
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    requestAnimationFrame(() => {
+      const activeEl = el.querySelector("[data-active='true']") as HTMLElement;
+      if (activeEl) {
+        activeEl.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
+      }
+      updateScrollState();
+    });
+  }, [activeTab, updateScrollState]);
+
+  const scrollLeft = () => scrollRef.current?.scrollBy({ left: -180, behavior: "smooth" });
+  const scrollRight = () => scrollRef.current?.scrollBy({ left: 180, behavior: "smooth" });
 
   useEffect(() => {
     if (isListenerSet.current) return;
@@ -116,7 +127,6 @@ export default function TabBar() {
   const renderTab = (tab: typeof tabs[0], index: number) => {
     const isActive = activeTab === tab.id;
     const showFavicon = tab.faviconUrl && !faviconErrors[tab.id];
-    const isHovered = hoveredTab === tab.id;
 
     return (
       <div
@@ -172,9 +182,11 @@ export default function TabBar() {
             <X size={10} strokeWidth={3} className="text-white/70" />
           </button>
         )}
-        {isHovered && tab.url && !tab.isHome && (
+        {/* Tooltip URL au survol */}
+        {hoveredTab === tab.id && tab.url && !tab.isHome && (
           <div className={`
-            absolute z-[100] px-2 py-1 rounded-md text-white text-[10px] whitespace-nowrap shadow-lg pointer-events-none
+            absolute z-[100] px-2 py-1 rounded-md text-white text-[10px]
+            whitespace-nowrap shadow-lg pointer-events-none
             bg-black/80 backdrop-blur-sm border border-white/10
             ${position === "top" ? "top-full mt-1 left-0" : "left-full ml-2 top-0"}
           `}>
@@ -185,36 +197,43 @@ export default function TabBar() {
     );
   };
 
-  // ── Style commun des boutons de flèche ────────────────────────────────────
-  const arrowBtnClass = "flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-md text-white/50 hover:text-white hover:bg-white/10 transition-all";
+  // ── Bouton flèche ─────────────────────────────────────────────
+  const ArrowBtn = ({ dir, onClick, show }: { dir: "left"|"right"; onClick: ()=>void; show: boolean }) => {
+    if (!show) return null;
+    return (
+      <button
+        onClick={onClick}
+        className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-md text-white/60 hover:text-white hover:bg-white/15 active:bg-white/25 transition-all z-10"
+        style={{ minWidth: 28 }}
+        aria-label={dir === "left" ? "Onglets précédents" : "Onglets suivants"}
+      >
+        {dir === "left"
+          ? <ChevronLeft size={15} strokeWidth={2.5} />
+          : <ChevronRight size={15} strokeWidth={2.5} />
+        }
+      </button>
+    );
+  };
 
-  // ── TOP layout ────────────────────────────────────────────────────────────
+  // ── TOP layout ────────────────────────────────────────────────
   if (position === "top") {
     return (
       <div className="fixed z-50 top-0 left-0 h-[6vh] w-screen flex items-center gap-1 px-2 bg-black/40 backdrop-blur-md border-b border-white/10">
 
-        {/* ✅ Flèche gauche — visible seulement si débordement à gauche */}
-        {canScrollLeft && (
-          <button onClick={scrollLeft} className={arrowBtnClass} title="Onglets précédents" aria-label="Défiler les onglets vers la gauche">
-            <ChevronLeft size={14} strokeWidth={2.5} />
-          </button>
-        )}
+        <ArrowBtn dir="left" onClick={scrollLeft} show={canScrollLeft} />
 
-        {/* Zone de scroll — cache la scrollbar native via hide-scrollbar */}
+        {/* Zone scrollable — scrollbar native masquée */}
         <div
           ref={scrollRef}
-          className="flex items-center gap-1 flex-1 overflow-x-auto overflow-y-hidden hide-scrollbar"
-          style={{ scrollbarWidth: "none" }}
+          className="flex items-end gap-1 flex-1 overflow-x-auto overflow-y-hidden"
+          style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+          onScroll={updateScrollState}
         >
+          <style>{`::-webkit-scrollbar{display:none}`}</style>
           {tabs.map((tab, i) => renderTab(tab, i))}
         </div>
 
-        {/* ✅ Flèche droite — visible seulement si débordement à droite */}
-        {canScrollRight && (
-          <button onClick={scrollRight} className={arrowBtnClass} title="Onglets suivants" aria-label="Défiler les onglets vers la droite">
-            <ChevronRight size={14} strokeWidth={2.5} />
-          </button>
-        )}
+        <ArrowBtn dir="right" onClick={scrollRight} show={canScrollRight} />
 
         <button
           onClick={() => addTab("https://hnaya.dz")}
@@ -235,7 +254,7 @@ export default function TabBar() {
     );
   }
 
-  // ── RIGHT layout — scroll vertical déjà géré par overflow-y-auto ─────────
+  // ── RIGHT layout ──────────────────────────────────────────────
   return (
     <div className="fixed z-50 top-0 right-0 h-screen w-[200px] flex flex-col gap-1 p-2 bg-black/40 backdrop-blur-md border-l border-white/10 overflow-y-auto overflow-x-hidden hide-scrollbar">
       <button
