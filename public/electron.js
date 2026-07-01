@@ -109,9 +109,9 @@ mainWindow = new BrowserWindow({
   mainWindow.webContents.setUserAgent(chromeUA);
 
 // DevTools uniquement en développement
-  if (!app.isPackaged) {
-    mainWindow.webContents.openDevTools();
-  }
+if (!app.isPackaged) {
+  mainWindow.webContents.openDevTools();
+}
 
   if (app.isPackaged) {
     appServe(mainWindow).then(() => mainWindow.loadURL("app://index.html"));
