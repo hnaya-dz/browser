@@ -222,14 +222,19 @@ export default function TabBar() {
 
         <ArrowBtn dir="left" onClick={scrollLeft} show={canScrollLeft} />
 
-        {/* Zone scrollable — scrollbar native masquée */}
+        {/* ✅ Zone scrollable — min-width:0 force le débordement dans un flex */}
         <div
           ref={scrollRef}
-          className="flex items-end gap-1 flex-1 overflow-x-auto overflow-y-hidden"
-          style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+          className="flex items-end gap-1 overflow-x-auto overflow-y-hidden"
+          style={{
+            flex: "1 1 0",        // flex-grow + flex-shrink + flex-basis:0
+            minWidth: 0,          // ✅ clé : sans ça, flexbox étire et scrollWidth === clientWidth
+            scrollbarWidth: "none",
+            msOverflowStyle: "none",
+          }}
           onScroll={updateScrollState}
         >
-          <style>{`::-webkit-scrollbar{display:none}`}</style>
+          <style>{`*::-webkit-scrollbar{display:none}`}</style>
           {tabs.map((tab, i) => renderTab(tab, i))}
         </div>
 
