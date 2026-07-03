@@ -12,6 +12,10 @@ import { LanguageProvider } from "@/context/langcontext";
 import { TabPositionProvider } from "@/context/tabpositioncontext";
 import URLBar from "@/components/urlbar";
 import HtmlWrapper from "@/components/html-wrapper";
+import dynamic from "next/dynamic";
+
+// ✅ Chargement dynamique — évite le SSR (UpdateBanner utilise window.electronAPI)
+const UpdateBanner = dynamic(() => import("@/components/UpdateBanner"), { ssr: false });
 
 export const metadata: Metadata = {
   title: {
@@ -46,6 +50,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                         <Navbar />
                         <URLBar />
                         {children}
+                        {/* ✅ Bannière mise à jour — s'affiche en bas de l'écran */}
+                        {/* uniquement si une nouvelle version est disponible */}
+                        <UpdateBanner />
                       </TabProvider>
                     </LoadingProvider>
                   </main>
