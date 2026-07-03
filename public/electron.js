@@ -1,4 +1,4 @@
-import { app, BrowserWindow, WebContentsView, ipcMain, Menu, dialog, shell } from "electron";
+import { app, BrowserWindow, WebContentsView, ipcMain, Menu, dialog, shell, screen } from "electron";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import { spawn } from "child_process";
@@ -92,10 +92,20 @@ async function ensureYtDlp() {
 
 const createWindow = () => {
   Menu.setApplicationMenu(null);
+// ✅ Dimensions adaptatives — s'ajuste à l'écran de l'utilisateur
+// 92% de la surface disponible, minimum 900×600 pour que l'interface reste utilisable
+const primaryDisplay = screen.getPrimaryDisplay();
+const { width: screenW, height: screenH } = primaryDisplay.workAreaSize;
+const winWidth  = Math.max(900, Math.round(screenW  * 0.92));
+const winHeight = Math.max(600, Math.round(screenH * 0.92));
+
 mainWindow = new BrowserWindow({
-  width: 1920,
-  height: 1080,
-  icon: join(__dirname, "../public/icons/icon.ico"), // ✅ icône de l'application
+  width:     winWidth,
+  height:    winHeight,
+  center:    true,
+  minWidth:  900,
+  minHeight: 600,
+  icon: join(__dirname, "../public/icons/icon.ico"),
   webPreferences: {
     preload: join(__dirname, "preload.js"),
     nodeIntegration: false,
