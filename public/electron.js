@@ -127,6 +127,12 @@ mainWindow = new BrowserWindow({
   mainWindow.on("closed", () => { mainWindow = null; });
 };
 
+// ✅ Codecs H.264/HTML5 — activés avant le démarrage de l'app
+// Nécessaire sur certains sites médias qui vérifient le support vidéo
+// Sans effet négatif si les codecs sont déjà présents
+app.commandLine.appendSwitch("enable-features", "PlatformHEVCDecoderSupport,UseOzonePlatform");
+app.commandLine.appendSwitch("autoplay-policy", "no-user-gesture-required");
+
 app.on("ready", async () => {
   createWindow();
   // ✅ Initialiser le gestionnaire de mots de passe
