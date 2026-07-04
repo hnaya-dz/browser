@@ -91,7 +91,42 @@ async function ensureYtDlp() {
 // ── SUPPRIMÉ : SUPPORTED_HOSTS et isDownloadableUrl (maintenant dans shared/supportedHosts.ts) ──
 
 const createWindow = () => {
-  Menu.setApplicationMenu(null);
+  // ✅ Menu invisible mais fonctionnel — restaure Ctrl+C/V/Z/R et clic droit
+  // setApplicationMenu(null) désactivait copier/coller/raccourcis standard
+  const template = [
+    {
+      label: "Edit",
+      submenu: [
+        { role: "undo",      accelerator: "CmdOrCtrl+Z" },
+        { role: "redo",      accelerator: "CmdOrCtrl+Y" },
+        { type: "separator" },
+        { role: "cut",       accelerator: "CmdOrCtrl+X" },
+        { role: "copy",      accelerator: "CmdOrCtrl+C" },
+        { role: "paste",     accelerator: "CmdOrCtrl+V" },
+        { role: "selectAll", accelerator: "CmdOrCtrl+A" },
+      ],
+    },
+    {
+      label: "View",
+      submenu: [
+        { role: "reload",         accelerator: "CmdOrCtrl+R" },
+        { role: "forceReload",    accelerator: "CmdOrCtrl+Shift+R" },
+        { role: "toggleDevTools", accelerator: "F12" },
+        { type: "separator" },
+        { role: "resetZoom" },
+        { role: "zoomIn",  accelerator: "CmdOrCtrl+Equal" },
+        { role: "zoomOut", accelerator: "CmdOrCtrl+Minus" },
+        { type: "separator" },
+        { role: "togglefullscreen", accelerator: "F11" },
+      ],
+    },
+  ];
+  const menu = Menu.buildFromTemplate(template);
+  Menu.setApplicationMenu(menu);
+
+  // Masquer la barre de menu (Windows/Linux) — les raccourcis restent actifs
+  mainWindow.setMenuBarVisibility(false);
+  mainWindow.setAutoHideMenuBar(true);
 // ✅ Dimensions adaptatives — s'ajuste à l'écran de l'utilisateur
 // 92% de la surface disponible, minimum 900×600 pour que l'interface reste utilisable
 const primaryDisplay = screen.getPrimaryDisplay();
@@ -406,6 +441,50 @@ ipcMain.on("open-tab", (event, newTab) => {
         return;
       }
       mainWindow.webContents.send("update-tab-title", { id, title });
+    });
+
+    // ✅ Menu contextuel clic droit dans les onglets de navigation
+    view.webContents.on("context-menu", (event, params) => {
+      const menuItems = [];
+
+      if (params.selectionText) {
+        menuItems.push(
+          { label: "Copier",           role: "copy",        accelerator: "CmdOrCtrl+C" },
+          { type: "separator" },
+        );
+      }
+      if (params.isEditable) {
+        menuItems.push(
+          { label: "Couper",           role: "cut",         accelerator: "CmdOrCtrl+X" },
+          { label: "Copier",           role: "copy",        accelerator: "CmdOrCtrl+C" },
+          { label: "Coller",           role: "paste",       accelerator: "CmdOrCtrl+V" },
+          { label: "Tout sélectionner",role: "selectAll",   accelerator: "CmdOrCtrl+A" },
+          { type: "separator" },
+        );
+      }
+      if (params.linkURL) {
+        menuItems.push(
+          { label: "Ouvrir le lien dans un nouvel onglet", click: () => {
+            mainWindow.webContents.send("new-tab-url", params.linkURL);
+          }},
+          { label: "Copier l'adresse du lien", click: () => {
+            require("electron").clipboard.writeText(params.linkURL);
+          }},
+          { type: "separator" },
+        );
+      }
+      menuItems.push(
+        { label: "Recharger la page",  click: () => view.webContents.reload() },
+        { label: "Précédent",          click: () => { if (view.webContents.navigationHistory?.canGoBack()) view.webContents.navigationHistory.goBack(); } },
+        { label: "Suivant",            click: () => { if (view.webContents.navigationHistory?.canGoForward()) view.webContents.navigationHistory.goForward(); } },
+        { type: "separator" },
+        { label: "Copier l'URL de la page", click: () => {
+          require("electron").clipboard.writeText(view.webContents.getURL());
+        }},
+      );
+
+      const contextMenu = Menu.buildFromTemplate(menuItems);
+      contextMenu.popup({ window: mainWindow });
     });
 
     view.webContents.setWindowOpenHandler((details) => {
