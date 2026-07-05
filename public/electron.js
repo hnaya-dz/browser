@@ -111,13 +111,34 @@ const createWindow = () => {
       submenu: [
         { role: "reload",         accelerator: "CmdOrCtrl+R" },
         { role: "forceReload",    accelerator: "CmdOrCtrl+Shift+R" },
-        { role: "toggleDevTools", accelerator: "F12" },
+        // ✅ F12 remplacé par Ctrl+Shift+I — évite conflit avec touche HP
+        { role: "toggleDevTools", accelerator: "CmdOrCtrl+Shift+I" },
         { type: "separator" },
-        { role: "resetZoom" },
-        { role: "zoomIn",  accelerator: "CmdOrCtrl+Equal" },
-        { role: "zoomOut", accelerator: "CmdOrCtrl+Minus" },
+        { role: "resetZoom",      accelerator: "CmdOrCtrl+0" },
+        // ✅ Zoom sur la fenêtre principale (barre, interface)
+        { role: "zoomIn",         accelerator: "CmdOrCtrl+Equal" },
+        { role: "zoomOut",        accelerator: "CmdOrCtrl+Minus" },
+        // ✅ Zoom sur la WebContentsView active (page web)
+        { label: "Zoom page +",   accelerator: "CmdOrCtrl+Shift+Equal", click: () => {
+          if (activeTabId && browserViews.has(activeTabId)) {
+            const wc = browserViews.get(activeTabId).webContents;
+            wc.setZoomLevel(wc.getZoomLevel() + 0.5);
+          }
+        }},
+        { label: "Zoom page -",   accelerator: "CmdOrCtrl+Shift+Minus", click: () => {
+          if (activeTabId && browserViews.has(activeTabId)) {
+            const wc = browserViews.get(activeTabId).webContents;
+            wc.setZoomLevel(wc.getZoomLevel() - 0.5);
+          }
+        }},
+        { label: "Zoom page 100%", accelerator: "CmdOrCtrl+Shift+0", click: () => {
+          if (activeTabId && browserViews.has(activeTabId)) {
+            browserViews.get(activeTabId).webContents.setZoomLevel(0);
+          }
+        }},
         { type: "separator" },
-        { role: "togglefullscreen", accelerator: "F11" },
+        // ✅ F11 remplacé par Ctrl+Shift+F — évite conflit avec touche HP
+        { role: "togglefullscreen", accelerator: "CmdOrCtrl+Shift+F" },
       ],
     },
   ];
