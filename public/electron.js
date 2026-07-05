@@ -124,9 +124,6 @@ const createWindow = () => {
   const menu = Menu.buildFromTemplate(template);
   Menu.setApplicationMenu(menu);
 
-  // Masquer la barre de menu (Windows/Linux) — les raccourcis restent actifs
-  mainWindow.setMenuBarVisibility(false);
-  mainWindow.setAutoHideMenuBar(true);
 // ✅ Dimensions adaptatives — s'ajuste à l'écran de l'utilisateur
 // 92% de la surface disponible, minimum 900×600 pour que l'interface reste utilisable
 const primaryDisplay = screen.getPrimaryDisplay();
@@ -152,6 +149,10 @@ mainWindow = new BrowserWindow({
   // ✅ User-Agent Chrome pour compatibilité avec les sites WordPress
   const chromeUA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
   mainWindow.webContents.setUserAgent(chromeUA);
+
+  // ✅ Masquer la barre de menu — raccourcis clavier restent actifs
+  mainWindow.setMenuBarVisibility(false);
+  mainWindow.setAutoHideMenuBar(true);
 
   if (app.isPackaged) {
     appServe(mainWindow).then(() => mainWindow.loadURL("app://index.html"));
