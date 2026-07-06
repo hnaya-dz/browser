@@ -115,17 +115,31 @@ const createWindow = () => {
         { role: "toggleDevTools", accelerator: "CmdOrCtrl+Shift+I" },
         { type: "separator" },
         { role: "resetZoom",      accelerator: "CmdOrCtrl+0" },
-        // ✅ Zoom sur la fenêtre principale (barre, interface)
+        // ✅ Zoom interface — QWERTY: Ctrl+= / AZERTY: Ctrl+Shift+= (même touche physique)
         { role: "zoomIn",         accelerator: "CmdOrCtrl+Equal" },
+        { role: "zoomIn",         accelerator: "CmdOrCtrl+numadd" },
         { role: "zoomOut",        accelerator: "CmdOrCtrl+Minus" },
-        // ✅ Zoom sur la WebContentsView active (page web)
+        { role: "zoomOut",        accelerator: "CmdOrCtrl+numsub" },
+        // ✅ Zoom page web — fonctionne sur QWERTY et AZERTY
         { label: "Zoom page +",   accelerator: "CmdOrCtrl+Shift+Equal", click: () => {
           if (activeTabId && browserViews.has(activeTabId)) {
             const wc = browserViews.get(activeTabId).webContents;
             wc.setZoomLevel(wc.getZoomLevel() + 0.5);
           }
         }},
+        { label: "Zoom page + (pavé)",   accelerator: "CmdOrCtrl+numadd", click: () => {
+          if (activeTabId && browserViews.has(activeTabId)) {
+            const wc = browserViews.get(activeTabId).webContents;
+            wc.setZoomLevel(wc.getZoomLevel() + 0.5);
+          }
+        }},
         { label: "Zoom page -",   accelerator: "CmdOrCtrl+Shift+Minus", click: () => {
+          if (activeTabId && browserViews.has(activeTabId)) {
+            const wc = browserViews.get(activeTabId).webContents;
+            wc.setZoomLevel(wc.getZoomLevel() - 0.5);
+          }
+        }},
+        { label: "Zoom page - (pavé)",   accelerator: "CmdOrCtrl+numsub", click: () => {
           if (activeTabId && browserViews.has(activeTabId)) {
             const wc = browserViews.get(activeTabId).webContents;
             wc.setZoomLevel(wc.getZoomLevel() - 0.5);
@@ -192,6 +206,12 @@ app.commandLine.appendSwitch("autoplay-policy", "no-user-gesture-required");
 
 app.on("ready", async () => {
   createWindow();
+  // ✅ Recalculer les vues au plein écran / sortie plein écran
+  app.on("browser-window-created", (_, win) => {
+    win.on("enter-full-screen", () => setTimeout(updateBrowserViewSize, 100));
+    win.on("leave-full-screen",  () => setTimeout(updateBrowserViewSize, 100));
+    win.on("resize",             () => setTimeout(updateBrowserViewSize, 50));
+  });
   // ✅ Initialiser le gestionnaire de mots de passe
   registerVaultIpc(
     () => mainWindow,
@@ -232,12 +252,25 @@ const updateBrowserViewSize = () => {
   if (!view) return;
   const { width, height } = mainWindow.getContentBounds();
   if (tabSideWidth > 0) {
+    // Mode sidebar — la vue prend toute la hauteur à gauche de la sidebar
     view.setBounds({ x: 0, y: 0, width: width - tabSideWidth, height });
   } else {
+    // Mode top — tabbar (6vh) + navbar (6vh) = 12vh de hauteur fixe
+    // On utilise des pixels calculés depuis la vraie hauteur de la fenêtre
+    // plutôt que Math.round(height * 0.12) qui peut diverger de 12vh selon la résolution
     const marginTop = Math.round(height * 0.12);
-    view.setBounds({ x: 0, y: marginTop, width, height: height - marginTop });
+    // ✅ S'assurer que la vue couvre bien toute la zone sous les barres
+    view.setBounds({
+      x: 0,
+      y: marginTop,
+      width,
+      height: height - marginTop
+    });
   }
 };
+
+// ✅ Recalculer la taille au redimensionnement et au plein écran
+const scheduleResize = () => setTimeout(updateBrowserViewSize, 50);
 
 // ✅ Masquer/afficher la WebContentsView active (pour laisser les modales React visibles)
 ipcMain.on("hide-active-view", () => {
