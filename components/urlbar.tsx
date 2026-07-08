@@ -11,6 +11,7 @@ import { isDownloadableUrl as isDownloadable } from "@/shared/supportedHosts";
 import { useTranslation } from "@/hooks/useTranslation";
 
 const VaultPanel = dynamic(() => import("./VaultPanel"), { ssr: false });
+const FavoritesPanel = dynamic(() => import("./FavoritesPanel"), { ssr: false });
 
 const HINT_DL_KEY    = "hnaya-hint-download-seen";
 const HINT_VAULT_KEY = "hnaya-hint-vault-seen";
@@ -54,6 +55,8 @@ export default function URLBar() {
   const [showDownload, setShowDownload] = useState(false);
   const [downloadUrl, setDownloadUrl] = useState("");
   const [showVault, setShowVault] = useState(false);
+  const [showFavorites, setShowFavorites] = useState(false);
+  const [isFavorited, setIsFavorited] = useState(false);
   const [hasCredentials, setHasCredentials] = useState(false);
   const [showDlHint, setShowDlHint] = useState(false);
   const [showVaultHint, setShowVaultHint] = useState(false);
@@ -97,6 +100,15 @@ export default function URLBar() {
     api.receive("open-download-panel", handler);
     return () => api.removeListener("open-download-panel", handler);
   }, []);
+
+  // Vérifier si la page actuelle est en favori
+  useEffect(() => {
+    const api = (window as any).electronAPI;
+    if (!api?.invoke || !realViewUrl) { setIsFavorited(false); return; }
+    api.invoke("favorites-is-saved", realViewUrl)
+      .then((saved: boolean) => setIsFavorited(saved))
+      .catch(() => setIsFavorited(false));
+  }, [realViewUrl]);
 
   // Vérifier si des credentials existent pour le site actif
   useEffect(() => {
@@ -167,6 +179,29 @@ export default function URLBar() {
     setShowDownload(false);
     (window as any)?.electronAPI?.send("show-active-view");
   }, []);
+
+  const handleFavoritesClick = useCallback(async () => {
+    await (window as any)?.electronAPI?.invoke("hide-active-view-sync");
+    setShowFavorites(true);
+  }, []);
+
+  const handleCloseFavorites = useCallback(() => {
+    setShowFavorites(false);
+    (window as any)?.electronAPI?.send("show-active-view");
+  }, []);
+
+  const handleToggleFavorite = useCallback(async () => {
+    const api = (window as any).electronAPI;
+    if (!api?.invoke || !realViewUrl) return;
+    if (isFavorited) {
+      const list = await api.invoke("favorites-list");
+      const entry = list?.find((f: any) => f.url === realViewUrl);
+      if (entry) { await api.invoke("favorites-remove", entry.id); setIsFavorited(false); }
+    } else {
+      await api.invoke("favorites-add", { url: realViewUrl, title: currentTab?.title || realViewUrl, favicon: currentTab?.faviconUrl || null });
+      setIsFavorited(true);
+    }
+  }, [realViewUrl, isFavorited, currentTab]);
 
   const handleVaultClick = useCallback(async () => {
     setShowVaultHint(false);
@@ -258,6 +293,26 @@ export default function URLBar() {
           </div>
         )}
 
+        {/* Bouton favori — ajouter/retirer la page active */}
+        <button
+          onClick={handleToggleFavorite}
+          className="urlbar-btn"
+          title={isFavorited ? t("Favorites.alreadySaved") : t("Favorites.addedToFavorites")}
+          style={{ color: isFavorited ? "#f5c518" : undefined, fontSize: 16 }}
+        >
+          {isFavorited ? "★" : "☆"}
+        </button>
+
+        {/* Bouton favoris — ouvrir le panneau */}
+        <button
+          onClick={handleFavoritesClick}
+          className="urlbar-btn"
+          title={t("Favorites.title")}
+          style={{ fontSize: 15 }}
+        >
+          📑
+        </button>
+
         {/* Bouton vault */}
         <div style={{ position: "relative", flexShrink: 0 }}>
           {showVaultHint && (
@@ -281,6 +336,10 @@ export default function URLBar() {
 
       {showDownload && (
         <DownloadPanel url={downloadUrl} onClose={handleCloseDownload} />
+      )}
+
+      {showFavorites && (
+        <FavoritesPanel onClose={handleCloseFavorites} />
       )}
 
       {showVault && (
