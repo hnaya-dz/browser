@@ -1,97 +1,25 @@
 {
-  "HomePage": {
-    "search": "بحث",
-    "discover": "اكتشف الويب الجزائري"
-  },
-  "ResultPage": {
-    "search": "بحث"
-  },
-  "TabBar": {
-    "home": "الرئيسية",
-    "newTab": "تبويب جديد",
-    "tabsTop": "الألسنة في الأعلى",
-    "tabsSide": "الألسنة الجانبية"
-  },
-  "Nav": {
-    "home": "حنايا",
-    "market": "حنايا ماركت",
-    "tube": "حنايا تيوب",
-    "apps": "أبستور",
-    "webhost": "ويبهوست"
-  },
-  "Search": {
-    "shop": "بحث للتسوّق"
-  },
-  "Download": {
-    "analyzing": "جارٍ تحليل الفيديو…",
-    "title": "تحميل الفيديو",
-    "downloading": "جارٍ التحميل…",
-    "done": "✅ اكتمل التحميل!",
-    "error": "⚠️ خطأ",
-    "connecting": "الاتصال بـ yt-dlp…",
-    "fast": "سريع",
-    "fastDesc": "MP4 720p",
-    "hq": "جودة عالية",
-    "hqDesc": "أفضل دقة",
-    "folder": "مجلد الوجهة",
-    "noFolder": "لم يتم اختيار مجلد",
-    "choose": "📁 اختيار",
-    "downloadFast": "⚡ تحميل MP4 720p",
-    "downloadHQ": "🎬 تحميل بجودة عالية",
-    "doNotClose": "لا تغلق هذا الصندوق أثناء التحميل",
-    "savedIn": "تم الحفظ في:",
-    "close": "إغلاق",
-    "unavailable": "واجهة Electron غير متاحة.",
-    "unexpected": "استجابة غير متوقعة من yt-dlp.",
-    "analysisError": "خطأ أثناء التحليل."
-  },
-  "Theme": {
-    "custom": "مخصص",
-    "customLabel": "خلفية مخصصة",
-    "chooseImage": "اختر صورة",
-    "changeImage": "تغيير الصورة",
-    "removeImage": "إزالة الصورة",
-    "dropHere": "اسحب صورة هنا أو انقر للاختيار",
-    "supportedFormats": "JPG، PNG، WEBP",
-    "overlayOpacity": "شفافية الطبقة",
-    "apply": "تطبيق",
-    "formatError": "تنسيق غير مدعوم.",
-    "sizeError": "الصورة كبيرة جداً (الحد الأقصى {max} ميغابايت).",
-    "close": "إغلاق"
-  },
-  "Vault": {
-    "title": "خزنة كلمات المرور",
-    "add": "إضافة",
-    "back": "رجوع",
-    "save": "حفظ",
-    "saved": "تم الحفظ",
-    "cancel": "إلغاء",
+  "Favorites": {
+    "title": "المفضلة",
+    "favorites": "المفضلة",
+    "groups": "مجموعات الألسنة",
+    "search": "البحث في المفضلة...",
+    "empty": "لا توجد مفضلة بعد",
+    "noResults": "لا توجد نتائج",
+    "noGroups": "لا توجد مجموعات محفوظة",
+    "open": "فتح",
+    "remove": "حذف",
     "delete": "حذف",
-    "inject": "ملء تلقائي",
-    "export": "تصدير النسخة الاحتياطية",
-    "site": "الموقع",
-    "url": "الرابط",
-    "login": "اسم المستخدم / البريد",
-    "password": "كلمة المرور",
-    "noLogin": "بدون اسم مستخدم",
-    "loading": "تحميل",
-    "empty": "لا توجد كلمات مرور محفوظة",
-    "unavailable": "التشفير غير متاح على هذا الجهاز",
-    "confirmDelete": "هل تريد حذف هذا الإدخال؟",
-    "injected": "تم الملء التلقائي",
-    "injectError": "تعذّر العثور على الحقول"
-  },
-  "URLBar": {
-    "download": "تحميل",
-    "downloadTitle": "تحميل هذا الفيديو",
-    "hintDownload": "انقر لتحميل الفيديو من هذه الصفحة",
-    "vaultTitle": "كلمات المرور",
-    "vaultTitleFound": "لديك كلمة مرور محفوظة لهذا الموقع",
-    "hintVault": "احفظ كلمات مرورك هنا",
-    "hintVaultFound": "لديك بيانات دخول لهذا الموقع — انقر للملء التلقائي"
-  },
-  "Update": {
-    "available": "تحديث متاح",
-    "download": "تحميل"
+    "export": "تصدير",
+    "import": "استيراد",
+    "save": "حفظ",
+    "restore": "استعادة",
+    "moveFolder": "تغيير المجلد",
+    "saveCurrentTabs": "حفظ الألسنة الحالية",
+    "tabs": "ألسنة",
+    "groupName": "اسم المجموعة",
+    "addedToFavorites": "تمت الإضافة إلى المفضلة",
+    "alreadySaved": "موجود بالفعل في المفضلة",
+    "folder": "المجلد"
   }
 }
