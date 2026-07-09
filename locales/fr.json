@@ -1,94 +1,25 @@
 {
-  "HomePage": {
-    "search": "Rechercher",
-    "discover": "Découvrez le web algérien"
-  },
-  "ResultPage": {
-    "search": "Rechercher"
-  },
-  "TabBar": {
-    "home": "Accueil",
-    "newTab": "Nouvel onglet",
-    "tabsTop": "Onglets en haut",
-    "tabsSide": "Onglets latéraux"
-  },
-  "Nav": {
-    "home": "Accueil",
-    "market": "Hnaya Market",
-    "tube": "Hnaya Tube",
-    "apps": "Hnaya Appstore",
-    "webhost": "Hnaya Webhost"
-  },
-  "Download": {
-    "analyzing": "Analyse de la vidéo…",
-    "title": "Télécharger la vidéo",
-    "downloading": "Téléchargement en cours…",
-    "done": "✅ Téléchargement terminé !",
-    "error": "⚠️ Erreur",
-    "connecting": "Connexion à yt-dlp…",
-    "fast": "Rapide",
-    "fastDesc": "MP4 720p",
-    "hq": "Haute qualité",
-    "hqDesc": "Meilleure résolution",
-    "folder": "Dossier de destination",
-    "noFolder": "Aucun dossier sélectionné",
-    "choose": "📁 Choisir",
-    "downloadFast": "⚡ Télécharger en MP4 720p",
-    "downloadHQ": "🎬 Télécharger en haute qualité",
-    "doNotClose": "Ne fermez pas ce panneau pendant le téléchargement",
-    "savedIn": "Enregistré dans :",
-    "close": "Fermer",
-    "unavailable": "API Electron non disponible.",
-    "unexpected": "Réponse inattendue de yt-dlp.",
-    "analysisError": "Erreur lors de l'analyse."
-  },
-  "Theme": {
-    "custom": "Personnalisé",
-    "customLabel": "Fond personnalisé",
-    "chooseImage": "Choisir une image",
-    "changeImage": "Changer l'image",
-    "removeImage": "Supprimer l'image",
-    "dropHere": "Glissez une image ici ou cliquez pour choisir",
-    "supportedFormats": "JPG, PNG, WEBP",
-    "overlayOpacity": "Opacité de la couche",
-    "apply": "Appliquer",
-    "formatError": "Format non supporté.",
-    "sizeError": "Image trop grande (max {max} Mo).",
-    "close": "Fermer"
-  },
-  "Vault": {
-    "title": "Coffre-fort de mots de passe",
-    "add": "Ajouter",
-    "back": "Retour",
-    "save": "Enregistrer",
-    "saved": "Enregistré",
-    "cancel": "Annuler",
+  "Favorites": {
+    "title": "Favoris",
+    "favorites": "Favoris",
+    "groups": "Groupes d'onglets",
+    "search": "Rechercher dans les favoris...",
+    "empty": "Aucun favori enregistré",
+    "noResults": "Aucun résultat",
+    "noGroups": "Aucun groupe enregistré",
+    "open": "Ouvrir",
+    "remove": "Supprimer",
     "delete": "Supprimer",
-    "inject": "Remplissage automatique",
-    "export": "Exporter la sauvegarde",
-    "site": "Site",
-    "url": "URL",
-    "login": "Identifiant / Email",
-    "password": "Mot de passe",
-    "noLogin": "Sans identifiant",
-    "loading": "Chargement",
-    "empty": "Aucun mot de passe enregistré",
-    "unavailable": "Le chiffrement n'est pas disponible sur cet appareil",
-    "confirmDelete": "Supprimer cette entrée ?",
-    "injected": "Rempli automatiquement",
-    "injectError": "Champs introuvables sur cette page"
-  },
-  "URLBar": {
-    "download": "Télécharger",
-    "downloadTitle": "Télécharger la vidéo de cette page",
-    "hintDownload": "Cliquez pour télécharger la vidéo de cette page",
-    "vaultTitle": "Mots de passe",
-    "vaultTitleFound": "Vous avez un mot de passe enregistré pour ce site",
-    "hintVault": "Enregistrez vos mots de passe ici",
-    "hintVaultFound": "Identifiants disponibles — cliquez pour remplir automatiquement"
-  },
-  "Update": {
-    "available": "Mise à jour disponible",
-    "download": "Télécharger"
+    "export": "Exporter",
+    "import": "Importer",
+    "save": "Enregistrer",
+    "restore": "Restaurer",
+    "moveFolder": "Changer de dossier",
+    "saveCurrentTabs": "Enregistrer les onglets actuels",
+    "tabs": "onglets",
+    "groupName": "Nom du groupe",
+    "addedToFavorites": "Ajouté aux favoris",
+    "alreadySaved": "Déjà dans les favoris",
+    "folder": "Dossier"
   }
 }
