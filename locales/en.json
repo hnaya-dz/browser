@@ -1,94 +1,25 @@
 {
-  "HomePage": {
-    "search": "Search",
-    "discover": "Discover the Algerian web"
-  },
-  "ResultPage": {
-    "search": "Search"
-  },
-  "TabBar": {
-    "home": "Home",
-    "newTab": "New tab",
-    "tabsTop": "Tabs on top",
-    "tabsSide": "Side tabs"
-  },
-  "Nav": {
-    "home": "Home",
-    "market": "Hnaya Market",
-    "tube": "Hnaya Tube",
-    "apps": "Hnaya Appstore",
-    "webhost": "Hnaya Webhost"
-  },
-  "Download": {
-    "analyzing": "Analyzing video…",
-    "title": "Download video",
-    "downloading": "Downloading…",
-    "done": "✅ Download complete!",
-    "error": "⚠️ Error",
-    "connecting": "Connecting to yt-dlp…",
-    "fast": "Fast",
-    "fastDesc": "MP4 720p",
-    "hq": "High quality",
-    "hqDesc": "Best resolution",
-    "folder": "Destination folder",
-    "noFolder": "No folder selected",
-    "choose": "📁 Choose",
-    "downloadFast": "⚡ Download MP4 720p",
-    "downloadHQ": "🎬 Download high quality",
-    "doNotClose": "Do not close this panel during download",
-    "savedIn": "Saved in:",
-    "close": "Close",
-    "unavailable": "Electron API not available.",
-    "unexpected": "Unexpected response from yt-dlp.",
-    "analysisError": "Error during analysis."
-  },
-  "Theme": {
-    "custom": "Custom",
-    "customLabel": "Custom background",
-    "chooseImage": "Choose image",
-    "changeImage": "Change image",
-    "removeImage": "Remove image",
-    "dropHere": "Drag an image here or click to choose",
-    "supportedFormats": "JPG, PNG, WEBP",
-    "overlayOpacity": "Overlay opacity",
-    "apply": "Apply",
-    "formatError": "Unsupported format.",
-    "sizeError": "Image too large (max {max} MB).",
-    "close": "Close"
-  },
-  "Vault": {
-    "title": "Password vault",
-    "add": "Add",
-    "back": "Back",
-    "save": "Save",
-    "saved": "Saved",
-    "cancel": "Cancel",
+  "Favorites": {
+    "title": "Favorites",
+    "favorites": "Favorites",
+    "groups": "Tab groups",
+    "search": "Search favorites...",
+    "empty": "No favorites yet",
+    "noResults": "No results",
+    "noGroups": "No saved groups",
+    "open": "Open",
+    "remove": "Remove",
     "delete": "Delete",
-    "inject": "Autofill",
-    "export": "Export backup",
-    "site": "Site",
-    "url": "URL",
-    "login": "Username / Email",
-    "password": "Password",
-    "noLogin": "No username",
-    "loading": "Loading",
-    "empty": "No passwords saved yet",
-    "unavailable": "Encryption is not available on this device",
-    "confirmDelete": "Delete this entry?",
-    "injected": "Autofilled",
-    "injectError": "Fields not found on this page"
-  },
-  "URLBar": {
-    "download": "Download",
-    "downloadTitle": "Download the video from this page",
-    "hintDownload": "Click to download the video from this page",
-    "vaultTitle": "Passwords",
-    "vaultTitleFound": "You have a saved password for this site",
-    "hintVault": "Save your passwords here",
-    "hintVaultFound": "Credentials available — click to autofill"
-  },
-  "Update": {
-    "available": "Update available",
-    "download": "Download"
+    "export": "Export",
+    "import": "Import",
+    "save": "Save",
+    "restore": "Restore",
+    "moveFolder": "Change folder",
+    "saveCurrentTabs": "Save current tabs",
+    "tabs": "tabs",
+    "groupName": "Group name",
+    "addedToFavorites": "Added to favorites",
+    "alreadySaved": "Already in favorites",
+    "folder": "Folder"
   }
 }
