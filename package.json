@@ -13,7 +13,7 @@
     "dist": "yarn build && electron-builder --win --x64",
     "dist:mac": "yarn build && electron-builder --mac",
     "dist:linux": "yarn build && electron-builder --linux",
-    "dist:all": "yarn build && electron-builder --win --x64 --mac --linux"
+    "dist:all": "yarn build && electron-builder --win --x64 --mac --linux",
     "kill-dev": "taskkill /IM electron.exe /F & taskkill /IM node.exe /F"
   },
   "build": {
