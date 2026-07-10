@@ -23,13 +23,15 @@
     "directories": {
       "output": "dist"
     },
-    "files": [
-      "out/**/*",
-      "public/electron.js",
-      "public/preload.js",
-      "public/hnaya.png",
-      "public/icons/**/*"
-    ],
+   "files": [
+  "out/**/*",
+  "public/electron.js",
+  "public/preload.js",
+  "public/hnaya.png",
+  "public/icons/**/*",
+  "public/bin/**/*",
+  "shared/**/*"
+],
     "win": {
       "target": [
         {
