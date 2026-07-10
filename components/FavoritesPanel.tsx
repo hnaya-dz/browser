@@ -126,7 +126,7 @@ export default function FavoritesPanel({ onClose }: FavoritesPanelProps) {
   const filtered = favorites.filter(f =>
     !search || f.title.toLowerCase().includes(search.toLowerCase()) || f.url.toLowerCase().includes(search.toLowerCase())
   );
-  const folders = [...new Set(filtered.map(f => f.folder || "Général"))];
+  const folders = Array.from(new Set(filtered.map(f => f.folder || "Général")));
 
   const inputStyle: React.CSSProperties = {
     width: "100%", padding: "7px 10px", borderRadius: 8,
