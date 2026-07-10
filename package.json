@@ -49,19 +49,22 @@
       "shortcutName": "Hnaya DZ Browser"
     },
     "mac": {
+  "target": [
+    {
       "target": "dmg",
-      "icon": "public/hnaya.png",
-      "arch": [
-        "x64",
-        "arm64"
-      ]
-    },
-    "linux": {
-      "target": "AppImage",
-      "arch": [
-        "x64"
-      ]
+      "arch": ["x64", "arm64"]
     }
+  ],
+  "icon": "public/hnaya.png"
+},
+"linux": {
+  "target": [
+    {
+      "target": "AppImage",
+      "arch": ["x64"]
+    }
+  ]
+}
   },
   "dependencies": {
     "@heroui/button": "2.2.13",
