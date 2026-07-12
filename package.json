@@ -30,7 +30,12 @@
   "public/hnaya.png",
   "public/icons/**/*",
   "public/bin/**/*",
-  "shared/**/*"
+  "public/shared/**/*",
+  "public/vault.js",
+  "public/vault-ipc.js",
+  "public/favorites.js",
+  "public/favorites-ipc.js",
+  "public/update-check.js"
 ],
     "win": {
       "target": [
