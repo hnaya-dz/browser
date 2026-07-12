@@ -5,7 +5,7 @@ import { spawn } from "child_process";
 import { existsSync } from "fs";
 import serve from "electron-serve";
 // ✅ PATCH 1 — import depuis shared/ (supprime la duplication avec urlbar.tsx)
-import { isDownloadableUrl } from "../shared/supportedHosts.js";
+import { isDownloadableUrl } from "./shared/supportedHosts.js";
 import { registerVaultIpc } from "./vault-ipc.js";
 import { registerFavoritesIpc } from "./favorites-ipc.js";
 import { checkForUpdate } from "./update-check.js";
