@@ -514,6 +514,17 @@ ipcMain.on("open-tab", (event, newTab) => {
           { type: "separator" },
         );
       }
+      if (params.mediaType === "image" || params.srcURL) {
+  menuItems.push(
+    { label: "Enregistrer l'image", click: () => {
+      browserViews.get(activeTabId)?.webContents.downloadURL(params.srcURL);
+    }},
+    { label: "Copier l'adresse de l'image", click: () => {
+      require("electron").clipboard.writeText(params.srcURL);
+    }},
+    { type: "separator" },
+  );
+}
       if (params.isEditable) {
         menuItems.push(
           { label: "Couper",           role: "cut",         accelerator: "CmdOrCtrl+X" },
