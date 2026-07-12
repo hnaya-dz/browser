@@ -213,6 +213,26 @@ app.on("ready", async () => {
     win.on("leave-full-screen",  () => setTimeout(updateBrowserViewSize, 100));
     win.on("resize",             () => setTimeout(updateBrowserViewSize, 50));
   });
+  // ✅ Téléchargement images avec dialogue de sauvegarde
+  mainWindow.webContents.session.on("will-download", (event, item) => {
+  const defaultPath = join(app.getPath("downloads"), item.getFilename());
+  item.setSavePath(defaultPath);
+  item.once("done", (event, state) => {
+    if (state === "completed") {
+      shell.showItemInFolder(defaultPath);
+    }
+  });
+});
+  // ✅ Autoriser le partage d'écran et l'accès caméra/micro dans les onglets
+mainWindow.webContents.session.setPermissionRequestHandler((webContents, permission, callback) => {
+  const allowedPermissions = ["media", "display-capture", "screen"];
+  callback(allowedPermissions.includes(permission));
+});
+
+mainWindow.webContents.session.setDisplayMediaRequestHandler((request, callback) => {
+  // Laisser Electron gérer la sélection de source d'écran
+  callback({ video: "screen" });
+});
   // ✅ Initialiser le gestionnaire de mots de passe
   registerVaultIpc(
     () => mainWindow,
