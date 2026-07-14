@@ -231,7 +231,15 @@ app.on("ready", async () => {
     }
 
     // ✅ Dialogue de sauvegarde — l'utilisateur choisit le dossier et le nom
-    event.preventDefault();
+    // ⚠️ NE PAS appeler event.preventDefault() ici : sur "will-download",
+    // preventDefault() annule le téléchargement IMMÉDIATEMENT et de façon
+    // synchrone. Le dialogue "showSaveDialog" est asynchrone (await), donc
+    // au moment où on essaie de faire item.setSavePath(), l'item est déjà
+    // annulé — c'est pour ça que la fenêtre se fermait sans rien enregistrer.
+    // La bonne approche : mettre l'item en pause (ce qui NE l'annule PAS),
+    // attendre le dialogue, puis reprendre avec le bon chemin, ou annuler
+    // explicitement seulement si l'utilisateur a cliqué "Annuler".
+    item.pause();
     const { filePath, canceled } = await dialog.showSaveDialog(mainWindow, {
       title: "Enregistrer l'image",
       defaultPath: join(app.getPath("downloads"), filename),
@@ -246,6 +254,7 @@ app.on("ready", async () => {
       item.once("done", (event, state) => {
         if (state === "completed") shell.showItemInFolder(filePath);
       });
+      if (item.isPaused()) item.resume();
     } else {
       item.cancel();
     }
@@ -567,7 +576,7 @@ ipcMain.on("open-tab", (event, newTab) => {
       browserViews.get(activeTabId)?.webContents.downloadURL(params.srcURL);
     }},
     { label: "Copier l'adresse de l'image", click: () => {
-      require("electron").clipboard.writeText(params.srcURL);
+      clipboard.writeText(params.srcURL);
     }},
     { type: "separator" },
   );
