@@ -190,6 +190,96 @@ mainWindow = new BrowserWindow({
   mainWindow.setMenuBarVisibility(false);
   mainWindow.setAutoHideMenuBar(true);
 
+  // ═══════════════════════════════════════════════════════════
+  // ✅ CONFIDENTIALITÉ — DNS-over-HTTPS
+  // ═══════════════════════════════════════════════════════════
+  // Chiffre les requêtes DNS (le FAI ne voit plus en clair les domaines
+  // consultés). Aucun coût de performance notable, aucun impact sur
+  // Zoom/Teams (ce sont des apps qui gèrent leur propre résolution/relais).
+  try {
+    app.configureHostResolver({
+      secureDnsMode: "secure",
+      secureDnsServers: [
+        "https://cloudflare-dns.com/dns-query",
+        "https://dns.quad9.net/dns-query",
+      ],
+    });
+  } catch (e) {
+    console.warn("DNS-over-HTTPS non configuré :", e?.message);
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // ✅ CONFIDENTIALITÉ — Fuite d'IP locale via WebRTC
+  // ═══════════════════════════════════════════════════════════
+  // "default_public_interface_only" : n'expose que l'IP publique dans les
+  // candidats ICE WebRTC, jamais les IP locales (192.168.x.x, etc.) — ce qui
+  // bloque une technique de fingerprinting/tracking classique. Contrairement
+  // à "disable_non_proxied_udp", ce mode laisse les connexions UDP directes
+  // fonctionner normalement (donc pas de relais TURN forcé) : aucune perte
+  // de qualité/latence pour les appels vidéo (Zoom web, Teams web, Meet…).
+  mainWindow.webContents.session.setWebRTCIPHandlingPolicy("default_public_interface_only");
+
+  // ═══════════════════════════════════════════════════════════
+  // ✅ CONFIDENTIALITÉ — En-tête Do Not Track
+  // ═══════════════════════════════════════════════════════════
+  mainWindow.webContents.session.webRequest.onBeforeSendHeaders((details, callback) => {
+    details.requestHeaders["DNT"] = "1";
+    callback({ requestHeaders: details.requestHeaders });
+  });
+
+  // ═══════════════════════════════════════════════════════════
+  // ✅ CONFIDENTIALITÉ — Blocage traqueurs/analytics connus
+  // ═══════════════════════════════════════════════════════════
+  // Liste volontairement restreinte à des domaines d'analytics/tracking
+  // sans ambiguïté (pas de réseaux publicitaires larges qui pourraient
+  // casser la mise en page ou des fonctionnalités de sites légitimes).
+  // ⚠️ ALLOWLIST vérifiée en premier : garde-fou explicite pour ne jamais
+  // bloquer Zoom/Teams/Meet même si la blocklist est étendue plus tard.
+  const PRIVACY_ALLOWLIST = [
+    "zoom.us", "zoomgov.com",
+    "teams.microsoft.com", "teams.live.com", "microsoftteams.com",
+    "meet.google.com", "gstatic.com", "googleapis.com",
+    "hnaya.dz", "startpage.com",
+  ];
+  const TRACKER_BLOCKLIST = [
+    "google-analytics.com", "googletagmanager.com", "analytics.google.com",
+    "doubleclick.net", "facebook.com/tr", "connect.facebook.net",
+    "hotjar.com", "mixpanel.com", "segment.io", "segment.com",
+    "amplitude.com", "fullstory.com", "clarity.ms", "scorecardresearch.com",
+  ];
+  function isAllowlisted(host) {
+    return PRIVACY_ALLOWLIST.some(h => host === h || host.endsWith("." + h));
+  }
+  function isTracker(url) {
+    try {
+      const { hostname } = new URL(url);
+      if (isAllowlisted(hostname)) return false;
+      return TRACKER_BLOCKLIST.some(h => hostname === h || hostname.endsWith("." + h) || url.includes(h));
+    } catch { return false; }
+  }
+  mainWindow.webContents.session.webRequest.onBeforeRequest((details, callback) => {
+    if (isTracker(details.url)) {
+      callback({ cancel: true });
+      return;
+    }
+    // ✅ Nettoie les paramètres de tracking de clic (utm_*, fbclid, gclid…)
+    // uniquement sur la navigation de page principale — ne touche jamais
+    // aux requêtes d'API/ressources (donc aucun risque de casser un site).
+    if (details.resourceType === "mainFrame") {
+      try {
+        const u = new URL(details.url);
+        const trackingParams = ["fbclid", "gclid", "msclkid", "utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content"];
+        let changed = false;
+        trackingParams.forEach(p => { if (u.searchParams.has(p)) { u.searchParams.delete(p); changed = true; } });
+        if (changed) {
+          callback({ redirectURL: u.toString() });
+          return;
+        }
+      } catch { /* URL non standard (ex: about:blank) — on laisse passer */ }
+    }
+    callback({});
+  });
+
   if (app.isPackaged) {
     appServe(mainWindow).then(() => mainWindow.loadURL("app://index.html"));
   } else {
@@ -204,6 +294,16 @@ mainWindow = new BrowserWindow({
 // Sans effet négatif si les codecs sont déjà présents
 app.commandLine.appendSwitch("enable-features", "PlatformHEVCDecoderSupport,UseOzonePlatform");
 app.commandLine.appendSwitch("autoplay-policy", "no-user-gesture-required");
+
+// ✅ CONFIDENTIALITÉ — désactive le "bruit de fond" réseau de Chromium.
+// Aucun de ces réglages ne touche au rendu de page, à la vidéo, à l'audio
+// ou au WebRTC : ils coupent uniquement des requêtes internes de télémétrie
+// / mise à jour de composants que Chromium envoie en arrière-plan, sans
+// rapport avec les sites que tu visites (donc zéro impact Zoom/Teams).
+app.commandLine.appendSwitch("disable-background-networking");   // pings de fond Chromium (mises à jour de composants, etc.)
+app.commandLine.appendSwitch("disable-domain-reliability");      // rapports de fiabilité réseau envoyés à Google
+app.commandLine.appendSwitch("disable-component-update");        // vérifie/télécharge des composants Chromium en tâche de fond
+app.commandLine.appendSwitch("no-pings");                        // désactive l'attribut HTML <a ping> (tracking de clics natif du navigateur)
 
 app.on("ready", async () => {
   createWindow();
