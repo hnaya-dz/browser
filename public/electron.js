@@ -214,7 +214,22 @@ app.on("ready", async () => {
     win.on("resize",             () => setTimeout(updateBrowserViewSize, 50));
   });
   // ✅ Téléchargement images avec dialogue de sauvegarde
+  // ⚠️ Verrou anti-doublon : "will-download" peut être émis deux fois pour la
+  // même image lors d'un clic sur "Enregistrer l'image" (comportement Chromium
+  // connu avec webContents.downloadURL — la ressource peut être re-signalée une
+  // seconde fois très rapidement). Sans ce verrou, deux dialogues de sauvegarde
+  // s'ouvrent pour un seul clic.
+  const recentDownloadUrls = new Map(); // url -> timestamp
   mainWindow.webContents.session.on("will-download", async (event, item) => {
+    const sourceUrl = item.getURL();
+    const now = Date.now();
+    const lastTime = recentDownloadUrls.get(sourceUrl);
+    if (lastTime && now - lastTime < 1500) {
+      // Doublon détecté — on annule silencieusement ce second événement
+      item.cancel();
+      return;
+    }
+    recentDownloadUrls.set(sourceUrl, now);
     // ✅ Déterminer l'extension correcte depuis le mimeType
     let filename = item.getFilename();
     const mime = item.getMimeType();
