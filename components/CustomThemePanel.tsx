@@ -36,8 +36,17 @@ export default function CustomThemePanel({ onClose }: CustomThemePanelProps) {
 
   const processFile = useCallback((file: File) => {
     setError("");
-    const allowed = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
-    if (!allowed.includes(file.type)) {
+    // ✅ Sur Windows, file.type peut être vide ou incorrect pour certains
+    // fichiers (déjà constaté pour le JPEG — voir RETOUR_EXPERIENCE.md).
+    // On garde la vérification MIME stricte, mais avec un repli sur
+    // l'extension du nom de fichier si le MIME est absent ou incorrect,
+    // pour ne pas rejeter des PNG/JPG/WEBP valides.
+    const allowedMime = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+    const allowedExt = ["jpg", "jpeg", "png", "webp"];
+    const ext = file.name.split(".").pop()?.toLowerCase() || "";
+    const mimeOk = allowedMime.includes(file.type);
+    const extOk = allowedExt.includes(ext);
+    if (!mimeOk && !extOk) {
       setError(t("Theme.formatError") + " " + t("Theme.supportedFormats"));
       return;
     }
