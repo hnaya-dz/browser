@@ -411,8 +411,8 @@ export default function Home() {
            apparaître l'image de fond
         ══════════════════════════════════════════════ */
         .custom .glass-card {
-  background:rgba(0,0,0,0.15);
-  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  background:rgba(0,0,0,0.05);
+  backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);
   border:1px solid rgba(255,255,255,0.08);
   box-shadow:0 8px 40px rgba(0,0,0,0.2),inset 0 1px 0 rgba(255,255,255,0.05);
 }
