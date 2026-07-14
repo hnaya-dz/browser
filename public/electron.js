@@ -1,4 +1,4 @@
-import { app, BrowserWindow, WebContentsView, ipcMain, Menu, dialog, shell, screen } from "electron";
+import { app, BrowserWindow, WebContentsView, ipcMain, Menu, dialog, shell, screen, clipboard } from "electron";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import { spawn } from "child_process";
@@ -587,7 +587,7 @@ ipcMain.on("open-tab", (event, newTab) => {
             mainWindow.webContents.send("new-tab-url", params.linkURL);
           }},
           { label: "Copier l'adresse du lien", click: () => {
-            require("electron").clipboard.writeText(params.linkURL);
+            clipboard.writeText(params.linkURL);
           }},
           { type: "separator" },
         );
@@ -598,7 +598,7 @@ ipcMain.on("open-tab", (event, newTab) => {
         { label: "Suivant",            click: () => { if (view.webContents.navigationHistory?.canGoForward()) view.webContents.navigationHistory.goForward(); } },
         { type: "separator" },
         { label: "Copier l'URL de la page", click: () => {
-          require("electron").clipboard.writeText(view.webContents.getURL());
+          clipboard.writeText(view.webContents.getURL());
         }},
       );
 
