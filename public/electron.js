@@ -214,15 +214,42 @@ app.on("ready", async () => {
     win.on("resize",             () => setTimeout(updateBrowserViewSize, 50));
   });
   // ✅ Téléchargement images avec dialogue de sauvegarde
-  mainWindow.webContents.session.on("will-download", (event, item) => {
-  const defaultPath = join(app.getPath("downloads"), item.getFilename());
-  item.setSavePath(defaultPath);
-  item.once("done", (event, state) => {
-    if (state === "completed") {
-      shell.showItemInFolder(defaultPath);
+  mainWindow.webContents.session.on("will-download", async (event, item) => {
+    // ✅ Déterminer l'extension correcte depuis le mimeType
+    let filename = item.getFilename();
+    const mime = item.getMimeType();
+    if (mime === "image/webp" && !filename.toLowerCase().endsWith(".webp")) {
+      filename = filename.replace(/\.[^/.]+$/, "") + ".webp";
+    } else if (mime === "image/jpeg" && !filename.match(/\.(jpg|jpeg)$/i)) {
+      filename = filename + ".jpg";
+    } else if (mime === "image/png" && !filename.toLowerCase().endsWith(".png")) {
+      filename = filename + ".png";
+    } else if (!filename.includes(".")) {
+      // Pas d'extension — en déduire depuis le mimeType
+      const extMap = { "image/webp": ".webp", "image/jpeg": ".jpg", "image/png": ".png", "image/gif": ".gif" };
+      filename = filename + (extMap[mime] || "");
+    }
+
+    // ✅ Dialogue de sauvegarde — l'utilisateur choisit le dossier et le nom
+    event.preventDefault();
+    const { filePath, canceled } = await dialog.showSaveDialog(mainWindow, {
+      title: "Enregistrer l'image",
+      defaultPath: join(app.getPath("downloads"), filename),
+      filters: [
+        { name: "Images", extensions: ["png", "jpg", "jpeg", "webp", "gif"] },
+        { name: "Tous les fichiers", extensions: ["*"] },
+      ],
+    });
+
+    if (!canceled && filePath) {
+      item.setSavePath(filePath);
+      item.once("done", (event, state) => {
+        if (state === "completed") shell.showItemInFolder(filePath);
+      });
+    } else {
+      item.cancel();
     }
   });
-});
   // ✅ Autoriser le partage d'écran et l'accès caméra/micro dans les onglets
 mainWindow.webContents.session.setPermissionRequestHandler((webContents, permission, callback) => {
   const allowedPermissions = ["media", "display-capture", "screen"];
