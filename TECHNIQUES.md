@@ -415,3 +415,48 @@ une whitelist (contrairement à `send`/`invoke`) — voir section 1 de ce docume
 | `set-app-language` + `NATIVE_LABELS`/`nativeT()` | `electron.js` + `langcontext.tsx` | Menu clic-droit et dialogues natifs figés en français en interface arabe |
 | Dépendance `ws` isolée dans `chat-module/node_modules` (fork, jamais d'import direct) | `chat-module/` + `electron.js` | Alourdit le navigateur principal ; risque sur `yarn dist` |
 | `chat-module/node_modules/` et `chat-module/data/` dans `.gitignore` | `.gitignore` | `/node_modules` racine ne couvre PAS les sous-dossiers — dépôt pollué |
+
+---
+
+## 12. Architecture de la recherche (page d'accueil) — `app/page.tsx` + `public/electron.js`
+
+### Ce qui est en place
+
+La page d'accueil propose **deux moteurs distincts**, sélectionnés par les onglets "Algérie" / "Monde" :
+
+**Recherche "Algérie"** — Google Programmable Search Engine (CSE), moteur configuré (`cx=d6cbf11613afc4d13`) chargé via :
+```js
+script.src = "https://cse.google.com/cse.js?cx=d6cbf11613afc4d13";
+```
+Les résultats s'affichent **dans la page** (conteneur `.gcse-search`, résultats inline — pas de nouvel onglet). Un `MutationObserver` intercepte chaque clic sur un résultat (`.gsc-results a.gs-title`, `.gsc-webResult a`) pour l'ouvrir dans un nouvel onglet Hnaya (`addTab(href)`) plutôt que de naviguer dans l'iframe de résultats.
+
+**Recherche "Monde"** — Startpage, ouverte dans un nouvel onglet :
+```js
+addTab(`https://www.startpage.com/sp/search?query=${encodeURIComponent(q)}`);
+```
+Startpage agit comme proxy vers l'index Google : la requête part anonymisée (Startpage ne transmet pas l'IP de l'utilisateur à Google), sans lien avec un compte Google.
+
+### Couche confidentialité appliquée à toute navigation (donc aussi aux résultats de recherche)
+
+Configurée au niveau `session` dans `electron.js`, donc active pour **tous** les onglets, qu'ils viennent d'une recherche Algérie/Monde ou d'une navigation directe :
+
+| Mécanisme | Effet |
+|---|---|
+| `app.configureHostResolver` (DNS-over-HTTPS, Cloudflare + Quad9) | Le FAI ne voit pas en clair les domaines résolus |
+| `setWebRTCIPHandlingPolicy("default_public_interface_only")` | Masque les IP locales dans les candidats ICE WebRTC |
+| En-tête `DNT: 1` sur chaque requête | Signal de refus de suivi envoyé aux sites visités |
+| `TRACKER_BLOCKLIST` + `PRIVACY_ALLOWLIST` (`onBeforeRequest`) | Bloque les domaines d'analytics connus (Google Analytics, Doubleclick, Hotjar, etc.), sauf domaines explicitement autorisés (Zoom, Teams, Meet…) |
+| Nettoyage des paramètres `utm_*`, `fbclid`, `gclid`, `msclkid` | Supprime les identifiants de tracking de clic dans l'URL de destination, sur la navigation principale uniquement |
+| Switches `disable-background-networking`, `disable-domain-reliability`, `disable-component-update`, `no-pings` | Coupe la télémétrie de fond de Chromium |
+
+### ⚠️ Point de vigilance — ce que cette couche NE change PAS
+
+- **La recherche "Algérie" interroge l'infrastructure de Google** (Programmable Search Engine) — la requête tapée par l'utilisateur est envoyée aux serveurs Google, même si l'affichage reste dans Hnaya DZ. Le blocage de traqueurs et le DNT s'appliquent aux pages de résultats/destination, pas à la requête de recherche elle-même envoyée au CSE.
+- **La recherche "Monde" dépend de Startpage**, société privée basée aux Pays-Bas — la couche de confidentialité de Hnaya DZ (DoH, WebRTC, blocklist) s'ajoute à la protection déjà offerte par Startpage (anonymisation des requêtes vers Google), elle ne la remplace pas.
+- Ne pas présenter la recherche comme "100% locale" ou "sans dépendance étrangère" dans une communication externe — ce serait factuellement inexact tant que Google CSE et Startpage restent les moteurs utilisés.
+
+### ⚠️ Ne pas faire
+
+- **Ne pas retirer l'allowlist** avant d'étendre `TRACKER_BLOCKLIST` — un domaine ajouté par erreur (ex. un sous-domaine `*.googleapis.com` utilisé par Teams) casserait des fonctionnalités tierces sans message d'erreur clair pour l'utilisateur.
+- **Ne pas bloquer `cse.google.com`** dans une future extension de la blocklist — c'est le moteur de recherche Algérie lui-même, pas un traqueur.
+- **Ne pas remplacer `default_public_interface_only` par `disable_non_proxied_udp`** sans revalider la qualité des appels vidéo (Zoom/Teams/Meet web) — ce mode plus strict force un relais TURN et peut dégrader sensiblement la latence.
