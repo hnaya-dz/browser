@@ -1,0 +1,17 @@
+{
+  "name": "hnaya-chat-module",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Module complémentaire de chat local (LAN) pour Hnaya DZ Browser. Installable séparément — n'alourdit jamais le navigateur principal. Aucune dépendance native (pas de compilation), utilisable dans une famille, une PME, une école ou une administration, sans serveur dédié.",
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "host": "node src/server.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

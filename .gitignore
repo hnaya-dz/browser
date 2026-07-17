@@ -40,3 +40,8 @@ next-env.d.ts
 # yt-dlp — téléchargé automatiquement au premier lancement (multi-OS)
 # Ne jamais committer ce dossier, il contiendra un binaire différent par OS de dev
 public/bin/
+
+# Messagerie locale — dépendances installées via `cd chat-module && yarn install`,
+# et données runtime (messages persistés par l'hôte) : jamais dans Git
+chat-module/node_modules/
+chat-module/data/
