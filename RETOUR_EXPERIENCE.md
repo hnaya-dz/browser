@@ -260,6 +260,45 @@ const allowed = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
 
 ---
 
+## 8. Messagerie locale (chat-module) — v0.3.0
+
+> Fonctionnalité développée et durcie par trois vagues de tests terrain
+> réels sur deux machines (PC dev Windows 11 + vieux PC Windows 10 avec
+> Kaspersky). Chaque solution ci-dessous a remplacé une tentative qui
+> échouait EN CONDITIONS RÉELLES.
+
+### Tentatives échouées
+
+| Tentative | Raison de l'échec |
+|---|---|
+| Fenêtre d'écoute découverte de 4 s | Sur machine lente (disque dur), le fork du worker dépasse la fenêtre — le salon n'était jamais trouvé au premier essai |
+| Lire `$p.ExitCode` après `Start-Process -Verb RunAs` | Sur certaines machines, relire le code de sortie à travers la frontière UAC échoue alors que le script a réussi — faux message « autorisation non accordée » |
+| Vérifier les règles pare-feu depuis la session normale | Kaspersky verrouille MÊME LA LECTURE des règles (« Accès refusé » CIM, y compris compte admin) — la re-vérification post-installation concluait toujours à l'échec |
+| `Remove-NetFirewallRule` puis `New-` (remplacement) | Kaspersky bloque la suppression même élevée mais laisse passer la création → règles en double à chaque exécution |
+| `stop()` de découverte non idempotent | Appelé 2× (minuteur interne + annulation manuelle) → `ERR_SOCKET_DGRAM_NOT_RUNNING` → la nouvelle écoute ne s'installait jamais → découverte morte jusqu'au redémarrage complet de l'app |
+| Détection de déconnexion par trame de fermeture seule | `wss.close()` ne termine PAS les connexions existantes ; wifi coupé/veille n'envoie jamais de trame → UI « connectée » à un salon mort, messages envoyés dans le vide |
+| Panneau modal pour la messagerie | Masque la page — contredit l'usage « discuter en naviguant ». (Une bulle flottante React est impossible : la WebContentsView recouvre nativement le DOM) |
+| Emoji comme icônes d'interface (💬🔒🛡️) | Rendu par la police de l'OS — apparence différente entre Windows 10 et 11 |
+| Libellés natifs codés en dur en français | Menu clic-droit et dialogues restaient français en interface arabe — pas « natif » |
+
+### Solutions finales retenues ✅
+
+- **Découverte** : écoute 30 s + `chat-warmup` (fork du worker dès l'ouverture du panneau) + `stop()` idempotents (drapeau `stopped` + try/catch) partout où un socket se ferme.
+- **Pare-feu** : le script ÉLEVÉ vérifie lui-même les règles et écrit OK/FAIL dans un fichier résultat lu par l'app ; drapeau local `userData/chat-network-setup.json` après succès (jamais re-demander l'UAC) ; création de règle conditionnelle (`if (-not (Get-NetFirewallRule…))`) ; contenu du `.ps1` en ASCII pur (PowerShell 5.1 lit les fichiers sans BOM en ANSI).
+- **Vivacité** : battement de cœur ping/pong 10 s des deux côtés (terminate si pas de pong) + `ws.close(1001)` explicite de chaque client dans `stop()` de l'hôte + événement `disconnected` → écran « Connexion au salon perdue ».
+- **UI** : dock ancré 340 px à droite (le main process rétrécit la vue via `chat-dock`, même mécanique que la sidebar d'onglets) ; store global `context/chatstore.ts` chargé avec l'app (icône verte + badge non-lus fiables panneau fermé) ; point de montage unique `ChatDockMount` ; icônes lucide.
+- **i18n natif** : canal `set-app-language` + table `NATIVE_LABELS`/`nativeT()` dans electron.js pour menu contextuel et dialogues.
+
+### ⚠️ Ne jamais modifier
+
+- **Tout `stop()`/`close()` retourné par le module doit rester idempotent** — la régression revient sinon (découverte morte jusqu'au relancement).
+- **Ne pas se fier aux codes de sortie à travers l'UAC** — seule vérité : le fichier résultat écrit par le script élevé, puis le drapeau local.
+- **Ne pas retirer le heartbeat** ni le `ws.close(1001)` de `stop()` — ce sont eux qui empêchent les « salons fantômes » silencieux.
+- **Ne pas raccourcir la fenêtre de découverte sous 30 s** — calibrée sur le matériel modeste réel de la cible.
+- **Ne pas réintroduire d'emoji ni de chaînes en dur** dans l'interface — lucide + fichiers de langue + `nativeT()` uniquement.
+
+---
+
 ## Tableau récapitulatif — Ce qui fonctionne et ne doit pas être touché
 
 | Mécanisme | Fichier(s) | Risque si modifié |

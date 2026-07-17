@@ -392,3 +392,26 @@ une whitelist (contrairement à `send`/`invoke`) — voir section 1 de ce docume
 | Configuration | Fichier | Risque si supprimée |
 |---|---|---|
 | `ensureYtDlp()` multi-OS + `.gitignore public/bin/` | `electron.js` + `.gitignore` + `package.json` | yt-dlp inutilisable sur Mac/Linux, ou binaires committés écrasés entre développeurs |
+
+---
+
+## 11. Messagerie locale — configurations critiques (v0.3.0)
+
+> Détails complets et historique des échecs : `RETOUR_EXPERIENCE.md` §8
+> et `chat-module/README.md`. Résumé des invariants à ne pas casser :
+
+| Configuration | Fichier(s) | Risque si modifiée |
+|---|---|---|
+| `stop()` idempotents (drapeau + try/catch) sur les sockets de découverte | `chat-module/src/discovery.js` | Double fermeture → découverte définitivement morte jusqu'au redémarrage de l'app |
+| Battement de cœur ping/pong 10 s des deux côtés | `chat-module/src/server.js` + `client.js` | Connexions mortes jamais détectées (wifi coupé, veille) — messages envoyés dans le vide sans erreur |
+| `ws.close(1001)` de chaque client dans `stop()` de l'hôte | `chat-module/src/server.js` | `wss.close()` seul laisse les participants « connectés » à un salon fantôme |
+| Verdict pare-feu écrit PAR le script élevé + drapeau `chat-network-setup.json` | `electron.js` | Faux « autorisation non accordée » sur les postes Kaspersky (lecture pare-feu refusée en session normale) |
+| Création de règle pare-feu conditionnelle (pas remove+create) | `electron.js` | Règles en double sous Kaspersky (suppression bloquée, création autorisée) |
+| Script `.ps1` élevé en ASCII pur | `electron.js` | PowerShell 5.1 lit les .ps1 sans BOM en ANSI — accents corrompus, chemin d'exe invalide |
+| Fenêtre de découverte 30 s + `chat-warmup` à l'ouverture du panneau | `ChatPanel.tsx` + `electron.js` | Premier essai raté systématiquement sur machine modeste (fork lent) |
+| Store global `context/chatstore.ts` chargé avec l'app (pas dans le panneau paresseux) | `chatstore.ts` + `navbar.tsx` + `urlbar.tsx` | Icône d'état et badge non-lus faux quand le panneau est fermé |
+| Point de montage unique `ChatDockMount` piloté par `store.panelOpen` | `ChatDockMount.tsx` + `app/layout.tsx` | Deux docks simultanés + largeurs de vue incohérentes (chaque bouton montait son panneau) |
+| `chat-dock` rétrécit la vue (jamais la masquer pour la messagerie) | `electron.js` (`updateBrowserViewSize`) | Le dock recouvrirait la page ou serait invisible — la mécanique est celle de `tabSideWidth` |
+| `set-app-language` + `NATIVE_LABELS`/`nativeT()` | `electron.js` + `langcontext.tsx` | Menu clic-droit et dialogues natifs figés en français en interface arabe |
+| Dépendance `ws` isolée dans `chat-module/node_modules` (fork, jamais d'import direct) | `chat-module/` + `electron.js` | Alourdit le navigateur principal ; risque sur `yarn dist` |
+| `chat-module/node_modules/` et `chat-module/data/` dans `.gitignore` | `.gitignore` | `/node_modules` racine ne couvre PAS les sous-dossiers — dépôt pollué |
