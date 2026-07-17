@@ -133,7 +133,36 @@ utilisateurs habitués aux navigateurs modernes.
 
 ---
 
-## 12. Compatibilité multi-système
+## 12. Messagerie locale — communication interne sans serveur ni abonnement
+
+Hnaya intègre une messagerie d'équipe qui fonctionne **entièrement sur le
+réseau local** (Wi-Fi ou câblé) — pensée pour les institutions, PME,
+écoles et familles qui veulent communiquer sans dépendre d'un service
+étranger, d'un serveur à administrer ou d'un abonnement :
+
+- **Sans serveur** : n'importe quel poste crée un salon en un clic et
+  devient l'hôte ; les autres postes le découvrent automatiquement sur le
+  réseau — aucune adresse à saisir.
+- **Accès protégé par code PIN** à 6 chiffres, communiqué par l'hôte ;
+  les échanges sont chiffrés (AES-256) — un appareil présent sur le même
+  Wi-Fi sans le PIN ne peut rien lire.
+- **Panneau ancré** à droite de l'écran : on discute **tout en naviguant**,
+  la page reste visible.
+- **Indicateur d'état** dans la barre : icône verte quand connecté,
+  pastille rouge quand un message non lu arrive.
+- **Autorisation réseau guidée** : au premier salon, l'application
+  configure elle-même le pare-feu Windows (confirmation administrateur
+  demandée une seule fois) — y compris sur les postes protégés par un
+  antivirus tiers.
+- **Messages conservés 30 jours** sur le poste hôte puis purgés
+  automatiquement — cohérent avec la philosophie de confidentialité.
+- Interface trilingue AR/FR/EN, y compris les alertes.
+
+Les données ne quittent jamais le réseau local de l'organisation.
+
+---
+
+## 13. Compatibilité multi-système
 
 | Système | Format distribué |
 |---|---|

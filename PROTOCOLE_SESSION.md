@@ -32,6 +32,12 @@ Exemples de fichiers clés :
 - locales/fr.json            → traductions français
 - locales/ar.json            → traductions arabe
 - locales/en.json            → traductions anglais
+- chat-module/src/server.js  → hôte de salon messagerie locale (LAN)
+- chat-module/src/client.js  → client + découverte messagerie locale
+- chat-module/src/worker.js  → pont fork() entre Electron et le module
+- context/chatstore.ts       → état global messagerie (icône, non-lus)
+- components/ChatPanel.tsx   → dock messagerie locale (colonne droite)
+- components/ChatDockMount.tsx → point de montage unique du dock
 - app/layout.tsx             → layout racine Next.js
 - TECHNIQUES.md              → configurations critiques à ne pas modifier
 - RETOUR_EXPERIENCE.md       → bugs résolus et tentatives échouées
@@ -177,6 +183,10 @@ yarn dist
 | i18n AR/FR/EN avec RTL | ✅ Actif |
 | HnayaTube Watch — bouton téléchargement | ✅ Actif |
 | Dimensions fenêtre adaptatives | ✅ Actif |
+| Messagerie locale (LAN, PIN, chiffrée, dock) | ✅ Actif (v0.3.0) |
+| Pare-feu Windows auto-configuré (UAC, Kaspersky géré) | ✅ Actif (v0.3.0) |
+| Icône d'état messagerie + badge non-lus | ✅ Actif (v0.3.0) |
+| Libellés natifs (clic droit, dialogues) AR/FR/EN | ✅ Actif (v0.3.0) |
 | Netflix DRM (Widevine) | ❌ Non supporté |
 | Snapchat | ❌ Bloqué par Snapchat |
 
