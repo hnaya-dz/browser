@@ -272,19 +272,21 @@ export default function URLBar() {
           .sunset .urlbar-input:focus{border-color:rgba(255,100,20,0.6);box-shadow:0 0 0 2px rgba(200,60,0,0.2)}
         `}</style>
 
-        <button className="urlbar-btn" onClick={() => (window as any)?.electronAPI?.send("go-back")} title="Précédent"><IconBack /></button>
-        <button className="urlbar-btn" onClick={() => (window as any)?.electronAPI?.send("go-forward")} title="Suivant"><IconForward /></button>
-        <button className="urlbar-btn" onClick={() => (window as any)?.electronAPI?.send("refresh")} title="Recharger"><IconRefresh /></button>
+        {/* ✅ Infobulles et placeholder traduits (clés Navbar existantes) —
+            elles étaient codées en dur en français même en interface arabe */}
+        <button className="urlbar-btn" onClick={() => (window as any)?.electronAPI?.send("go-back")} title={t("Navbar.back")}><IconBack /></button>
+        <button className="urlbar-btn" onClick={() => (window as any)?.electronAPI?.send("go-forward")} title={t("Navbar.forward")}><IconForward /></button>
+        <button className="urlbar-btn" onClick={() => (window as any)?.electronAPI?.send("refresh")} title={t("Navbar.reload")}><IconRefresh /></button>
 
         <input
           className="urlbar-input"
-          placeholder="URL ou recherche Startpage..."
+          placeholder={t("Navbar.searchPlaceholder")}
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleNavigation()}
         />
 
-        <button className="urlbar-btn" onClick={handleNavigation} title="Naviguer ou rechercher"><IconSearch /></button>
+        <button className="urlbar-btn" onClick={handleNavigation} title={t("Navbar.search")}><IconSearch /></button>
 
         {/* Bouton téléchargement */}
         {canDownload && (

@@ -34,6 +34,33 @@ let tabSideWidth = 0;
 // que tabSideWidth : la WebContentsView est rétrécie pour laisser la
 // colonne React visible à droite, l'utilisateur discute EN voyant la page
 let chatDockWidth = 0;
+
+// ── Langue des libellés NATIFS (menu contextuel, boîtes de dialogue) ───────
+// Le renderer envoie la langue choisie via "set-app-language". Sans ça,
+// clic droit et dialogues restaient codés en dur en français même quand
+// l'interface est en arabe — pas « natif » pour la cible arabophone.
+let appLang = "ar"; // même défaut que l'interface (layout lang="ar")
+const NATIVE_LABELS = {
+  ar: { copy: "نسخ", cut: "قص", paste: "لصق", selectAll: "تحديد الكل",
+        saveImage: "حفظ الصورة", copyImageUrl: "نسخ عنوان الصورة",
+        openLinkNewTab: "فتح الرابط في لسان جديد", copyLinkUrl: "نسخ عنوان الرابط",
+        reloadPage: "إعادة تحميل الصفحة", back: "السابق", forward: "التالي",
+        copyPageUrl: "نسخ عنوان الصفحة", images: "الصور", allFiles: "كل الملفات",
+        chooseFolder: "اختر مجلد التحميل" },
+  fr: { copy: "Copier", cut: "Couper", paste: "Coller", selectAll: "Tout sélectionner",
+        saveImage: "Enregistrer l'image", copyImageUrl: "Copier l'adresse de l'image",
+        openLinkNewTab: "Ouvrir le lien dans un nouvel onglet", copyLinkUrl: "Copier l'adresse du lien",
+        reloadPage: "Recharger la page", back: "Précédent", forward: "Suivant",
+        copyPageUrl: "Copier l'URL de la page", images: "Images", allFiles: "Tous les fichiers",
+        chooseFolder: "Choisir le dossier de téléchargement" },
+  en: { copy: "Copy", cut: "Cut", paste: "Paste", selectAll: "Select all",
+        saveImage: "Save image", copyImageUrl: "Copy image address",
+        openLinkNewTab: "Open link in new tab", copyLinkUrl: "Copy link address",
+        reloadPage: "Reload page", back: "Back", forward: "Forward",
+        copyPageUrl: "Copy page URL", images: "Images", allFiles: "All files",
+        chooseFolder: "Choose download folder" },
+};
+const nativeT = (key) => (NATIVE_LABELS[appLang] || NATIVE_LABELS.fr)[key] || key;
 // Référence au process yt-dlp en cours (pour l'annulation)
 let activeDownloadProc = null;
 
@@ -270,11 +297,11 @@ app.on("ready", async () => {
     // explicitement seulement si l'utilisateur a cliqué "Annuler".
     item.pause();
     const { filePath, canceled } = await dialog.showSaveDialog(mainWindow, {
-      title: "Enregistrer l'image",
+      title: nativeT("saveImage"),
       defaultPath: join(app.getPath("downloads"), filename),
       filters: [
-        { name: "Images", extensions: ["png", "jpg", "jpeg", "webp", "gif"] },
-        { name: "Tous les fichiers", extensions: ["*"] },
+        { name: nativeT("images"), extensions: ["png", "jpg", "jpeg", "webp", "gif"] },
+        { name: nativeT("allFiles"), extensions: ["*"] },
       ],
     });
 
@@ -419,6 +446,11 @@ ipcMain.on("chat-dock", (event, width) => {
   updateBrowserViewSize();
 });
 
+// ✅ Langue des libellés natifs — synchronisée depuis langcontext.tsx
+ipcMain.on("set-app-language", (event, lang) => {
+  if (["ar", "fr", "en"].includes(lang)) appLang = lang;
+});
+
 ////////////////////////////////////////////////////////////////////////////////
 // ── TÉLÉCHARGEMENT (yt-dlp) ──────────────────────────────────────────────────
 
@@ -471,7 +503,7 @@ ipcMain.handle("get-video-info", async (event, url) => {
 // 3. Choisir le dossier de destination (dialogue natif Windows)
 ipcMain.handle("choose-download-folder", async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
-    title: "Choisir le dossier de téléchargement",
+    title: nativeT("chooseFolder"),
     properties: ["openDirectory"],
     defaultPath: app.getPath("downloads"),
   });
@@ -816,18 +848,19 @@ ipcMain.on("open-tab", (event, newTab) => {
     view.webContents.on("context-menu", (event, params) => {
       const menuItems = [];
 
+      // ✅ Libellés via nativeT() — suivent la langue de l'interface (AR/FR/EN)
       if (params.selectionText) {
         menuItems.push(
-          { label: "Copier",           role: "copy",        accelerator: "CmdOrCtrl+C" },
+          { label: nativeT("copy"),    role: "copy",        accelerator: "CmdOrCtrl+C" },
           { type: "separator" },
         );
       }
       if (params.mediaType === "image" || params.srcURL) {
   menuItems.push(
-    { label: "Enregistrer l'image", click: () => {
+    { label: nativeT("saveImage"), click: () => {
       browserViews.get(activeTabId)?.webContents.downloadURL(params.srcURL);
     }},
-    { label: "Copier l'adresse de l'image", click: () => {
+    { label: nativeT("copyImageUrl"), click: () => {
       clipboard.writeText(params.srcURL);
     }},
     { type: "separator" },
@@ -835,30 +868,30 @@ ipcMain.on("open-tab", (event, newTab) => {
 }
       if (params.isEditable) {
         menuItems.push(
-          { label: "Couper",           role: "cut",         accelerator: "CmdOrCtrl+X" },
-          { label: "Copier",           role: "copy",        accelerator: "CmdOrCtrl+C" },
-          { label: "Coller",           role: "paste",       accelerator: "CmdOrCtrl+V" },
-          { label: "Tout sélectionner",role: "selectAll",   accelerator: "CmdOrCtrl+A" },
+          { label: nativeT("cut"),       role: "cut",         accelerator: "CmdOrCtrl+X" },
+          { label: nativeT("copy"),      role: "copy",        accelerator: "CmdOrCtrl+C" },
+          { label: nativeT("paste"),     role: "paste",       accelerator: "CmdOrCtrl+V" },
+          { label: nativeT("selectAll"), role: "selectAll",   accelerator: "CmdOrCtrl+A" },
           { type: "separator" },
         );
       }
       if (params.linkURL) {
         menuItems.push(
-          { label: "Ouvrir le lien dans un nouvel onglet", click: () => {
+          { label: nativeT("openLinkNewTab"), click: () => {
             mainWindow.webContents.send("new-tab-url", params.linkURL);
           }},
-          { label: "Copier l'adresse du lien", click: () => {
+          { label: nativeT("copyLinkUrl"), click: () => {
             clipboard.writeText(params.linkURL);
           }},
           { type: "separator" },
         );
       }
       menuItems.push(
-        { label: "Recharger la page",  click: () => view.webContents.reload() },
-        { label: "Précédent",          click: () => { if (view.webContents.navigationHistory?.canGoBack()) view.webContents.navigationHistory.goBack(); } },
-        { label: "Suivant",            click: () => { if (view.webContents.navigationHistory?.canGoForward()) view.webContents.navigationHistory.goForward(); } },
+        { label: nativeT("reloadPage"), click: () => view.webContents.reload() },
+        { label: nativeT("back"),       click: () => { if (view.webContents.navigationHistory?.canGoBack()) view.webContents.navigationHistory.goBack(); } },
+        { label: nativeT("forward"),    click: () => { if (view.webContents.navigationHistory?.canGoForward()) view.webContents.navigationHistory.goForward(); } },
         { type: "separator" },
-        { label: "Copier l'URL de la page", click: () => {
+        { label: nativeT("copyPageUrl"), click: () => {
           clipboard.writeText(view.webContents.getURL());
         }},
       );

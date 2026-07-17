@@ -169,7 +169,9 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
     store.userId = nickname.trim();
     if (typeof window !== "undefined") localStorage.setItem("hnaya-chat-user-id", nickname.trim());
     // Même remise à zéro qu'à la création — le backlog fait foi.
-    patchStore({ messages: [], online: [] });
+    // ✅ Retenir aussi le nom du salon rejoint : affiché dans l'en-tête
+    // du dock une fois connecté (on doit savoir OÙ on discute).
+    patchStore({ messages: [], online: [], sessionName: store.selectedSession.sessionName || "" });
     startConnecting();
     api.send("chat-join", {
       address: store.selectedSession.address,
@@ -221,7 +223,18 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
         <MessageSquare size={20} style={{ color: accent, flexShrink: 0 }} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 14, fontWeight: 700, lineHeight: 1.2 }}>{t("Chat.title")}</div>
-          <div style={{ fontSize: 10, color: muted, lineHeight: 1.3, marginTop: 1 }}>{t("Chat.subtitle")}</div>
+          {/* Connecté : afficher le NOM DU SALON (on doit savoir où on
+              discute) — sinon le sous-titre descriptif habituel */}
+          {store.status === "joined" && store.sessionName ? (
+            <div style={{
+              fontSize: 11, color: accent, fontWeight: 600, lineHeight: 1.3, marginTop: 1,
+              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+            }}>
+              {store.sessionName}
+            </div>
+          ) : (
+            <div style={{ fontSize: 10, color: muted, lineHeight: 1.3, marginTop: 1 }}>{t("Chat.subtitle")}</div>
+          )}
         </div>
         {store.status === "joined" && (
           <button onClick={handleLeave} style={{ ...btnStyle(), padding: "5px 10px", fontSize: 11 }}>

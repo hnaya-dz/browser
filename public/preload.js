@@ -45,6 +45,7 @@ const ALLOWED_SEND = [
   "hide-active-view",
   "show-active-view",
   "set-tab-position",
+  "set-app-language",
   "close-browser-view",
   "get-current-url",
   "download-video",

@@ -22,6 +22,10 @@ export const LanguageProvider = ({ children }: { children: ReactNode }) => {
     useEffect(() => {
         if (language) {
             localStorage.setItem('language', language);
+            // ✅ Synchronise la langue avec le process principal Electron —
+            // les libellés natifs (clic droit, dialogues) suivent la langue
+            // de l'interface au lieu de rester figés en français
+            (window as any)?.electronAPI?.send?.('set-app-language', language);
         }
     }, [language]);
 
