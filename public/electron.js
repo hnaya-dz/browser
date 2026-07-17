@@ -2,8 +2,8 @@ import { app, BrowserWindow, WebContentsView, ipcMain, Menu, dialog, shell, scre
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import { spawn, fork } from "child_process";
-import { existsSync } from "fs";
-import serve from "electron-serve";
+import { existsSync, createReadStream, statSync } from "fs";
+import http from "http";
 // ✅ PATCH 1 — import depuis shared/ (supprime la duplication avec urlbar.tsx)
 import { isDownloadableUrl } from "./shared/supportedHosts.js";
 import { registerVaultIpc } from "./vault-ipc.js";
@@ -22,10 +22,89 @@ function isGoogleAuthUrl(url) {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const appServe = app.isPackaged ? serve({
-  directory: join(__dirname, "../out"),
-}) : null;
+// ═══════════════════════════════════════════════════════════════
+// Serveur statique local pour la version packagée
+// ═══════════════════════════════════════════════════════════════
+// ⚠️ REMPLACE electron-serve (protocole app://). Raison : sous l'origine
+// opaque « app:// », Google Custom Search (recherche « Algérie » de la
+// page d'accueil) REFUSE de s'initialiser — referrer vide, origine non
+// http(s). Résultat : la recherche Algérie ne rendait aucun résultat dans
+// le .exe alors qu'elle marche en dev (http://localhost:3000). En servant
+// out/ sur http://127.0.0.1, la version packagée retrouve une vraie
+// origine http et se comporte comme le dev (bonus : localhost est un
+// « secure context » Chromium — WebCrypto/PWA disponibles pour le futur).
+// Diagnostic complet : origine app:// prouvée bloquante au débogage distant.
+//
+// ⚠️ PORT FIXE OBLIGATOIRE : localStorage (thème, image de fond, langue,
+// pseudo chat) est indexé par ORIGINE = scheme://host:PORT. Un port
+// aléatoire changerait l'origine à chaque lancement → réglages remis à
+// zéro à chaque démarrage. Le port fixe garantit une origine stable, donc
+// des réglages persistants. (Vault et favoris sont stockés en fichier via
+// app.getPath — eux ne dépendent pas de l'origine.)
+const STATIC_PORT = 47823; // port local fixe, arbitraire et peu courant
+const STATIC_MIME = {
+  ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8",
+  ".css": "text/css; charset=utf-8", ".json": "application/json; charset=utf-8",
+  ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+  ".gif": "image/gif", ".webp": "image/webp", ".svg": "image/svg+xml",
+  ".ico": "image/x-icon", ".woff": "font/woff", ".woff2": "font/woff2",
+  ".ttf": "font/ttf", ".map": "application/json; charset=utf-8", ".txt": "text/plain; charset=utf-8",
+};
 
+function startStaticServer() {
+  const root = join(__dirname, "../out");
+  // Résout un chemin de requête vers un fichier réel de l'export Next.
+  // Next `output: export` génère index.html, browser.html, results.html,
+  // 404.html + _next/… — on essaie fichier exact, puis .html, puis
+  // /index.html, avec garde-fou anti-traversée de répertoire.
+  const resolveFile = (urlPath) => {
+    let p = decodeURIComponent(urlPath.split("?")[0]);
+    if (p === "/" || p === "") p = "/index.html";
+    const candidates = [p, p + ".html", join(p, "index.html")];
+    for (const c of candidates) {
+      const abs = join(root, c);
+      // Anti-traversée : le chemin résolu doit rester sous root
+      if (!abs.startsWith(root)) continue;
+      try { if (statSync(abs).isFile()) return abs; } catch { /* n'existe pas */ }
+    }
+    return null;
+  };
+
+  const makeServer = () => http.createServer((req, res) => {
+    let file = resolveFile(req.url);
+    let status = 200;
+    if (!file) {
+      // Repli SPA : 404.html si présent, sinon index.html
+      file = resolveFile("/404.html") || resolveFile("/index.html");
+      status = file && file.endsWith("404.html") ? 404 : 200;
+    }
+    if (!file) { res.writeHead(404); res.end("Not found"); return; }
+    const ext = file.slice(file.lastIndexOf(".")).toLowerCase();
+    res.writeHead(status, { "Content-Type": STATIC_MIME[ext] || "application/octet-stream" });
+    createReadStream(file).pipe(res);
+  });
+
+  return new Promise((resolve) => {
+    const server = makeServer();
+    // Boucle locale (127.0.0.1) uniquement — jamais exposé au réseau.
+    server.listen(STATIC_PORT, "127.0.0.1", () => {
+      resolve(`http://127.0.0.1:${STATIC_PORT}`);
+    });
+    server.on("error", (err) => {
+      // Port occupé (autre appli, ou instance précédente pas encore libérée).
+      // Repli sur un port éphémère : l'app fonctionne toujours ; seuls les
+      // réglages localStorage de CETTE session diffèreraient — cas rare et
+      // dégradé proprement plutôt qu'un écran blanc.
+      console.warn(`[static] Port ${STATIC_PORT} indisponible (${err.code}) — repli éphémère`);
+      const fallback = makeServer();
+      fallback.listen(0, "127.0.0.1", () => {
+        resolve(`http://127.0.0.1:${fallback.address().port}`);
+      });
+    });
+  });
+}
+
+let staticServerUrl = null;
 let mainWindow = null;
 const browserViews = new Map();
 let activeTabId = null;
@@ -232,7 +311,8 @@ mainWindow = new BrowserWindow({
   mainWindow.setAutoHideMenuBar(true);
 
   if (app.isPackaged) {
-    appServe(mainWindow).then(() => mainWindow.loadURL("app://index.html"));
+    // staticServerUrl est prêt (démarré dans app.on("ready") avant createWindow)
+    mainWindow.loadURL(staticServerUrl);
   } else {
     mainWindow.loadURL("http://localhost:3000");
     mainWindow.webContents.on("did-fail-load", () => mainWindow.webContents.reloadIgnoringCache());
@@ -247,6 +327,10 @@ app.commandLine.appendSwitch("enable-features", "PlatformHEVCDecoderSupport,UseO
 app.commandLine.appendSwitch("autoplay-policy", "no-user-gesture-required");
 
 app.on("ready", async () => {
+  // Démarre le serveur statique AVANT de créer la fenêtre (packagé seulement)
+  if (app.isPackaged) {
+    staticServerUrl = await startStaticServer();
+  }
   createWindow();
   // ✅ Recalculer les vues au plein écran / sortie plein écran
   app.on("browser-window-created", (_, win) => {
