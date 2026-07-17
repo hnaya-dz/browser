@@ -9,9 +9,11 @@ import DownloadPanel from "./DownloadPanel";
 import dynamic from "next/dynamic";
 import { isDownloadableUrl as isDownloadable } from "@/shared/supportedHosts";
 import { useTranslation } from "@/hooks/useTranslation";
+import { MessageSquare } from "lucide-react";
 
 const VaultPanel = dynamic(() => import("./VaultPanel"), { ssr: false });
 const FavoritesPanel = dynamic(() => import("./FavoritesPanel"), { ssr: false });
+const ChatPanel = dynamic(() => import("./ChatPanel"), { ssr: false });
 
 const HINT_DL_KEY    = "hnaya-hint-download-seen";
 const HINT_VAULT_KEY = "hnaya-hint-vault-seen";
@@ -56,6 +58,7 @@ export default function URLBar() {
   const [downloadUrl, setDownloadUrl] = useState("");
   const [showVault, setShowVault] = useState(false);
   const [showFavorites, setShowFavorites] = useState(false);
+  const [showChat, setShowChat] = useState(false);
   const [isFavorited, setIsFavorited] = useState(false);
   const [hasCredentials, setHasCredentials] = useState(false);
   const [showDlHint, setShowDlHint] = useState(false);
@@ -216,6 +219,16 @@ export default function URLBar() {
     (window as any)?.electronAPI?.send("show-active-view");
   }, []);
 
+  const handleChatClick = useCallback(async () => {
+    await (window as any)?.electronAPI?.invoke("hide-active-view-sync");
+    setShowChat(true);
+  }, []);
+
+  const handleCloseChat = useCallback(() => {
+    setShowChat(false);
+    (window as any)?.electronAPI?.send("show-active-view");
+  }, []);
+
   if (!isExternalTab) return null;
 
   const rightOffset = position === "right" ? "200px" : "0px";
@@ -330,6 +343,16 @@ export default function URLBar() {
           </button>
         </div>
 
+        {/* Bouton messagerie locale (LAN) — icône vectorielle, rendu
+            identique sur Windows 10 et 11 contrairement aux emoji */}
+        <button
+          onClick={handleChatClick}
+          className="urlbar-btn"
+          title={t("Chat.title")}
+        >
+          <MessageSquare size={17} />
+        </button>
+
         <LangSwitch />
         <ThemeSwitch />
       </nav>
@@ -344,6 +367,10 @@ export default function URLBar() {
 
       {showVault && (
         <VaultPanel onClose={handleCloseVault} />
+      )}
+
+      {showChat && (
+        <ChatPanel onClose={handleCloseChat} />
       )}
     </>
   );

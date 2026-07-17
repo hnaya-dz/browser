@@ -1,10 +1,16 @@
 "use client";
+import { useState } from "react";
 import { usePathname } from "next/navigation";
+import dynamic from "next/dynamic";
+import { MessageSquare } from "lucide-react";
 import { ThemeSwitch } from "@/components/theme-switch";
 import LangSwitch from "./lang-switch";
 import { useTabContext } from "@/context/tabcontext";
 import { useTabPosition } from "@/context/tabpositioncontext";
 import { useLanguage } from "@/context/langcontext";
+import { useTranslation } from "@/hooks/useTranslation";
+
+const ChatPanel = dynamic(() => import("./ChatPanel"), { ssr: false });
 
 const HNAYA_NAV = [
   { key: "home",    url: "https://hnaya.dz",                 labels: { ar: "حنايا",       fr: "Accueil",        en: "Home"           } },
@@ -19,12 +25,15 @@ export const Navbar = () => {
   const { addTab } = useTabContext();
   const { language, isRTL } = useLanguage();
   const { position } = useTabPosition();
+  const { t } = useTranslation();
+  const [showChat, setShowChat] = useState(false);
 
   if (pathname === "/browser") return null;
 
   const rightOffset = position === "right" ? "200px" : "0px";
 
   return (
+    <>
     <nav
       className="fixed mt-[6vh] h-[6vh] z-40 flex items-center px-4 gap-3 bg-black/40 backdrop-blur-md border-b border-white/10"
       style={{ left: 0, right: rightOffset, width: `calc(100vw - ${rightOffset})` }}
@@ -47,9 +56,20 @@ export const Navbar = () => {
         ))}
       </div>
       <div className="flex items-center gap-2 flex-shrink-0">
+        <button
+          onClick={() => setShowChat(true)}
+          className="px-2 text-white/70 hover:text-white transition-all duration-150"
+          title={t("Chat.title")}
+        >
+          {/* Icône vectorielle : rendu identique sur Windows 10 et 11,
+              contrairement aux emoji (police système) */}
+          <MessageSquare size={16} />
+        </button>
         <LangSwitch />
         <ThemeSwitch />
       </div>
     </nav>
+    {showChat && <ChatPanel onClose={() => setShowChat(false)} />}
+    </>
   );
 };
