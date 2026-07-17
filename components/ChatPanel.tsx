@@ -6,190 +6,24 @@ import { useEffect, useState } from "react";
 import { MessageSquare, Shield, Lock } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useLanguage } from "@/context/langcontext";
+import { useTabPosition } from "@/context/tabpositioncontext";
+import {
+  store,
+  patchStore,
+  getApi,
+  clearConnectTimer,
+  startConnecting,
+  useChatSnapshot,
+  type DiscoveredSession,
+} from "@/context/chatstore";
 
 interface ChatPanelProps {
   onClose: () => void;
 }
 
-interface ChatMessage {
-  id: string;
-  groupId: string;
-  from: string;
-  text: string;
-  ts: number;
-}
-
-interface DiscoveredSession {
-  sessionName: string;
-  address: string;
-  wsPort: number;
-  hostname: string;
-}
-
-type ChatStatus = "idle" | "discovering" | "entering-pin" | "connecting" | "joined" | "error" | "network-setup";
-
-// ═══════════════════════════════════════════════════════════════
-// Store module-level — persiste tant que la page n'est pas rechargée,
-// même quand <ChatPanel> est démonté (l'utilisateur ferme le panneau).
-// Sans ça, fermer/rouvrir le panneau perdrait l'historique affiché et
-// l'état "salon rejoint", alors que la connexion elle-même (côté
-// process principal Electron) continue de tourner en arrière-plan.
-// ⚠️ Limite connue MVP : les messages reçus PENDANT que le panneau est
-// fermé ne sont pas mémorisés ici tant que ce module n'a pas été
-// importé une première fois (import paresseux via next/dynamic).
-// ═══════════════════════════════════════════════════════════════
-interface ChatStore {
-  status: ChatStatus;
-  isHost: boolean;
-  sessionName: string;
-  pin: string | null;
-  userId: string;
-  messages: ChatMessage[];
-  online: string[];
-  discovered: Map<string, DiscoveredSession>;
-  error: string | null;
-  selectedSession: DiscoveredSession | null;
-  // null = pas encore vérifié ; false = autorisation pare-feu absente
-  // (le bouton « Autoriser » ne s'affiche que dans ce cas)
-  networkOk: boolean | null;
-}
-
-const store: ChatStore = {
-  status: "idle",
-  isHost: false,
-  sessionName: "",
-  pin: null,
-  userId: "",
-  messages: [],
-  online: [],
-  discovered: new Map(),
-  error: null,
-  selectedSession: null,
-  networkOk: null,
-};
-
-const listeners = new Set<() => void>();
-function notify() { listeners.forEach((fn) => fn()); }
-function patchStore(patch: Partial<ChatStore>) { Object.assign(store, patch); notify(); }
-
-// ═══════════════════════════════════════════════════════════════
-// Délai maximum de connexion. Sans ça, si le salon est injoignable
-// (pare-feu, mauvais wifi, hôte éteint), la WebSocket reste "en cours de
-// connexion" indéfiniment sans jamais émettre "open" ni "error" — l'UI
-// resterait bloquée sur "Connexion…" pour toujours. Ce garde-fou affiche
-// une erreur claire après CONNECT_TIMEOUT_MS.
-// ═══════════════════════════════════════════════════════════════
-const CONNECT_TIMEOUT_MS = 12000;
-let connectTimer: ReturnType<typeof setTimeout> | null = null;
-
-function clearConnectTimer() {
-  if (connectTimer) { clearTimeout(connectTimer); connectTimer = null; }
-}
-
-function startConnecting() {
-  clearConnectTimer();
-  patchStore({ status: "connecting", error: null });
-  connectTimer = setTimeout(() => {
-    connectTimer = null;
-    if (store.status === "connecting") {
-      patchStore({ status: "error", error: "connectionTimeout" });
-    }
-  }, CONNECT_TIMEOUT_MS);
-}
-
-function getApi() {
-  return typeof window !== "undefined" ? (window as any).electronAPI : null;
-}
-
-function getUserId() {
-  if (typeof window === "undefined") return "";
-  let id = localStorage.getItem("hnaya-chat-user-id");
-  if (!id) {
-    id = "user_" + Math.random().toString(36).slice(2, 10);
-    localStorage.setItem("hnaya-chat-user-id", id);
-  }
-  return id;
-}
-
-let listening = false;
-function ensureListening() {
-  if (listening) return;
-  listening = true;
-  store.userId = getUserId();
-  const api = getApi();
-  if (!api?.receive) return;
-
-  api.receive("chat-event", (evt: any) => {
-    switch (evt.event) {
-      case "host-started": {
-        // ✅ L'hôte rejoint automatiquement son propre salon pour pouvoir
-        // discuter — sans ça, "Créer un salon" ouvrirait un serveur muet.
-        patchStore({ pin: evt.pin, isHost: true });
-        startConnecting();
-        api.send("chat-join", {
-          address: "127.0.0.1",
-          wsPort: evt.wsPort,
-          pin: evt.pin,
-          userId: store.userId,
-          groups: ["all"],
-          lastSeenTs: 0,
-        });
-        break;
-      }
-      case "host-stopped":
-        patchStore({ isHost: false });
-        break;
-      case "session-found": {
-        const key = `${evt.session.address}:${evt.session.wsPort}`;
-        const discovered = new Map(store.discovered);
-        discovered.set(key, evt.session);
-        patchStore({ discovered });
-        break;
-      }
-      case "joined":
-        clearConnectTimer();
-        patchStore({ status: "joined", error: null });
-        break;
-      case "join-failed":
-        clearConnectTimer();
-        patchStore({
-          status: "error",
-          error: evt.reason === "pin-incorrect" ? "pinIncorrect" : "genericError",
-        });
-        break;
-      case "disconnected":
-        clearConnectTimer();
-        // Ne réagir que si on se croyait connecté — un "disconnected"
-        // émis après « Quitter » (volontaire) ne doit rien afficher.
-        if (store.status === "joined") {
-          patchStore({ status: "error", error: "connectionLost", online: [] });
-        }
-        break;
-      case "message": {
-        // Déduplication par id : le backlog renvoyé à la (re)connexion
-        // peut recouper des messages déjà affichés (ex. re-création d'un
-        // salon sur le même poste, l'hôte persistant l'historique 30 j).
-        // Sans ce filtre : clés React dupliquées + messages en double.
-        if (store.messages.some((m) => m.id === evt.message.id)) break;
-        const messages = [...store.messages, evt.message];
-        patchStore({ messages });
-        break;
-      }
-      case "presence":
-        patchStore({ online: evt.online || [] });
-        break;
-      case "error":
-        // Ne bascule vers l'écran d'erreur QUE si on était en train de se
-        // connecter — un aléa réseau pendant une session déjà établie ne
-        // doit pas éjecter l'utilisateur du fil de discussion.
-        if (store.status === "connecting") {
-          clearConnectTimer();
-          patchStore({ status: "error", error: "genericError" });
-        }
-        break;
-    }
-  });
-}
+// Largeur de la colonne ancrée. La fenêtre fait 900px minimum : il reste
+// donc toujours ≥ 560px pour la page consultée.
+const DOCK_WIDTH = 340;
 
 function getThemeName() {
   if (typeof document === "undefined") return "dark";
@@ -199,21 +33,28 @@ function getThemeName() {
   return "dark";
 }
 
+// ═══════════════════════════════════════════════════════════════
+// Panneau ANCRÉ (dock) à droite — remplace l'ancienne fenêtre modale qui
+// masquait la page. Principe : le process principal rétrécit la
+// WebContentsView de DOCK_WIDTH (canal "chat-dock"), ce qui rend visible
+// cette colonne React à droite — l'utilisateur discute EN voyant la page.
+// C'est la même mécanique que la barre d'onglets latérale (tabSideWidth).
+// ═══════════════════════════════════════════════════════════════
 export default function ChatPanel({ onClose }: ChatPanelProps) {
   const { t } = useTranslation();
   const { isRTL } = useLanguage();
+  const { position } = useTabPosition();
   const dir = isRTL ? "rtl" : "ltr";
+  useChatSnapshot();
 
-  const [, forceRender] = useState(0);
   useEffect(() => {
-    ensureListening();
     // Préchauffage du module de messagerie dès l'ouverture du panneau —
     // sur machine lente, le premier fork prend plusieurs secondes qui
     // s'ajoutaient au délai ressenti sur « Créer » / « Rejoindre ».
     getApi()?.send?.("chat-warmup");
-    const rerender = () => forceRender((n) => n + 1);
-    listeners.add(rerender);
-    return () => { listeners.delete(rerender); };
+    // Réserve la colonne : la page web se rétrécit au lieu d'être cachée
+    getApi()?.send?.("chat-dock", DOCK_WIDTH);
+    return () => { getApi()?.send?.("chat-dock", 0); };
   }, []);
 
   const [nickname, setNickname] = useState(() =>
@@ -361,39 +202,42 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
   };
 
   const discoveredList = Array.from(store.discovered.values());
+  // La barre d'onglets latérale occupe déjà les 200px de droite quand elle
+  // est active — le dock se place alors juste à sa gauche.
+  const rightOffset = position === "right" ? 200 : 0;
 
   return (
-    <div
-      style={{
-        position: "fixed", inset: 0, zIndex: 9998,
-        background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)",
-        display: "flex", alignItems: "flex-start", justifyContent: "center",
-        padding: "14vh 16px 16px",
-      }}
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-    >
-      <div dir={dir} style={{
-        width: 480, maxWidth: "92vw", maxHeight: "80vh", overflowY: "auto",
-        background: bg, border: `1px solid ${border}`, borderRadius: 20,
-        padding: 22, color: text, boxShadow: "0 24px 80px rgba(0,0,0,0.7)",
-        display: "flex", flexDirection: "column", gap: 14,
-      }}>
-        {/* Header */}
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <MessageSquare size={20} style={{ color: accent, flexShrink: 0 }} />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 15, fontWeight: 700, lineHeight: 1.2 }}>{t("Chat.title")}</div>
-            <div style={{ fontSize: 11, color: muted, lineHeight: 1.3, marginTop: 1 }}>{t("Chat.subtitle")}</div>
-          </div>
-          {store.status === "joined" && (
-            <button onClick={handleLeave} style={{ ...btnStyle(), padding: "6px 12px", fontSize: 12 }}>
-              {/* Sur l'hôte, « Quitter » FERME le salon pour tout le monde —
-                  le libellé doit le dire, sinon l'hôte croit juste sortir */}
-              {store.isHost ? t("Chat.closeRoom") : t("Chat.leave")}
-            </button>
-          )}
-          <button onClick={onClose} style={{ background: "none", border: "none", color: muted, fontSize: 20, cursor: "pointer" }}>✕</button>
+    <div dir={dir} style={{
+      position: "fixed", top: "12vh", bottom: 0, right: rightOffset,
+      width: DOCK_WIDTH, zIndex: 9000,
+      background: bg, borderLeft: `1px solid ${border}`,
+      boxShadow: "-8px 0 30px rgba(0,0,0,0.35)",
+      padding: 14, color: text,
+      display: "flex", flexDirection: "column", gap: 12,
+      overflow: "hidden",
+    }}>
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+        <MessageSquare size={20} style={{ color: accent, flexShrink: 0 }} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, lineHeight: 1.2 }}>{t("Chat.title")}</div>
+          <div style={{ fontSize: 10, color: muted, lineHeight: 1.3, marginTop: 1 }}>{t("Chat.subtitle")}</div>
         </div>
+        {store.status === "joined" && (
+          <button onClick={handleLeave} style={{ ...btnStyle(), padding: "5px 10px", fontSize: 11 }}>
+            {/* Sur l'hôte, « Quitter » FERME le salon pour tout le monde —
+                le libellé doit le dire, sinon l'hôte croit juste sortir */}
+            {store.isHost ? t("Chat.closeRoom") : t("Chat.leave")}
+          </button>
+        )}
+        <button onClick={onClose} style={{ background: "none", border: "none", color: muted, fontSize: 18, cursor: "pointer", flexShrink: 0 }}>✕</button>
+      </div>
+
+      {/* Contenu déroulant pour les écrans hors discussion */}
+      <div style={{
+        flex: 1, minHeight: 0, display: "flex", flexDirection: "column", gap: 12,
+        overflowY: store.status === "joined" ? "hidden" : "auto",
+      }}>
 
         {/* Menu principal */}
         {store.status === "idle" && (
@@ -418,7 +262,7 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
               )}
             </div>
 
-            <div style={{ borderTop: `1px solid ${border}`, paddingTop: 14 }}>
+            <div style={{ borderTop: `1px solid ${border}`, paddingTop: 12 }}>
               <div style={{ fontSize: 11, color: muted, marginBottom: 4 }}>{t("Chat.sessionName")}</div>
               <input
                 style={{ ...inputStyle, marginBottom: 8 }}
@@ -435,7 +279,7 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
               </button>
             </div>
 
-            <div style={{ borderTop: `1px solid ${border}`, paddingTop: 14 }}>
+            <div style={{ borderTop: `1px solid ${border}`, paddingTop: 12 }}>
               <button
                 onClick={handleStartDiscovery}
                 disabled={!nickname.trim()}
@@ -445,7 +289,7 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
               </button>
             </div>
 
-            <div style={{ fontSize: 11, color: muted, textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>
+            <div style={{ fontSize: 10, color: muted, textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>
               <Lock size={11} style={{ flexShrink: 0 }} /> {t("Chat.securityNotice")}
             </div>
           </>
@@ -454,12 +298,12 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
         {/* Découverte des salons */}
         {store.status === "discovering" && (
           <>
-            <div style={{ textAlign: "center", padding: "8px 0", color: muted, fontSize: 13 }}>
+            <div style={{ textAlign: "center", padding: "6px 0", color: muted, fontSize: 12 }}>
               {t("Chat.searching")}
             </div>
             {discoveredList.length === 0 ? (
               <>
-                <div style={{ textAlign: "center", padding: "12px 0", color: muted, fontSize: 13 }}>
+                <div style={{ textAlign: "center", padding: "10px 0", color: muted, fontSize: 12 }}>
                   {t("Chat.noRoomsFound")}
                 </div>
                 {/* Bouton d'autorisation UNIQUEMENT si elle est absente —
@@ -594,21 +438,23 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
             {store.isHost && store.pin && (
               <div style={{
                 background: `${accent}18`, border: `1px solid ${accent}40`, borderRadius: 10,
-                padding: "8px 12px", textAlign: "center",
+                padding: "6px 10px", textAlign: "center", flexShrink: 0,
               }}>
                 <div style={{ fontSize: 10, color: muted }}>{t("Chat.yourPin")}</div>
-                <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: 4, color: accent }}>{store.pin}</div>
-                <div style={{ fontSize: 10, color: muted, marginTop: 2 }}>{t("Chat.pinHint")}</div>
+                <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: 4, color: accent }}>{store.pin}</div>
+                <div style={{ fontSize: 9, color: muted, marginTop: 2 }}>{t("Chat.pinHint")}</div>
               </div>
             )}
 
-            <div style={{ fontSize: 11, color: muted, display: "flex", alignItems: "center", gap: 6 }}>
+            <div style={{ fontSize: 11, color: muted, display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
               <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#00c853", flexShrink: 0 }} />
               {store.online.length} {t("Chat.online")}
             </div>
 
+            {/* Fil de messages : occupe tout l'espace restant du dock,
+                défile indépendamment (minHeight: 0 requis en flex) */}
             <div style={{
-              flex: 1, minHeight: 180, maxHeight: 320, overflowY: "auto",
+              flex: 1, minHeight: 0, overflowY: "auto",
               display: "flex", flexDirection: "column", gap: 8,
               background: "rgba(255,255,255,0.03)", borderRadius: 10, padding: 10,
             }}>
@@ -622,7 +468,7 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
                   return (
                     <div key={m.id} style={{
                       alignSelf: isMine ? (isRTL ? "flex-start" : "flex-end") : (isRTL ? "flex-end" : "flex-start"),
-                      maxWidth: "80%",
+                      maxWidth: "85%",
                       background: isMine ? `${accent}30` : "rgba(255,255,255,0.06)",
                       border: `1px solid ${isMine ? accent + "40" : border}`,
                       borderRadius: 10, padding: "6px 10px",
@@ -635,7 +481,7 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
               )}
             </div>
 
-            <div style={{ display: "flex", gap: 8 }}>
+            <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
               <input
                 style={{ ...inputStyle, flex: 1 }}
                 value={messageInput}

@@ -1,7 +1,5 @@
 "use client";
-import { useState } from "react";
 import { usePathname } from "next/navigation";
-import dynamic from "next/dynamic";
 import { MessageSquare } from "lucide-react";
 import { ThemeSwitch } from "@/components/theme-switch";
 import LangSwitch from "./lang-switch";
@@ -9,8 +7,7 @@ import { useTabContext } from "@/context/tabcontext";
 import { useTabPosition } from "@/context/tabpositioncontext";
 import { useLanguage } from "@/context/langcontext";
 import { useTranslation } from "@/hooks/useTranslation";
-
-const ChatPanel = dynamic(() => import("./ChatPanel"), { ssr: false });
+import { setPanelOpen, useChatSnapshot } from "@/context/chatstore";
 
 const HNAYA_NAV = [
   { key: "home",    url: "https://hnaya.dz",                 labels: { ar: "حنايا",       fr: "Accueil",        en: "Home"           } },
@@ -26,14 +23,15 @@ export const Navbar = () => {
   const { language, isRTL } = useLanguage();
   const { position } = useTabPosition();
   const { t } = useTranslation();
-  const [showChat, setShowChat] = useState(false);
+  // État global de la messagerie : couleur d'icône (vert = connecté) et
+  // badge non-lus, tenus à jour même quand le dock est fermé
+  const chat = useChatSnapshot();
 
   if (pathname === "/browser") return null;
 
   const rightOffset = position === "right" ? "200px" : "0px";
 
   return (
-    <>
     <nav
       className="fixed mt-[6vh] h-[6vh] z-40 flex items-center px-4 gap-3 bg-black/40 backdrop-blur-md border-b border-white/10"
       style={{ left: 0, right: rightOffset, width: `calc(100vw - ${rightOffset})` }}
@@ -57,19 +55,25 @@ export const Navbar = () => {
       </div>
       <div className="flex items-center gap-2 flex-shrink-0">
         <button
-          onClick={() => setShowChat(true)}
+          onClick={() => setPanelOpen(!chat.panelOpen)}
           className="px-2 text-white/70 hover:text-white transition-all duration-150"
           title={t("Chat.title")}
+          style={{ position: "relative" }}
         >
           {/* Icône vectorielle : rendu identique sur Windows 10 et 11,
               contrairement aux emoji (police système) */}
-          <MessageSquare size={16} />
+          <MessageSquare size={16} style={chat.status === "joined" ? { color: "#00c853" } : undefined} />
+          {chat.unreadCount > 0 && (
+            <span style={{
+              position: "absolute", top: 0, right: 2, width: 8, height: 8,
+              borderRadius: "50%", background: "#ff3b30",
+              border: "1.5px solid rgba(0,0,0,0.4)",
+            }} />
+          )}
         </button>
         <LangSwitch />
         <ThemeSwitch />
       </div>
     </nav>
-    {showChat && <ChatPanel onClose={() => setShowChat(false)} />}
-    </>
   );
 };

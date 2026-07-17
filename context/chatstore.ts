@@ -1,0 +1,227 @@
+"use client";
+// ═══════════════════════════════════════════════════════════════
+// État global de la Messagerie locale — vit au niveau de l'application
+// (importé par la barre d'adresse et la navbar dès le démarrage), PAS
+// dans le panneau chargé paresseusement. Indispensable pour :
+//  - l'icône d'état (grise = déconnecté, verte = connecté) toujours juste ;
+//  - le badge « non lus » qui compte les messages reçus panneau fermé ;
+//  - conserver fil et statut quand le panneau est fermé puis rouvert.
+// La connexion réseau elle-même vit dans le process principal Electron
+// (chat-module/worker) — ce store n'est que son reflet côté interface.
+// ═══════════════════════════════════════════════════════════════
+import { useEffect, useState } from "react";
+
+export interface ChatMessage {
+  id: string;
+  groupId: string;
+  from: string;
+  text: string;
+  ts: number;
+}
+
+export interface DiscoveredSession {
+  sessionName: string;
+  address: string;
+  wsPort: number;
+  hostname: string;
+}
+
+export type ChatStatus =
+  | "idle"
+  | "discovering"
+  | "entering-pin"
+  | "connecting"
+  | "joined"
+  | "error"
+  | "network-setup";
+
+export interface ChatStore {
+  status: ChatStatus;
+  isHost: boolean;
+  sessionName: string;
+  pin: string | null;
+  userId: string;
+  messages: ChatMessage[];
+  online: string[];
+  discovered: Map<string, DiscoveredSession>;
+  error: string | null;
+  selectedSession: DiscoveredSession | null;
+  // null = pas encore vérifié ; false = autorisation pare-feu absente
+  // (le bouton « Autoriser » ne s'affiche que dans ce cas)
+  networkOk: boolean | null;
+  // Messages des autres participants reçus pendant que le panneau est
+  // fermé — affiché en pastille rouge sur l'icône, remis à zéro à l'ouverture
+  unreadCount: number;
+  // Le panneau (dock) est-il actuellement affiché ? Piloté par setPanelOpen
+  // — source unique de vérité pour le montage du panneau ET le badge
+  panelOpen: boolean;
+}
+
+export const store: ChatStore = {
+  status: "idle",
+  isHost: false,
+  sessionName: "",
+  pin: null,
+  userId: "",
+  messages: [],
+  online: [],
+  discovered: new Map(),
+  error: null,
+  selectedSession: null,
+  networkOk: null,
+  unreadCount: 0,
+  panelOpen: false,
+};
+
+const listeners = new Set<() => void>();
+function notify() { listeners.forEach((fn) => fn()); }
+
+export function patchStore(patch: Partial<ChatStore>) {
+  Object.assign(store, patch);
+  notify();
+}
+
+export function getApi() {
+  return typeof window !== "undefined" ? (window as any).electronAPI : null;
+}
+
+function getUserId() {
+  if (typeof window === "undefined") return "";
+  let id = localStorage.getItem("hnaya-chat-user-id");
+  if (!id) {
+    id = "user_" + Math.random().toString(36).slice(2, 10);
+    localStorage.setItem("hnaya-chat-user-id", id);
+  }
+  return id;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Délai maximum de connexion. Sans ça, si le salon est injoignable
+// (pare-feu, mauvais wifi, hôte éteint), la WebSocket reste "en cours de
+// connexion" indéfiniment sans jamais émettre "open" ni "error" — l'UI
+// resterait bloquée sur "Connexion…" pour toujours. Ce garde-fou affiche
+// une erreur claire après CONNECT_TIMEOUT_MS.
+// ═══════════════════════════════════════════════════════════════
+const CONNECT_TIMEOUT_MS = 12000;
+let connectTimer: ReturnType<typeof setTimeout> | null = null;
+
+export function clearConnectTimer() {
+  if (connectTimer) { clearTimeout(connectTimer); connectTimer = null; }
+}
+
+export function startConnecting() {
+  clearConnectTimer();
+  patchStore({ status: "connecting", error: null });
+  connectTimer = setTimeout(() => {
+    connectTimer = null;
+    if (store.status === "connecting") {
+      patchStore({ status: "error", error: "connectionTimeout" });
+    }
+  }, CONNECT_TIMEOUT_MS);
+}
+
+/** Ouvre/ferme le panneau. L'ouverture remet le compteur non-lus à zéro. */
+export function setPanelOpen(open: boolean) {
+  patchStore(open ? { panelOpen: true, unreadCount: 0 } : { panelOpen: false });
+}
+
+let listening = false;
+export function ensureListening() {
+  if (listening) return;
+  listening = true;
+  store.userId = getUserId();
+  const api = getApi();
+  if (!api?.receive) return;
+
+  api.receive("chat-event", (evt: any) => {
+    switch (evt.event) {
+      case "host-started": {
+        // ✅ L'hôte rejoint automatiquement son propre salon pour pouvoir
+        // discuter — sans ça, "Créer un salon" ouvrirait un serveur muet.
+        patchStore({ pin: evt.pin, isHost: true });
+        startConnecting();
+        api.send("chat-join", {
+          address: "127.0.0.1",
+          wsPort: evt.wsPort,
+          pin: evt.pin,
+          userId: store.userId,
+          groups: ["all"],
+          lastSeenTs: 0,
+        });
+        break;
+      }
+      case "host-stopped":
+        patchStore({ isHost: false });
+        break;
+      case "session-found": {
+        const key = `${evt.session.address}:${evt.session.wsPort}`;
+        const discovered = new Map(store.discovered);
+        discovered.set(key, evt.session);
+        patchStore({ discovered });
+        break;
+      }
+      case "joined":
+        clearConnectTimer();
+        patchStore({ status: "joined", error: null });
+        break;
+      case "join-failed":
+        clearConnectTimer();
+        patchStore({
+          status: "error",
+          error: evt.reason === "pin-incorrect" ? "pinIncorrect" : "genericError",
+        });
+        break;
+      case "disconnected":
+        clearConnectTimer();
+        // Ne réagir que si on se croyait connecté — un "disconnected"
+        // émis après « Quitter » (volontaire) ne doit rien afficher.
+        if (store.status === "joined") {
+          patchStore({ status: "error", error: "connectionLost", online: [] });
+        }
+        break;
+      case "message": {
+        // Déduplication par id : le backlog renvoyé à la (re)connexion
+        // peut recouper des messages déjà affichés (ex. re-création d'un
+        // salon sur le même poste, l'hôte persistant l'historique 30 j).
+        // Sans ce filtre : clés React dupliquées + messages en double.
+        if (store.messages.some((m) => m.id === evt.message.id)) break;
+        const patch: Partial<ChatStore> = { messages: [...store.messages, evt.message] };
+        // Badge non-lus : uniquement les messages des AUTRES participants
+        // reçus pendant que le panneau est fermé
+        if (!store.panelOpen && evt.message.from !== store.userId) {
+          patch.unreadCount = store.unreadCount + 1;
+        }
+        patchStore(patch);
+        break;
+      }
+      case "presence":
+        patchStore({ online: evt.online || [] });
+        break;
+      case "error":
+        // Ne bascule vers l'écran d'erreur QUE si on était en train de se
+        // connecter — un aléa réseau pendant une session déjà établie ne
+        // doit pas éjecter l'utilisateur du fil de discussion.
+        if (store.status === "connecting") {
+          clearConnectTimer();
+          patchStore({ status: "error", error: "genericError" });
+        }
+        break;
+    }
+  });
+}
+
+/**
+ * Abonnement React au store : re-rend le composant à chaque changement
+ * et démarre l'écoute des événements dès le premier montage (donc dès
+ * l'affichage de la barre — les messages reçus panneau fermé comptent).
+ */
+export function useChatSnapshot(): ChatStore {
+  const [, force] = useState(0);
+  useEffect(() => {
+    ensureListening();
+    const fn = () => force((n) => n + 1);
+    listeners.add(fn);
+    return () => { listeners.delete(fn); };
+  }, []);
+  return store;
+}

@@ -30,6 +30,10 @@ let mainWindow = null;
 const browserViews = new Map();
 let activeTabId = null;
 let tabSideWidth = 0;
+// Largeur réservée au dock Messagerie locale (0 = fermé) — même principe
+// que tabSideWidth : la WebContentsView est rétrécie pour laisser la
+// colonne React visible à droite, l'utilisateur discute EN voyant la page
+let chatDockWidth = 0;
 // Référence au process yt-dlp en cours (pour l'annulation)
 let activeDownloadProc = null;
 
@@ -340,17 +344,19 @@ const updateBrowserViewSize = () => {
   const { width, height } = mainWindow.getContentBounds();
   if (tabSideWidth > 0) {
     // Mode sidebar — la vue prend toute la hauteur à gauche de la sidebar
-    view.setBounds({ x: 0, y: 0, width: width - tabSideWidth, height });
+    // (et du dock messagerie s'il est ouvert)
+    view.setBounds({ x: 0, y: 0, width: width - tabSideWidth - chatDockWidth, height });
   } else {
     // Mode top — tabbar (6vh) + navbar (6vh) = 12vh de hauteur fixe
     // On utilise des pixels calculés depuis la vraie hauteur de la fenêtre
     // plutôt que Math.round(height * 0.12) qui peut diverger de 12vh selon la résolution
     const marginTop = Math.round(height * 0.12);
-    // ✅ S'assurer que la vue couvre bien toute la zone sous les barres
+    // ✅ S'assurer que la vue couvre bien toute la zone sous les barres,
+    // moins la colonne du dock messagerie s'il est ouvert
     view.setBounds({
       x: 0,
       y: marginTop,
-      width,
+      width: width - chatDockWidth,
       height: height - marginTop
     });
   }
@@ -404,6 +410,12 @@ ipcMain.on("show-active-view", () => {
 
 ipcMain.on("set-tab-position", (event, position) => {
   tabSideWidth = position === "right" ? 200 : 0;
+  updateBrowserViewSize();
+});
+
+// ✅ Dock Messagerie locale — réserve/libère la colonne de droite
+ipcMain.on("chat-dock", (event, width) => {
+  chatDockWidth = Math.max(0, Number(width) || 0);
   updateBrowserViewSize();
 });
 

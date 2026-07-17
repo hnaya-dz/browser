@@ -13,6 +13,7 @@ import { TabPositionProvider } from "@/context/tabpositioncontext";
 import URLBar from "@/components/urlbar";
 import HtmlWrapper from "@/components/html-wrapper";
 import UpdateBannerClient from "@/components/UpdateBannerClient";
+import ChatDockMount from "@/components/ChatDockMount";
 
 export const metadata: Metadata = {
   title: {
@@ -49,6 +50,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                         {children}
                         {/* ✅ Bannière mise à jour — s'affiche uniquement si nouvelle version disponible */}
                         <UpdateBannerClient />
+                        {/* ✅ Dock Messagerie locale — point de montage unique, piloté par le store global */}
+                        <ChatDockMount />
                       </TabProvider>
                     </LoadingProvider>
                   </main>

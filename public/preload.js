@@ -51,6 +51,7 @@ const ALLOWED_SEND = [
   "cancel-download",
   // ✅ Chat local (LAN) — module complémentaire (voir chat-module/README.md)
   "chat-warmup",
+  "chat-dock",
   "chat-stop-host",
   "chat-discover",
   "chat-join",

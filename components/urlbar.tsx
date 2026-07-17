@@ -10,10 +10,10 @@ import dynamic from "next/dynamic";
 import { isDownloadableUrl as isDownloadable } from "@/shared/supportedHosts";
 import { useTranslation } from "@/hooks/useTranslation";
 import { MessageSquare } from "lucide-react";
+import { setPanelOpen, useChatSnapshot } from "@/context/chatstore";
 
 const VaultPanel = dynamic(() => import("./VaultPanel"), { ssr: false });
 const FavoritesPanel = dynamic(() => import("./FavoritesPanel"), { ssr: false });
-const ChatPanel = dynamic(() => import("./ChatPanel"), { ssr: false });
 
 const HINT_DL_KEY    = "hnaya-hint-download-seen";
 const HINT_VAULT_KEY = "hnaya-hint-vault-seen";
@@ -58,7 +58,8 @@ export default function URLBar() {
   const [downloadUrl, setDownloadUrl] = useState("");
   const [showVault, setShowVault] = useState(false);
   const [showFavorites, setShowFavorites] = useState(false);
-  const [showChat, setShowChat] = useState(false);
+  // État global de la messagerie : couleur d'icône, badge non-lus, dock
+  const chat = useChatSnapshot();
   const [isFavorited, setIsFavorited] = useState(false);
   const [hasCredentials, setHasCredentials] = useState(false);
   const [showDlHint, setShowDlHint] = useState(false);
@@ -219,15 +220,9 @@ export default function URLBar() {
     (window as any)?.electronAPI?.send("show-active-view");
   }, []);
 
-  const handleChatClick = useCallback(async () => {
-    await (window as any)?.electronAPI?.invoke("hide-active-view-sync");
-    setShowChat(true);
-  }, []);
-
-  const handleCloseChat = useCallback(() => {
-    setShowChat(false);
-    (window as any)?.electronAPI?.send("show-active-view");
-  }, []);
+  // ✅ Le dock ne masque PAS la page (le process principal rétrécit la
+  // vue) — donc ni hide-active-view-sync ni show-active-view ici,
+  // contrairement aux panneaux modaux (coffre-fort, favoris).
 
   if (!isExternalTab) return null;
 
@@ -262,6 +257,7 @@ export default function URLBar() {
           .urlbar-btn-vault:hover{background:rgba(255,255,255,0.1);border-color:rgba(255,255,255,0.15);transform:scale(1.1)}
           .light .urlbar-btn-vault:hover{background:rgba(0,99,65,0.1);border-color:rgba(0,99,65,0.2)}
           .vault-dot{position:absolute;top:1px;right:1px;width:7px;height:7px;border-radius:50%;background:#00c853;border:1.5px solid rgba(0,0,0,0.4)}
+          .chat-unread-dot{position:absolute;top:1px;right:1px;width:8px;height:8px;border-radius:50%;background:#ff3b30;border:1.5px solid rgba(0,0,0,0.4)}
           .urlbar-hint{position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.88);color:#fff;font-size:11px;font-weight:500;padding:5px 10px;border-radius:6px;white-space:nowrap;pointer-events:none;z-index:9999;animation:hint-in 0.2s ease}
           .urlbar-hint::after{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);border:4px solid transparent;border-top-color:rgba(0,0,0,0.88)}
           @keyframes hint-in{from{opacity:0;transform:translateX(-50%) translateY(4px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
@@ -344,13 +340,15 @@ export default function URLBar() {
         </div>
 
         {/* Bouton messagerie locale (LAN) — icône vectorielle, rendu
-            identique sur Windows 10 et 11 contrairement aux emoji */}
+            identique sur Windows 10 et 11 contrairement aux emoji.
+            Vert = connecté à un salon ; pastille rouge = non-lus. */}
         <button
-          onClick={handleChatClick}
+          onClick={() => setPanelOpen(!chat.panelOpen)}
           className="urlbar-btn"
           title={t("Chat.title")}
         >
-          <MessageSquare size={17} />
+          <MessageSquare size={17} style={chat.status === "joined" ? { color: "#00c853" } : undefined} />
+          {chat.unreadCount > 0 && <span className="chat-unread-dot" />}
         </button>
 
         <LangSwitch />
@@ -367,10 +365,6 @@ export default function URLBar() {
 
       {showVault && (
         <VaultPanel onClose={handleCloseVault} />
-      )}
-
-      {showChat && (
-        <ChatPanel onClose={handleCloseChat} />
       )}
     </>
   );
