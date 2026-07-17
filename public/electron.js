@@ -337,7 +337,13 @@ mainWindow = new BrowserWindow({
   // à "disable_non_proxied_udp", ce mode laisse les connexions UDP directes
   // fonctionner normalement (donc pas de relais TURN forcé) : aucune perte
   // de qualité/latence pour les appels vidéo (Zoom web, Teams web, Meet…).
-  mainWindow.webContents.session.setWebRTCIPHandlingPolicy("default_public_interface_only");
+  // ⚠️ API Electron : setWebRTCIPHandlingPolicy est une méthode de
+  // webContents, PAS de session — l'appel via session.* jetait un
+  // TypeError qui interrompait createWindow AVANT loadURL : fenêtre
+  // blanche sur la version packagée (bug détecté au premier build réel).
+  // La même politique est appliquée à chaque vue de navigation dans
+  // "open-tab" — c'est là que la fuite d'IP se produirait réellement.
+  mainWindow.webContents.setWebRTCIPHandlingPolicy("default_public_interface_only");
 
   // ═══════════════════════════════════════════════════════════
   // ✅ CONFIDENTIALITÉ — En-tête Do Not Track
@@ -999,6 +1005,12 @@ ipcMain.on("open-tab", (event, newTab) => {
       }
     });
     browserViews.set(id, view);
+
+    // ✅ CONFIDENTIALITÉ — même politique WebRTC que la fenêtre principale.
+    // L'API est PAR-webContents (pas par session) : chaque vue de
+    // navigation doit recevoir la sienne, sinon les sites visités
+    // peuvent lire l'IP locale via les candidats ICE.
+    view.webContents.setWebRTCIPHandlingPolicy("default_public_interface_only");
 
     // ✅ PATCH 6 — updateTabInfo simplifié : envoyer le titre sans double filtre
     // Le filtre "title !== domain" bloquait les vrais titres de page
