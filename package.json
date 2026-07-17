@@ -37,6 +37,13 @@
   "public/favorites-ipc.js",
   "public/update-check.js"
 ],
+    "extraResources": [
+      {
+        "from": "chat-module",
+        "to": "chat-module",
+        "filter": ["**/*", "!data/**"]
+      }
+    ],
     "win": {
       "target": [
         {

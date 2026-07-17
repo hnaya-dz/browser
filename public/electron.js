@@ -1,7 +1,7 @@
 import { app, BrowserWindow, WebContentsView, ipcMain, Menu, dialog, shell, screen, clipboard } from "electron";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
-import { spawn } from "child_process";
+import { spawn, fork } from "child_process";
 import { existsSync } from "fs";
 import serve from "electron-serve";
 // ✅ PATCH 1 — import depuis shared/ (supprime la duplication avec urlbar.tsx)
@@ -32,6 +32,16 @@ let activeTabId = null;
 let tabSideWidth = 0;
 // Référence au process yt-dlp en cours (pour l'annulation)
 let activeDownloadProc = null;
+
+// ── Chat local (LAN) — module complémentaire, désactivé par défaut ─────────
+// ⚠️ Ce module est un package Node séparé (chat-module/) avec sa propre
+// dépendance "ws" — jamais installée dans le navigateur principal. Il n'est
+// lancé (fork) que si l'utilisateur active la fonctionnalité depuis l'UI.
+// Voir chat-module/README.md pour l'architecture complète.
+const chatModulePath = app.isPackaged
+  ? join(process.resourcesPath, "chat-module", "src", "worker.js")
+  : join(__dirname, "..", "chat-module", "src", "worker.js");
+let chatWorker = null; // process enfant (fork) du module de chat, null si inactif
 
 // ── Chemin vers yt-dlp (multi-OS) ────────────────────────────────────────────
 // ⚠️ NE PAS modifier sans relire TECHNIQUES.md — affecte Windows/macOS/Linux
@@ -526,6 +536,221 @@ ipcMain.on("cancel-download", () => {
   if (activeDownloadProc) {
     activeDownloadProc.kill();
     activeDownloadProc = null;
+  }
+});
+
+////////////////////////////////////////////////////////////////////////////////
+// Chat local (LAN) — module complémentaire, fork à la demande uniquement
+// ⚠️ Voir chat-module/README.md pour l'architecture complète avant de
+// modifier quoi que ce soit ici.
+
+function ensureChatWorker() {
+  if (chatWorker) return chatWorker;
+  if (!existsSync(chatModulePath)) {
+    console.warn("[hnaya-chat] Module introuvable :", chatModulePath);
+    return null;
+  }
+  chatWorker = fork(chatModulePath, [], { silent: false });
+
+  // Relaie chaque événement du worker vers le renderer via un seul canal
+  // ("chat-event") — évite d'avoir à whitelister un canal par type
+  // d'événement dans preload.js (voir TECHNIQUES.md section 1).
+  chatWorker.on("message", (msg) => {
+    mainWindow?.webContents.send("chat-event", msg);
+  });
+  chatWorker.on("exit", () => { chatWorker = null; });
+  chatWorker.on("error", (err) => {
+    console.error("[hnaya-chat] Erreur worker :", err.message);
+    mainWindow?.webContents.send("chat-event", { event: "error", message: err.message });
+  });
+  return chatWorker;
+}
+
+ipcMain.handle("chat-start-host", async (event, sessionName) => {
+  const worker = ensureChatWorker();
+  if (!worker) return { ok: false, error: "module-not-found" };
+  worker.send({ cmd: "start-host", sessionName });
+  return { ok: true };
+});
+
+ipcMain.on("chat-stop-host", () => { chatWorker?.send({ cmd: "stop-host" }); });
+
+ipcMain.on("chat-discover", (event, timeoutMs) => {
+  ensureChatWorker()?.send({ cmd: "discover", timeoutMs });
+});
+
+ipcMain.on("chat-join", (event, joinParams) => {
+  ensureChatWorker()?.send({ cmd: "join", ...joinParams });
+});
+
+ipcMain.on("chat-send-message", (event, { text, groupId, media }) => {
+  chatWorker?.send({ cmd: "send-message", text, groupId, media });
+});
+
+ipcMain.on("chat-mark-read", (event, { messageId, groupId }) => {
+  chatWorker?.send({ cmd: "mark-read", messageId, groupId });
+});
+
+ipcMain.on("chat-leave", () => { chatWorker?.send({ cmd: "leave" }); });
+
+// ── Pare-feu Windows — autorisation réseau adaptative ──────────────────────
+// Le poste qui HÉBERGE un salon doit accepter des connexions ENTRANTES :
+// TCP 4802 (messages) et UDP 41234 (découverte). Sans règle de pare-feu,
+// les autres postes VOIENT le salon (le beacon sortant passe toujours)
+// mais ne peuvent pas s'y connecter — symptôme : « Connexion… » qui expire
+// côté client. L'alerte Windows native ne suffit pas : (1) elle ne couvre
+// que le profil coché (souvent « Privé » alors que le wifi est classé
+// « Public »), (2) un clic sur « Annuler » crée une règle de BLOCAGE
+// persistante qui prime sur toute autorisation ultérieure, (3) le salon
+// tourne dans un process séparé du navigateur.
+// Solution : vérifier nos règles nommées avant d'héberger, et les créer
+// après élévation UAC (autorisation utilisateur/admin), avec une portée
+// limitée au sous-réseau local (-RemoteAddress LocalSubnet) et tous
+// profils (-Profile Any) — fonctionne donc aussi sur un point d'accès
+// mobile classé « Public ».
+const FIREWALL_RULE_TCP = "Hnaya Messagerie locale (TCP 4802)";
+const FIREWALL_RULE_UDP = "Hnaya Messagerie locale (UDP 41234)";
+
+function runPowerShell(args) {
+  return new Promise((resolve) => {
+    const proc = spawn("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", ...args], { windowsHide: true });
+    let out = "";
+    proc.stdout.on("data", (d) => { out += d.toString(); });
+    proc.on("close", (code) => resolve({ code, out: out.trim() }));
+    proc.on("error", () => resolve({ code: -1, out: "" }));
+  });
+}
+
+// ⚠️ Sur certains postes (compte restreint, antivirus tiers qui verrouille
+// le pare-feu), MÊME LA LECTURE des règles est refusée en session normale
+// (« Accès refusé » CIM, observé en test multi-postes). Il faut donc
+// distinguer « règles absentes » de « lecture impossible » — sinon l'app
+// redemande l'UAC à chaque fois et signale de faux échecs.
+async function checkFirewallRules() {
+  if (process.platform !== "win32") return { rulesOk: true, readable: true };
+  const { out } = await runPowerShell(["-Command",
+    "try { " +
+    "$null = Get-NetFirewallRule -ErrorAction Stop | Select-Object -First 1; " +
+    "$t = Get-NetFirewallRule -DisplayName '" + FIREWALL_RULE_TCP + "' -ErrorAction SilentlyContinue; " +
+    "$u = Get-NetFirewallRule -DisplayName '" + FIREWALL_RULE_UDP + "' -ErrorAction SilentlyContinue; " +
+    "Write-Output ('READ|' + [string]([bool]$t -and [bool]$u)) " +
+    "} catch { Write-Output 'DENIED|False' }",
+  ]);
+  const [access, ok] = (out || "DENIED|False").split("|");
+  return { readable: access === "READ", rulesOk: ok === "True" };
+}
+
+// Drapeau local « configuration réseau déjà réussie sur ce poste » —
+// indispensable sur les postes où la lecture du pare-feu est refusée :
+// sans lui, impossible de savoir qu'une configuration a déjà eu lieu,
+// et l'UAC serait redemandée à chaque création de salon.
+function networkSetupFlagPath() {
+  return join(app.getPath("userData"), "chat-network-setup.json");
+}
+
+// ⚠️ PowerShell est LENT à démarrer sur les machines modestes (5-10 s
+// observées) — sans cache ni raccourci, chaque clic sur « Créer un salon »
+// gelait l'interface pendant toute la vérification. Ordre des contrôles :
+// 1) cache mémoire (instantané, une vérification max par session) ;
+// 2) drapeau local d'une configuration déjà réussie (instantané —
+//    compromis assumé : si l'utilisateur supprime les règles à la main,
+//    il ne sera pas re-sollicité ; le message connectionTimeout côté
+//    client oriente alors vers le pare-feu) ;
+// 3) vérification PowerShell réelle, en dernier recours.
+let networkCheckCache = null;
+
+ipcMain.handle("chat-network-check", async () => {
+  if (networkCheckCache) return networkCheckCache;
+  if (existsSync(networkSetupFlagPath())) {
+    networkCheckCache = { rulesOk: true };
+    return networkCheckCache;
+  }
+  const check = await checkFirewallRules();
+  if (check.rulesOk) {
+    networkCheckCache = { rulesOk: true };
+    return networkCheckCache;
+  }
+  return { rulesOk: false };
+});
+
+// Préchauffage : forker le worker dès l'ouverture du panneau plutôt qu'au
+// premier clic — sur disque dur lent, le fork (chargement d'un binaire
+// Electron complet en mode Node) peut prendre plusieurs secondes qui
+// s'ajoutaient au délai ressenti sur « Créer » / « Rejoindre ».
+ipcMain.on("chat-warmup", () => { ensureChatWorker(); });
+
+ipcMain.handle("chat-network-setup", async () => {
+  if (process.platform !== "win32") return { ok: true };
+  const exe = process.execPath.replace(/'/g, "''");
+  const { writeFileSync, mkdtempSync, readFileSync } = await import("fs");
+  const { tmpdir } = await import("os");
+  const dir = mkdtempSync(join(tmpdir(), "hnaya-fw-"));
+  const ps1 = join(dir, "hnaya-firewall.ps1");
+  // Le script élevé dépose son verdict ici — c'est LUI qui vérifie les
+  // règles après création (il a toujours le droit de lecture, même quand
+  // la session normale ne l'a pas — cas « Accès refusé » observé).
+  const resultFile = join(dir, "result.txt");
+  const resultEsc = resultFile.replace(/'/g, "''");
+  // Script élevé : supprime nos anciennes règles + toute règle de BLOCAGE
+  // héritée d'un refus de l'alerte Windows (un Block prime sur un Allow),
+  // recrée les deux règles limitées au sous-réseau local, puis vérifie
+  // et écrit OK/FAIL dans le fichier de résultat.
+  // ⚠️ Contenu ASCII uniquement — PowerShell 5.1 lit les .ps1 sans BOM en
+  // ANSI, des accents y seraient corrompus.
+  const script = [
+    "$exe = '" + exe + "'",
+    "Remove-NetFirewallRule -DisplayName '" + FIREWALL_RULE_TCP + "' -ErrorAction SilentlyContinue",
+    "Remove-NetFirewallRule -DisplayName '" + FIREWALL_RULE_UDP + "' -ErrorAction SilentlyContinue",
+    "Get-NetFirewallRule -Direction Inbound -Action Block -Enabled True -ErrorAction SilentlyContinue | Where-Object { $dn = $_.DisplayName; ($dn -like '*hnaya*') -or ($dn -like '*electron*') -or ($dn -like '*node*') } | Where-Object { ($_ | Get-NetFirewallApplicationFilter -ErrorAction SilentlyContinue).Program -ieq $exe } | Remove-NetFirewallRule -ErrorAction SilentlyContinue",
+    // « Créer seulement si absent » plutôt que supprimer-puis-créer :
+    // Kaspersky (observé sur poste de test) peut bloquer la SUPPRESSION
+    // de règles même en élévation tout en autorisant la création — le
+    // remove+create y produit des règles en double à chaque exécution.
+    "if (-not (Get-NetFirewallRule -DisplayName '" + FIREWALL_RULE_TCP + "' -ErrorAction SilentlyContinue)) { New-NetFirewallRule -DisplayName '" + FIREWALL_RULE_TCP + "' -Direction Inbound -Action Allow -Protocol TCP -LocalPort 4802 -Program $exe -RemoteAddress LocalSubnet -Profile Any | Out-Null }",
+    "if (-not (Get-NetFirewallRule -DisplayName '" + FIREWALL_RULE_UDP + "' -ErrorAction SilentlyContinue)) { New-NetFirewallRule -DisplayName '" + FIREWALL_RULE_UDP + "' -Direction Inbound -Action Allow -Protocol UDP -LocalPort 41234 -Program $exe -RemoteAddress LocalSubnet -Profile Any | Out-Null }",
+    "$t = Get-NetFirewallRule -DisplayName '" + FIREWALL_RULE_TCP + "' -ErrorAction SilentlyContinue",
+    "$u = Get-NetFirewallRule -DisplayName '" + FIREWALL_RULE_UDP + "' -ErrorAction SilentlyContinue",
+    "if ($t -and $u) { Set-Content -LiteralPath '" + resultEsc + "' -Value 'OK' } else { Set-Content -LiteralPath '" + resultEsc + "' -Value 'FAIL' }",
+    "exit 0",
+  ].join("\r\n");
+  writeFileSync(ps1, script, "utf8");
+
+  // -Verb RunAs → invite UAC : l'utilisateur (ou l'admin du poste, si le
+  // compte courant n'est pas administrateur) accorde l'autorisation.
+  const { code } = await runPowerShell(["-Command",
+    "try { $p = Start-Process powershell -Verb RunAs -Wait -WindowStyle Hidden -PassThru -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-File','\"" + ps1.replace(/'/g, "''") + "\"'; exit $p.ExitCode } catch { exit 125 }",
+  ]);
+
+  // ⚠️ Ne PAS conclure sur le code de sortie : avec -Verb RunAs, relire
+  // $p.ExitCode depuis un process non-élevé échoue sur certaines machines
+  // alors que le script a bien réussi. Deux vérités terrain, dans l'ordre :
+  // 1) re-lecture directe des règles (si la session y a droit) ;
+  // 2) verdict écrit par le script élevé (couvre les postes où la lecture
+  //    non-élevée du pare-feu est « Accès refusé »).
+  const check = await checkFirewallRules();
+  let ok = check.readable && check.rulesOk;
+  if (!ok) {
+    try { ok = readFileSync(resultFile, "utf8").trim() === "OK"; }
+    catch { /* fichier absent = le script n'a jamais tourné (UAC refusée) */ }
+  }
+  if (ok) {
+    // Mémorise la réussite — évite de redemander l'UAC sur les postes où
+    // la vérification directe restera à jamais impossible.
+    try { writeFileSync(networkSetupFlagPath(), JSON.stringify({ done: true, ts: Date.now() })); } catch {}
+    networkCheckCache = { rulesOk: true };
+    return { ok: true };
+  }
+  return { ok: false, refused: code === 125 };
+});
+
+// ✅ Fermeture propre : le worker reçoit "disconnect" (fork() le fait
+// automatiquement au kill du process parent), qui déclenche son propre
+// nettoyage (voir worker.js) — mais on force l'arrêt explicitement au cas
+// où l'utilisateur ferme le navigateur sans passer par app.quit().
+app.on("before-quit", () => {
+  if (chatWorker) {
+    chatWorker.kill();
+    chatWorker = null;
   }
 });
 

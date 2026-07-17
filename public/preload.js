@@ -27,6 +27,10 @@ const ALLOWED_INVOKE = [
   "tabgroups-delete",
   "check-for-update",
   "get-app-version",
+  // ✅ Chat local (LAN) — module complémentaire (voir chat-module/README.md)
+  "chat-start-host",
+  "chat-network-check",
+  "chat-network-setup",
 ];
 
 const ALLOWED_SEND = [
@@ -45,6 +49,14 @@ const ALLOWED_SEND = [
   "get-current-url",
   "download-video",
   "cancel-download",
+  // ✅ Chat local (LAN) — module complémentaire (voir chat-module/README.md)
+  "chat-warmup",
+  "chat-stop-host",
+  "chat-discover",
+  "chat-join",
+  "chat-send-message",
+  "chat-mark-read",
+  "chat-leave",
 ];
 
 contextBridge.exposeInMainWorld("electronAPI", {
