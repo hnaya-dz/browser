@@ -1,75 +1,80 @@
-# HnayaDZ Browser
+# Hnaya DZ Browser
 
-Hnaya DZ Browser is a desktop application built with Electron and Next.js, designed to provide a seamless browsing experience.
+> **Navigateur algérien souverain** — données locales, interface arabe
+> native (RTL), téléchargement vidéo intégré, messagerie locale sans
+> serveur. Windows · macOS · Linux.
 
-## Features
+Hnaya DZ Browser est un navigateur de bureau construit avec **Electron 35**
+et **Next.js 15**, conçu pour les utilisateurs arabophones et francophones
+— institutions, PME, écoles et familles — qui veulent naviguer et
+collaborer **sans dépendre de services étrangers ni d'abonnements**.
 
-- **Electron Integration**: Combines the power of Electron with Next.js for a desktop application.
-- **Multi-Platform Support**: Build and run on macOS, Windows, and Linux.
-- **Internationalization**: Supports multiple languages using `i18next`.
-- **Responsive Design**: Utilizes Tailwind CSS for styling.
+## Fonctionnalités principales
 
-## Getting Started
+- **Interface trilingue native** AR / FR / EN, y compris le sens de lecture
+  (RTL), les menus contextuels et les boîtes de dialogue système.
+- **Messagerie locale** *(v0.3.0)* — communication d'équipe chiffrée
+  (AES-256, code PIN) entièrement sur le réseau local : sans serveur, sans
+  compte, sans abonnement. Panneau ancré pour discuter en naviguant,
+  découverte automatique des salons, configuration du pare-feu Windows
+  guidée. Voir [`chat-module/README.md`](chat-module/README.md).
+- **Téléchargement vidéo intégré** — 30+ plateformes (YouTube, TikTok,
+  Facebook…) via yt-dlp, téléchargé automatiquement au premier lancement.
+- **Gestionnaire de mots de passe** local chiffré (AES-256 + safeStorage)
+  — aucune inscription, aucune donnée dans le cloud.
+- **Favoris et groupes d'onglets**, thèmes (sombre, clair, coucher de
+  soleil, image personnalisée), recherche orientée Algérie.
+- **Mises à jour non intrusives** — vérification hebdomadaire, bannière
+  discrète, jamais imposées.
 
-### Prerequisites
+La liste complète est dans [`FICHE_TECHNIQUE.md`](FICHE_TECHNIQUE.md).
 
-- Node.js (version 14 or higher)
-- Yarn (for package management)
+## Démarrage
+
+### Prérequis
+
+- Node.js ≥ 18
+- Yarn 1.x
 
 ### Installation
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/yourusername/HnayaDZ.git
-   cd HnayaDZ
-   ```
-
-2. Install dependencies:
-   ```bash
-   yarn install
-   ```
-
-### Development
-
-To start the development server, run:
 ```bash
-yarn dev
+git clone https://github.com/hnaya-dz/browser.git
+cd browser
+yarn install
+cd chat-module && yarn install && cd ..   # dépendances de la messagerie locale
 ```
 
-This command will run both the Next.js development server and the Electron application.
+### Développement
 
-### Building for Production
-
-To build the application for production, run:
 ```bash
-yarn build
+yarn dev        # Next.js + Electron
+yarn kill-dev   # arrêter tous les processus de dev (Windows)
 ```
 
-Then, to create a distributable package, run:
+### Distribution
+
 ```bash
-yarn dist
+yarn dist         # Windows (.exe NSIS)
+yarn dist:mac     # macOS (.dmg x64 + arm64)
+yarn dist:linux   # Linux (AppImage)
 ```
 
-### Running the Application
+> ⚠️ Ne jamais lancer `yarn dist` pendant qu'un `yarn dev` tourne — le
+> build de production écrase le cache `.next` du serveur de dev.
 
-To start the application in production mode, use:
-```bash
-yarn start
-```
+## Documents de référence
 
-## Scripts
+| Fichier | Contenu |
+|---|---|
+| [`TECHNIQUES.md`](TECHNIQUES.md) | Configurations critiques et invariants à ne pas casser |
+| [`RETOUR_EXPERIENCE.md`](RETOUR_EXPERIENCE.md) | Tentatives échouées et solutions finales, par fonctionnalité |
+| [`FICHE_TECHNIQUE.md`](FICHE_TECHNIQUE.md) | Fiche produit complète |
+| [`PROTOCOLE_SESSION.md`](PROTOCOLE_SESSION.md) | Protocole de reprise de session de développement |
+| [`chat-module/README.md`](chat-module/README.md) | Architecture et modèle de sécurité de la messagerie locale |
 
-- `dev`: Runs the application in development mode.
-- `electron-dev`: Starts the Electron app with the development URL.
-- `build`: Builds the Next.js application.
-- `export`: Exports the Next.js application.
-- `start`: Runs the application in production mode.
-- `dist`: Builds the application and creates a distributable package.
+## Licence
 
-## Contributing
+MIT — © 2026 Nacib Hamida.
 
-Contributions are welcome! Please open an issue or submit a pull request.
-
-## License
-
-This project is licensed under the MIT License.
+*Hnaya DZ Browser — Navigateur algérien souverain.*
