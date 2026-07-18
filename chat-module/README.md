@@ -122,6 +122,47 @@ depuis `src/client.js` pour simuler un second participant.
 
 ---
 
+## Accès mobile — téléphones sur le même wifi (C-bis, Marche 1)
+
+En plus du WebSocket (4802), l'hôte sert une **page web autonome** sur
+**TCP 4803** (`src/mobile-server.js` + `mobile/index.html`). Un téléphone
+scanne le QR « Inviter un téléphone » du dock → ouvre
+`http://<ip-hôte>:4803` → saisit le PIN → rejoint le salon avec le **même
+protocole chiffré** que les postes. Aucune installation, aucun app store,
+aucune découverte multicast côté téléphone (le QR transporte l'adresse —
+ce qui contourne les restrictions multicast d'iOS).
+
+**Pourquoi une crypto bundlée** : sur une origine `http://` (pas de TLS
+possible sur une IP privée), `crypto.subtle` est indisponible. La page
+embarque donc `mobile/vendor/crypto-bundle.js` — scrypt + AES-256-GCM
+purs JS (@noble/hashes, @noble/ciphers), **compatibles bit-à-bit** avec
+`src/crypto.js`. Le bundle est un artefact commité ; pour le reconstruire
+après modification de `mobile/crypto-src.mjs` :
+
+```bash
+cd chat-module
+npx esbuild mobile/crypto-src.mjs --bundle --format=esm --minify --outfile=mobile/vendor/crypto-bundle.js
+node test/crypto-interop.test.mjs   # OBLIGATOIRE : vérifie l'interop Node ↔ navigateur
+```
+
+**Limites assumées de la Marche 1** (documentées dans la page elle-même) :
+notifications uniquement page ouverte (les navigateurs mobiles suspendent
+les onglets en arrière-plan) ; la page se reconnecte automatiquement au
+retour au premier plan et récupère les messages manqués via le backlog.
+Les notifications d'écran verrouillé viendront de la PWA hnaya.dz
+(Marche 2, Web Push) puis de l'application Android native (Marche 3).
+
+**Pare-feu** : TCP 4803 fait partie des règles créées par l'autorisation
+guidée de l'application (voir section Pare-feu ci-dessus). Les postes
+autorisés avant cette version re-proposeront l'autorisation une fois
+(drapeau versionné `NETWORK_SETUP_VERSION`). Commande manuelle :
+
+```powershell
+New-NetFirewallRule -DisplayName "Hnaya Messagerie locale (TCP 4803 mobile)" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 4803 -RemoteAddress LocalSubnet -Profile Any
+```
+
+---
+
 ## Étapes suivantes (non incluses dans ce squelette)
 
 1. **`ChatPanel.tsx`** — composant React côté renderer : saisie du PIN,

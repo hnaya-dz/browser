@@ -156,6 +156,12 @@ réseau local** (Wi-Fi ou câblé) — pensée pour les institutions, PME,
   antivirus tiers.
 - **Messages conservés 30 jours** sur le poste hôte puis purgés
   automatiquement — cohérent avec la philosophie de confidentialité.
+- **Accès depuis les téléphones, sans application à installer** : le
+  bouton « Inviter un téléphone » affiche un QR code ; tout smartphone du
+  même wifi le scanne, saisit le PIN et participe à la conversation
+  depuis son navigateur — même chiffrement que les postes. (Les
+  notifications nécessitent de garder la page ouverte dans cette
+  version.)
 - Interface trilingue AR/FR/EN, y compris les alertes.
 
 Les données ne quittent jamais le réseau local de l'organisation.

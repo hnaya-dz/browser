@@ -415,6 +415,11 @@ une whitelist (contrairement à `send`/`invoke`) — voir section 1 de ce docume
 | `set-app-language` + `NATIVE_LABELS`/`nativeT()` | `electron.js` + `langcontext.tsx` | Menu clic-droit et dialogues natifs figés en français en interface arabe |
 | Dépendance `ws` isolée dans `chat-module/node_modules` (fork, jamais d'import direct) | `chat-module/` + `electron.js` | Alourdit le navigateur principal ; risque sur `yarn dist` |
 | `chat-module/node_modules/` et `chat-module/data/` dans `.gitignore` | `.gitignore` | `/node_modules` racine ne couvre PAS les sous-dossiers — dépôt pollué |
+| Crypto de la page mobile compatible BIT-À-BIT avec `src/crypto.js` (scrypt N=16384/r=8/p=1, trame `[iv][tag][ct]`) — test `node test/crypto-interop.test.mjs` après TOUTE modif + rebuild du bundle | `chat-module/mobile/crypto-src.mjs` + `vendor/crypto-bundle.js` | Les téléphones ne peuvent plus rejoindre aucun salon (messages indéchiffrables) |
+| Bundle crypto = artefact COMMITÉ (esbuild, cmd dans `crypto-src.mjs`) — noble/esbuild restent en devDependencies | `chat-module/mobile/vendor/` | La page mobile référence un fichier absent ; ou `ws` n'est plus la seule dépendance runtime du module |
+| Le QR encode l'URL SEULE, jamais le PIN | `ChatPanel.tsx` (`inviteUrl`) | Quiconque photographie l'écran entre dans le salon — même règle que le beacon (jamais de secret annoncé) |
+| Version du dispositif pare-feu (`NETWORK_SETUP_VERSION`, drapeau v2) | `electron.js` | Les postes autorisés avant l'accès mobile n'ouvriraient jamais TCP 4803 — téléphones bloqués sans aucun message |
+| Serveur mobile lié à `0.0.0.0` (contrairement au serveur statique de l'app, limité à 127.0.0.1) | `chat-module/src/mobile-server.js` | Lié à localhost, les téléphones ne peuvent pas charger la page — c'est tout l'objet du serveur |
 
 ---
 
