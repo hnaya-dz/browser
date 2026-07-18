@@ -445,8 +445,8 @@ Configurée au niveau `session` dans `electron.js`, donc active pour **tous** le
 | `app.configureHostResolver` (DNS-over-HTTPS, Cloudflare + Quad9) | Le FAI ne voit pas en clair les domaines résolus |
 | `setWebRTCIPHandlingPolicy("default_public_interface_only")` | Masque les IP locales dans les candidats ICE WebRTC |
 | En-tête `DNT: 1` sur chaque requête | Signal de refus de suivi envoyé aux sites visités |
-| `TRACKER_BLOCKLIST` + `PRIVACY_ALLOWLIST` (`onBeforeRequest`) | Bloque les domaines d'analytics connus (Google Analytics, Doubleclick, Hotjar, etc.), sauf domaines explicitement autorisés (Zoom, Teams, Meet…) |
-| Nettoyage des paramètres `utm_*`, `fbclid`, `gclid`, `msclkid` | Supprime les identifiants de tracking de clic dans l'URL de destination, sur la navigation principale uniquement |
+| `TRACKER_BLOCKLIST` + `PRIVACY_ALLOWLIST` (`onBeforeRequest`) | Bloque les domaines d'analytics connus (Google Analytics, Doubleclick, Hotjar, etc.), sauf domaines explicitement autorisés (Zoom, Teams, Meet…) — **désactivable par l'utilisateur** (voir « Interrupteurs utilisateur ») |
+| Nettoyage des paramètres `utm_*`, `fbclid`, `gclid`, `msclkid` | Supprime les identifiants de tracking de clic dans l'URL de destination, sur la navigation principale uniquement — **désactivable par l'utilisateur** |
 | Switches `disable-background-networking`, `disable-domain-reliability`, `disable-component-update`, `no-pings` | Coupe la télémétrie de fond de Chromium |
 
 ### ⚠️ Point de vigilance — ce que cette couche NE change PAS
@@ -460,3 +460,39 @@ Configurée au niveau `session` dans `electron.js`, donc active pour **tous** le
 - **Ne pas retirer l'allowlist** avant d'étendre `TRACKER_BLOCKLIST` — un domaine ajouté par erreur (ex. un sous-domaine `*.googleapis.com` utilisé par Teams) casserait des fonctionnalités tierces sans message d'erreur clair pour l'utilisateur.
 - **Ne pas bloquer `cse.google.com`** dans une future extension de la blocklist — c'est le moteur de recherche Algérie lui-même, pas un traqueur.
 - **Ne pas remplacer `default_public_interface_only` par `disable_non_proxied_udp`** sans revalider la qualité des appels vidéo (Zoom/Teams/Meet web) — ce mode plus strict force un relais TURN et peut dégrader sensiblement la latence.
+
+### Interrupteurs utilisateur — panneau Confidentialité (`components/PrivacyPanel.tsx`)
+
+Sur les 6 mécanismes du tableau, **deux seulement peuvent casser un site
+légitime** : le blocage de traqueurs (ex. « Login with Facebook » passe par
+`connect.facebook.net` ; GTM charge parfois des bandeaux de consentement ou
+des fonctionnalités réelles) et le nettoyage des liens. Ces deux-là sont
+donc désactivables par l'utilisateur — bouton bouclier (lucide `Shield`)
+dans la navbar et l'urlbar. Les 4 autres (DoH, WebRTC, DNT, anti-bruit
+Chromium) sont sans risque fonctionnel : toujours actifs, pas
+d'interrupteur. Raison du choix « interrupteur » plutôt qu'« allowlist
+extensible » : impossible de prédire tous les sites qui casseront ; un
+utilisateur bloqué doit pouvoir se débloquer seul, en un clic, sans mise à
+jour de l'application.
+
+Mécanique (pourquoi c'est fait comme ça) :
+- **L'état vit dans le main process** (`privacySettings` dans
+  `electron.js`), là où tourne le filtre réseau — le renderer n'en garde
+  aucune copie d'autorité. Persistance :
+  `userData/privacy-settings.json`, chargé dans `app.on("ready")`
+  **avant** `createWindow` pour que la toute première requête respecte
+  déjà le choix.
+- **Le filtre consulte l'objet à chaque requête** (pas de copie au moment
+  de l'installation du hook) → un changement s'applique immédiatement,
+  sans redémarrage. Vérifié par CDP : requête `google-analytics.com`
+  bloquée → interrupteur coupé → la même requête passe → réactivé →
+  rebloquée.
+- IPC : `privacy-get-settings` (invoke) / `privacy-set-settings` (send) —
+  ajoutés aux listes blanches de `preload.js`.
+- Défaut : les deux **activés** (positionnement privacy-first). Clés i18n
+  `Privacy.*` dans les 3 locales.
+
+**Ne pas faire** : ne pas déplacer l'état d'autorité dans localStorage —
+localStorage est indexé par origine (voir §« port fixe ») et le main
+process n'y a pas accès au démarrage ; le fichier userData est la seule
+source fiable disponible avant la création de la fenêtre.

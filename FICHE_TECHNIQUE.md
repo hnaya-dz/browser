@@ -162,7 +162,32 @@ Les données ne quittent jamais le réseau local de l'organisation.
 
 ---
 
-## 13. Compatibilité multi-système
+## 13. Confidentialité renforcée — protections réseau intégrées
+
+Hnaya DZ protège la navigation au niveau du moteur lui-même, sans
+extension à installer :
+
+- **DNS chiffré** : les domaines consultés ne circulent plus en clair sur
+  le réseau du fournisseur d'accès.
+- **Anti-fuite d'adresse locale (WebRTC)** : les adresses IP internes du
+  poste ne sont jamais exposées aux sites visités — une technique de
+  pistage classique neutralisée.
+- **Signal « Do Not Track »** envoyé à chaque site, et suppression de la
+  télémétrie d'arrière-plan du moteur de rendu.
+- **Blocage des traqueurs** : les services connus de mesure d'audience et
+  de suivi publicitaire (Google Analytics, Facebook Pixel, Hotjar…) sont
+  bloqués avant même le chargement.
+- **Nettoyage des liens** : les paramètres de pistage (`utm_`, `fbclid`,
+  `gclid`…) sont retirés des adresses visitées.
+
+Les deux dernières protections sont **désactivables en un clic** depuis le
+panneau Confidentialité (bouton bouclier de la barre d'outils) si un site
+professionnel en dépend — le réglage s'applique immédiatement, sans
+redémarrage, et par défaut elles sont actives.
+
+---
+
+## 14. Compatibilité multi-système
 
 | Système | Format distribué |
 |---|---|
