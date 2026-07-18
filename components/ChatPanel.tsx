@@ -45,17 +45,26 @@ function getThemeName() {
 // Découpe un message en texte + liens cliquables. Les URLs collées dans la
 // discussion passaient comme du texte mort (retour de test terrain) — ici
 // elles s'ouvrent dans un nouvel onglet, le dock restant visible à côté.
-const URL_SPLIT = /(https?:\/\/[^\s]+)/g;
+// ⚠️ Détecte aussi les liens tapés SANS schéma — « www.hnaya.dz » ou
+// « hnaya.dz/boutique » (personne ne tape https:// à la main ; second
+// retour terrain : « les liens ne sont pas actifs pour l'envoyeur »).
+// TLD volontairement limités pour éviter les faux positifs sur des noms
+// de fichiers (« electron.js », « package.json »).
+// ⚠️ Même regex dans chat-module/mobile/index.html (renderText) — les
+// deux côtés doivent linkifier à l'identique.
+const URL_SPLIT = /((?:https?:\/\/|www\.)[^\s]+|(?:[a-zA-Z0-9-]+\.)+(?:dz|com|net|org|fr|io)(?:\/[^\s]*)?)/g;
+const isLinkPart = (p: string) => /^(?:https?:\/\/|www\.|(?:[a-zA-Z0-9-]+\.)+(?:dz|com|net|org|fr|io)(?:\/|$))/.test(p);
+const toHref = (p: string) => (/^https?:\/\//.test(p) ? p : "https://" + p);
 function MessageText({ text, accent, onOpen }: { text: string; accent: string; onOpen: (url: string) => void }) {
   const parts = String(text).split(URL_SPLIT);
   return (
     <div style={{ fontSize: 13, wordBreak: "break-word" }}>
       {parts.map((p, i) =>
-        /^https?:\/\//.test(p) ? (
+        isLinkPart(p) ? (
           <a
             key={i}
-            onClick={(e) => { e.preventDefault(); onOpen(p); }}
-            href={p}
+            onClick={(e) => { e.preventDefault(); onOpen(toHref(p)); }}
+            href={toHref(p)}
             style={{ color: accent, textDecoration: "underline", cursor: "pointer", direction: "ltr", unicodeBidi: "embed" }}
           >
             {p}

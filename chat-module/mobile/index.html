@@ -156,12 +156,18 @@ const seenIds = new Set(); // dédoublonnage backlog/reconnexion (règle du modu
 function showStatus(show) { statusBar.classList.toggle("show", show); }
 
 // Liens cliquables : découpage texte/URL en éléments DOM (jamais
-// d'innerHTML avec du contenu reçu — le texte reste inerte)
+// d'innerHTML avec du contenu reçu — le texte reste inerte).
+// ⚠️ Détecte aussi les liens sans schéma (www.hnaya.dz, hnaya.dz/…) —
+// même regex que MessageText dans components/ChatPanel.tsx : les deux
+// côtés doivent linkifier à l'identique.
+const URL_SPLIT = /((?:https?:\/\/|www\.)[^\s]+|(?:[a-zA-Z0-9-]+\.)+(?:dz|com|net|org|fr|io)(?:\/[^\s]*)?)/g;
+const isLinkPart = (p) => /^(?:https?:\/\/|www\.|(?:[a-zA-Z0-9-]+\.)+(?:dz|com|net|org|fr|io)(?:\/|$))/.test(p);
 function renderText(container, text) {
-  String(text).split(/(https?:\/\/[^\s]+)/g).forEach((part) => {
-    if (/^https?:\/\//.test(part)) {
+  String(text).split(URL_SPLIT).forEach((part) => {
+    if (isLinkPart(part)) {
       const a = document.createElement("a");
-      a.href = part; a.textContent = part;
+      a.href = /^https?:\/\//.test(part) ? part : "https://" + part;
+      a.textContent = part;
       a.target = "_blank"; a.rel = "noopener noreferrer";
       container.appendChild(a);
     } else if (part) {
