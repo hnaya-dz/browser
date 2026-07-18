@@ -146,5 +146,14 @@
     "moduleNotFound": "Le module de chat local est introuvable.",
     "genericError": "Une erreur est survenue.",
     "securityNotice": "Chiffré par PIN sur ce réseau local — pas un chiffrement de bout en bout."
+  },
+  "Privacy": {
+    "title": "Confidentialité",
+    "alwaysOn": "Protections permanentes : DNS chiffré, anti-fuite d'IP locale (WebRTC), signal « Do Not Track » et suppression de la télémétrie en arrière-plan.",
+    "blockTrackers": "Blocage des traqueurs",
+    "blockTrackersDesc": "Bloque les services de mesure d'audience et de suivi publicitaire connus (Google Analytics, Facebook Pixel, Hotjar…).",
+    "cleanLinks": "Nettoyage des liens",
+    "cleanLinksDesc": "Retire les paramètres de suivi des adresses visitées (utm_, fbclid, gclid…).",
+    "troubleshoot": "Si un site ne fonctionne pas correctement (connexion via Facebook, contenu manquant…), désactivez temporairement ces protections puis rechargez la page. Les changements s'appliquent immédiatement."
   }
 }

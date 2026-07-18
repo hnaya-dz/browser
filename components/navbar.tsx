@@ -1,6 +1,8 @@
 "use client";
+import { useState } from "react";
 import { usePathname } from "next/navigation";
-import { MessageSquare } from "lucide-react";
+import dynamic from "next/dynamic";
+import { MessageSquare, Shield } from "lucide-react";
 import { ThemeSwitch } from "@/components/theme-switch";
 import LangSwitch from "./lang-switch";
 import { useTabContext } from "@/context/tabcontext";
@@ -8,6 +10,8 @@ import { useTabPosition } from "@/context/tabpositioncontext";
 import { useLanguage } from "@/context/langcontext";
 import { useTranslation } from "@/hooks/useTranslation";
 import { setPanelOpen, useChatSnapshot } from "@/context/chatstore";
+
+const PrivacyPanel = dynamic(() => import("./PrivacyPanel"), { ssr: false });
 
 const HNAYA_NAV = [
   { key: "home",    url: "https://hnaya.dz",                 labels: { ar: "حنايا",       fr: "Accueil",        en: "Home"           } },
@@ -26,6 +30,7 @@ export const Navbar = () => {
   // État global de la messagerie : couleur d'icône (vert = connecté) et
   // badge non-lus, tenus à jour même quand le dock est fermé
   const chat = useChatSnapshot();
+  const [showPrivacy, setShowPrivacy] = useState(false);
 
   if (pathname === "/browser") return null;
 
@@ -71,9 +76,19 @@ export const Navbar = () => {
             }} />
           )}
         </button>
+        {/* Panneau Confidentialité — page d'accueil : pas de WebContentsView
+            à masquer, ouverture directe */}
+        <button
+          onClick={() => setShowPrivacy(true)}
+          className="px-2 text-white/70 hover:text-white transition-all duration-150"
+          title={t("Privacy.title")}
+        >
+          <Shield size={16} />
+        </button>
         <LangSwitch />
         <ThemeSwitch />
       </div>
+      {showPrivacy && <PrivacyPanel onClose={() => setShowPrivacy(false)} />}
     </nav>
   );
 };

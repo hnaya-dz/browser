@@ -2,7 +2,7 @@ import { app, BrowserWindow, WebContentsView, ipcMain, Menu, dialog, shell, scre
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import { spawn, fork } from "child_process";
-import { existsSync, createReadStream, statSync } from "fs";
+import { existsSync, createReadStream, statSync, readFileSync, writeFileSync } from "fs";
 import http from "http";
 // ✅ PATCH 1 — import depuis shared/ (supprime la duplication avec urlbar.tsx)
 import { isDownloadableUrl } from "./shared/supportedHosts.js";
@@ -42,6 +42,42 @@ const __dirname = dirname(__filename);
 // des réglages persistants. (Vault et favoris sont stockés en fichier via
 // app.getPath — eux ne dépendent pas de l'origine.)
 const STATIC_PORT = 47823; // port local fixe, arbitraire et peu courant
+
+// ═══════════════════════════════════════════════════════════════
+// CONFIDENTIALITÉ — interrupteurs utilisateur
+// ═══════════════════════════════════════════════════════════════
+// Les protections « toujours actives » (DNS-over-HTTPS, anti-fuite WebRTC,
+// Do Not Track, anti-bruit Chromium) ne présentent aucun risque fonctionnel
+// et n'ont pas d'interrupteur. Les DEUX protections qui PEUVENT casser un
+// site légitime (ex. « Login with Facebook » via connect.facebook.net, ou
+// des fonctionnalités chargées par googletagmanager.com) sont désactivables
+// par l'utilisateur depuis le panneau Confidentialité :
+//   - blockTrackers : blocage de la TRACKER_BLOCKLIST
+//   - cleanLinks    : suppression des paramètres de suivi (utm_*, fbclid…)
+// Défaut : activées (cohérent avec le positionnement privacy-first).
+// L'état vit ici (main process, là où tourne le filtre réseau) et persiste
+// dans userData/privacy-settings.json. Le filtre consulte l'objet EN DIRECT
+// à chaque requête → un changement s'applique immédiatement, sans
+// redémarrage. Chargé dans app.on("ready") AVANT createWindow pour que la
+// toute première requête respecte déjà le choix de l'utilisateur.
+let privacySettings = { blockTrackers: true, cleanLinks: true };
+const privacySettingsPath = () => join(app.getPath("userData"), "privacy-settings.json");
+
+function loadPrivacySettings() {
+  try {
+    const saved = JSON.parse(readFileSync(privacySettingsPath(), "utf8"));
+    if (typeof saved?.blockTrackers === "boolean") privacySettings.blockTrackers = saved.blockTrackers;
+    if (typeof saved?.cleanLinks === "boolean") privacySettings.cleanLinks = saved.cleanLinks;
+  } catch { /* premier lancement ou fichier corrompu — on garde les défauts */ }
+}
+
+function savePrivacySettings() {
+  try {
+    writeFileSync(privacySettingsPath(), JSON.stringify(privacySettings, null, 2), "utf8");
+  } catch (e) {
+    console.warn("Réglages confidentialité non sauvegardés :", e?.message);
+  }
+}
 const STATIC_MIME = {
   ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8",
   ".css": "text/css; charset=utf-8", ".json": "application/json; charset=utf-8",
@@ -384,14 +420,16 @@ mainWindow = new BrowserWindow({
     } catch { return false; }
   }
   mainWindow.webContents.session.webRequest.onBeforeRequest((details, callback) => {
-    if (isTracker(details.url)) {
+    // Interrupteurs utilisateur (panneau Confidentialité) consultés en
+    // direct — privacySettings est mis à jour par "privacy-set-settings".
+    if (privacySettings.blockTrackers && isTracker(details.url)) {
       callback({ cancel: true });
       return;
     }
     // ✅ Nettoie les paramètres de tracking de clic (utm_*, fbclid, gclid…)
     // uniquement sur la navigation de page principale — ne touche jamais
     // aux requêtes d'API/ressources (donc aucun risque de casser un site).
-    if (details.resourceType === "mainFrame") {
+    if (privacySettings.cleanLinks && details.resourceType === "mainFrame") {
       try {
         const u = new URL(details.url);
         const trackingParams = ["fbclid", "gclid", "msclkid", "utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content"];
@@ -433,6 +471,9 @@ app.commandLine.appendSwitch("disable-component-update");        // vérifie/té
 app.commandLine.appendSwitch("no-pings");                        // désactive l'attribut HTML <a ping> (tracking de clics natif du navigateur)
 
 app.on("ready", async () => {
+  // Interrupteurs confidentialité : lus AVANT createWindow pour que le
+  // filtre réseau respecte le choix de l'utilisateur dès la 1re requête
+  loadPrivacySettings();
   // Démarre le serveur statique AVANT de créer la fenêtre (packagé seulement)
   if (app.isPackaged) {
     staticServerUrl = await startStaticServer();
@@ -639,6 +680,17 @@ ipcMain.on("chat-dock", (event, width) => {
 // ✅ Langue des libellés natifs — synchronisée depuis langcontext.tsx
 ipcMain.on("set-app-language", (event, lang) => {
   if (["ar", "fr", "en"].includes(lang)) appLang = lang;
+});
+
+// ✅ Interrupteurs confidentialité (panneau Confidentialité du renderer).
+// Le filtre réseau lit privacySettings à chaque requête → effet immédiat.
+ipcMain.handle("privacy-get-settings", () => ({ ...privacySettings }));
+
+ipcMain.on("privacy-set-settings", (event, partial) => {
+  if (!partial || typeof partial !== "object") return;
+  if (typeof partial.blockTrackers === "boolean") privacySettings.blockTrackers = partial.blockTrackers;
+  if (typeof partial.cleanLinks === "boolean") privacySettings.cleanLinks = partial.cleanLinks;
+  savePrivacySettings();
 });
 
 ////////////////////////////////////////////////////////////////////////////////

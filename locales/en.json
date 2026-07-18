@@ -146,5 +146,14 @@
     "moduleNotFound": "The local chat module could not be found.",
     "genericError": "An error occurred.",
     "securityNotice": "Encrypted by PIN on this local network — not end-to-end encryption."
+  },
+  "Privacy": {
+    "title": "Privacy",
+    "alwaysOn": "Always-on protections: encrypted DNS, WebRTC local-IP leak prevention, \"Do Not Track\" signal and background telemetry removal.",
+    "blockTrackers": "Tracker blocking",
+    "blockTrackersDesc": "Blocks known audience-measurement and ad-tracking services (Google Analytics, Facebook Pixel, Hotjar…).",
+    "cleanLinks": "Link cleaning",
+    "cleanLinksDesc": "Removes tracking parameters from visited addresses (utm_, fbclid, gclid…).",
+    "troubleshoot": "If a website misbehaves (Facebook login, missing content…), temporarily disable these protections and reload the page. Changes apply immediately."
   }
 }

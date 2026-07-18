@@ -31,6 +31,8 @@ const ALLOWED_INVOKE = [
   "chat-start-host",
   "chat-network-check",
   "chat-network-setup",
+  // ✅ Confidentialité — interrupteurs utilisateur
+  "privacy-get-settings",
 ];
 
 const ALLOWED_SEND = [
@@ -59,6 +61,8 @@ const ALLOWED_SEND = [
   "chat-send-message",
   "chat-mark-read",
   "chat-leave",
+  // ✅ Confidentialité — interrupteurs utilisateur
+  "privacy-set-settings",
 ];
 
 contextBridge.exposeInMainWorld("electronAPI", {

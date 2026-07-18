@@ -9,11 +9,12 @@ import DownloadPanel from "./DownloadPanel";
 import dynamic from "next/dynamic";
 import { isDownloadableUrl as isDownloadable } from "@/shared/supportedHosts";
 import { useTranslation } from "@/hooks/useTranslation";
-import { MessageSquare } from "lucide-react";
+import { MessageSquare, Shield } from "lucide-react";
 import { setPanelOpen, useChatSnapshot } from "@/context/chatstore";
 
 const VaultPanel = dynamic(() => import("./VaultPanel"), { ssr: false });
 const FavoritesPanel = dynamic(() => import("./FavoritesPanel"), { ssr: false });
+const PrivacyPanel = dynamic(() => import("./PrivacyPanel"), { ssr: false });
 
 const HINT_DL_KEY    = "hnaya-hint-download-seen";
 const HINT_VAULT_KEY = "hnaya-hint-vault-seen";
@@ -58,6 +59,7 @@ export default function URLBar() {
   const [downloadUrl, setDownloadUrl] = useState("");
   const [showVault, setShowVault] = useState(false);
   const [showFavorites, setShowFavorites] = useState(false);
+  const [showPrivacy, setShowPrivacy] = useState(false);
   // État global de la messagerie : couleur d'icône, badge non-lus, dock
   const chat = useChatSnapshot();
   const [isFavorited, setIsFavorited] = useState(false);
@@ -220,6 +222,16 @@ export default function URLBar() {
     (window as any)?.electronAPI?.send("show-active-view");
   }, []);
 
+  const handlePrivacyClick = useCallback(async () => {
+    await (window as any)?.electronAPI?.invoke("hide-active-view-sync");
+    setShowPrivacy(true);
+  }, []);
+
+  const handleClosePrivacy = useCallback(() => {
+    setShowPrivacy(false);
+    (window as any)?.electronAPI?.send("show-active-view");
+  }, []);
+
   // ✅ Le dock ne masque PAS la page (le process principal rétrécit la
   // vue) — donc ni hide-active-view-sync ni show-active-view ici,
   // contrairement aux panneaux modaux (coffre-fort, favoris).
@@ -353,6 +365,16 @@ export default function URLBar() {
           {chat.unreadCount > 0 && <span className="chat-unread-dot" />}
         </button>
 
+        {/* Bouton confidentialité — interrupteurs blocage traqueurs /
+            nettoyage des liens (panneau modal, comme coffre-fort/favoris) */}
+        <button
+          onClick={handlePrivacyClick}
+          className="urlbar-btn"
+          title={t("Privacy.title")}
+        >
+          <Shield size={17} />
+        </button>
+
         <LangSwitch />
         <ThemeSwitch />
       </nav>
@@ -367,6 +389,10 @@ export default function URLBar() {
 
       {showVault && (
         <VaultPanel onClose={handleCloseVault} />
+      )}
+
+      {showPrivacy && (
+        <PrivacyPanel onClose={handleClosePrivacy} />
       )}
     </>
   );
