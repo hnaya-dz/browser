@@ -1,9 +1,9 @@
 {
-  "version": "0.3.0",
+  "version": "0.3.1",
   "url": "https://github.com/hnaya-dz/browser/releases/latest",
   "notes": {
-    "ar": "المراسلة المحلية: تواصل آمن عبر شبكتك الداخلية — بدون خادم وبدون اشتراك",
-    "fr": "Messagerie locale : communication sécurisée sur votre réseau interne — sans serveur ni abonnement",
-    "en": "Local Messaging: secure communication over your internal network — no server, no subscription"
+    "ar": "دعوة الهواتف المحمولة إلى المراسلة المحلية عبر رمز QR، مفاتيح تحكم بالخصوصية، مدقق إملائي، وتحديثات أمنية",
+    "fr": "Invitation des mobiles à la Messagerie locale par QR code, interrupteurs de confidentialité, correcteur orthographique et mises à jour de sécurité",
+    "en": "Invite smartphones to Local Messaging via QR code, privacy toggles, spell-checker, and security updates"
   }
 }
