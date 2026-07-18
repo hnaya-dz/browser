@@ -23,25 +23,28 @@
     "directories": {
       "output": "dist"
     },
-   "files": [
-  "out/**/*",
-  "public/electron.js",
-  "public/preload.js",
-  "public/hnaya.png",
-  "public/icons/**/*",
-  "public/bin/**/*",
-  "public/shared/**/*",
-  "public/vault.js",
-  "public/vault-ipc.js",
-  "public/favorites.js",
-  "public/favorites-ipc.js",
-  "public/update-check.js"
-],
+    "files": [
+      "out/**/*",
+      "public/electron.js",
+      "public/preload.js",
+      "public/hnaya.png",
+      "public/icons/**/*",
+      "public/bin/**/*",
+      "public/shared/**/*",
+      "public/vault.js",
+      "public/vault-ipc.js",
+      "public/favorites.js",
+      "public/favorites-ipc.js",
+      "public/update-check.js"
+    ],
     "extraResources": [
       {
         "from": "chat-module",
         "to": "chat-module",
-        "filter": ["**/*", "!data/**"]
+        "filter": [
+          "**/*",
+          "!data/**"
+        ]
       }
     ],
     "win": {
@@ -63,22 +66,27 @@
       "shortcutName": "Hnaya DZ Browser"
     },
     "mac": {
-  "target": [
-    {
-      "target": "dmg",
-      "arch": ["x64", "arm64"]
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "icon": "public/hnaya.png"
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
     }
-  ],
-  "icon": "public/hnaya.png"
-},
-"linux": {
-  "target": [
-    {
-      "target": "AppImage",
-      "arch": ["x64"]
-    }
-  ]
-}
   },
   "dependencies": {
     "@heroui/button": "2.2.13",
@@ -98,14 +106,14 @@
     "electron-serve": "^2.1.1",
     "framer-motion": "11.13.1",
     "lucide-react": "^0.483.0",
-    "next": "15.0.4",
+    "next": "15.5.19",
     "next-themes": "^0.4.4",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "wait-on": "^8.0.2"
   },
   "devDependencies": {
-    "@next/eslint-plugin-next": "15.0.4",
+    "@next/eslint-plugin-next": "15.5.19",
     "@react-types/shared": "3.25.0",
     "@types/node": "20.5.7",
     "@types/react": "18.3.3",
@@ -116,7 +124,7 @@
     "electron": "^35.0.2",
     "electron-builder": "^25.1.8",
     "eslint": "^8.57.0",
-    "eslint-config-next": "15.0.4",
+    "eslint-config-next": "15.5.19",
     "eslint-config-prettier": "9.1.0",
     "eslint-plugin-import": "^2.26.0",
     "eslint-plugin-jsx-a11y": "^6.4.1",
@@ -125,7 +133,7 @@
     "eslint-plugin-react": "^7.23.2",
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-unused-imports": "4.1.4",
-    "postcss": "8.4.49",
+    "postcss": "8.5.19",
     "prettier": "3.3.3",
     "tailwind-variants": "0.3.0",
     "tailwindcss": "3.4.16",
