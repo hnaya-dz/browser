@@ -161,21 +161,45 @@ const NATIVE_LABELS = {
         openLinkNewTab: "فتح الرابط في لسان جديد", copyLinkUrl: "نسخ عنوان الرابط",
         reloadPage: "إعادة تحميل الصفحة", back: "السابق", forward: "التالي",
         copyPageUrl: "نسخ عنوان الصفحة", images: "الصور", allFiles: "كل الملفات",
-        chooseFolder: "اختر مجلد التحميل" },
+        chooseFolder: "اختر مجلد التحميل",
+        noSuggestions: "لا توجد اقتراحات", addToDictionary: "إضافة إلى القاموس" },
   fr: { copy: "Copier", cut: "Couper", paste: "Coller", selectAll: "Tout sélectionner",
         saveImage: "Enregistrer l'image", copyImageUrl: "Copier l'adresse de l'image",
         openLinkNewTab: "Ouvrir le lien dans un nouvel onglet", copyLinkUrl: "Copier l'adresse du lien",
         reloadPage: "Recharger la page", back: "Précédent", forward: "Suivant",
         copyPageUrl: "Copier l'URL de la page", images: "Images", allFiles: "Tous les fichiers",
-        chooseFolder: "Choisir le dossier de téléchargement" },
+        chooseFolder: "Choisir le dossier de téléchargement",
+        noSuggestions: "Aucune suggestion", addToDictionary: "Ajouter au dictionnaire" },
   en: { copy: "Copy", cut: "Cut", paste: "Paste", selectAll: "Select all",
         saveImage: "Save image", copyImageUrl: "Copy image address",
         openLinkNewTab: "Open link in new tab", copyLinkUrl: "Copy link address",
         reloadPage: "Reload page", back: "Back", forward: "Forward",
         copyPageUrl: "Copy page URL", images: "Images", allFiles: "All files",
-        chooseFolder: "Choose download folder" },
+        chooseFolder: "Choose download folder",
+        noSuggestions: "No suggestions", addToDictionary: "Add to dictionary" },
 };
 const nativeT = (key) => (NATIVE_LABELS[appLang] || NATIVE_LABELS.fr)[key] || key;
+
+// ✅ Correcteur orthographique — items de menu contextuel pour un mot
+// souligné : suggestions du dictionnaire + « Ajouter au dictionnaire ».
+// Chromium soulignait déjà les fautes, mais nos menus personnalisés
+// n'exposaient PAS les corrections (retour de test terrain : « le clic
+// droit ne propose pas de correction »). Utilisé pour la fenêtre
+// principale (champ de la messagerie, barre d'adresse) ET les vues web.
+function spellingMenuItems(webContents, params) {
+  if (!params.misspelledWord) return [];
+  const items = (params.dictionarySuggestions || []).slice(0, 5).map((s) => ({
+    label: s,
+    click: () => webContents.replaceMisspelling(s),
+  }));
+  if (items.length === 0) items.push({ label: nativeT("noSuggestions"), enabled: false });
+  items.push(
+    { label: nativeT("addToDictionary"),
+      click: () => webContents.session.addWordToSpellCheckerDictionary(params.misspelledWord) },
+    { type: "separator" },
+  );
+  return items;
+}
 // Référence au process yt-dlp en cours (pour l'annulation)
 let activeDownloadProc = null;
 
@@ -387,6 +411,36 @@ mainWindow = new BrowserWindow({
   mainWindow.webContents.session.webRequest.onBeforeSendHeaders((details, callback) => {
     details.requestHeaders["DNT"] = "1";
     callback({ requestHeaders: details.requestHeaders });
+  });
+
+  // ✅ Correcteur orthographique multilingue sur la session partagée
+  // (fenêtre principale + vues web). AR/FR/EN ensemble : les utilisateurs
+  // cibles alternent couramment entre les trois dans un même champ.
+  try {
+    mainWindow.webContents.session.setSpellCheckerLanguages(["ar", "fr", "en-US"]);
+  } catch (e) {
+    console.warn("Langues du correcteur non configurées :", e?.message);
+  }
+
+  // ✅ Menu contextuel de la FENÊTRE PRINCIPALE (champ de la messagerie,
+  // barre d'adresse, panneaux) — sans lui, le clic droit n'affichait
+  // RIEN dans l'interface de l'application : impossible de coller une
+  // adresse ou d'appliquer une correction orthographique.
+  mainWindow.webContents.on("context-menu", (event, params) => {
+    const menuItems = [];
+    if (params.isEditable) {
+      menuItems.push(
+        ...spellingMenuItems(mainWindow.webContents, params),
+        { label: nativeT("cut"),       role: "cut",       accelerator: "CmdOrCtrl+X" },
+        { label: nativeT("copy"),      role: "copy",      accelerator: "CmdOrCtrl+C" },
+        { label: nativeT("paste"),     role: "paste",     accelerator: "CmdOrCtrl+V" },
+        { label: nativeT("selectAll"), role: "selectAll", accelerator: "CmdOrCtrl+A" },
+      );
+    } else if (params.selectionText) {
+      menuItems.push({ label: nativeT("copy"), role: "copy", accelerator: "CmdOrCtrl+C" });
+    }
+    if (menuItems.length === 0) return; // rien d'utile — pas de menu vide
+    Menu.buildFromTemplate(menuItems).popup({ window: mainWindow });
   });
 
   // ═══════════════════════════════════════════════════════════
@@ -1133,6 +1187,9 @@ ipcMain.on("open-tab", (event, newTab) => {
 }
       if (params.isEditable) {
         menuItems.push(
+          // Suggestions du correcteur en tête — le réflexe universel du
+          // clic droit sur un mot souligné
+          ...spellingMenuItems(view.webContents, params),
           { label: nativeT("cut"),       role: "cut",         accelerator: "CmdOrCtrl+X" },
           { label: nativeT("copy"),      role: "copy",        accelerator: "CmdOrCtrl+C" },
           { label: nativeT("paste"),     role: "paste",       accelerator: "CmdOrCtrl+V" },

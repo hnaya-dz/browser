@@ -146,8 +146,9 @@
     "moduleNotFound": "The local chat module could not be found.",
     "genericError": "An error occurred.",
     "securityNotice": "Encrypted by PIN on this local network — not end-to-end encryption.",
-    "invitePhone": "Invite a phone",
-    "inviteHint": "Scan with the phone's camera (same wifi), then enter the room PIN. Keep the page open to receive messages."
+    "invitePhone": "Invite a smartphone",
+    "inviteClose": "Close",
+    "inviteHint": "Scan with the smartphone's camera (same wifi), then enter the room PIN. Keep the page open to receive messages."
   },
   "Privacy": {
     "title": "Privacy",

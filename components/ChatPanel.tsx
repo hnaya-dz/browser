@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 // ✅ Icônes vectorielles (lucide, déjà dans les dépendances) plutôt
 // qu'emoji : les emoji sont rendus par la police du système et diffèrent
 // visuellement entre Windows 10 et 11 — incohérent d'un poste à l'autre.
@@ -8,6 +8,7 @@ import qrcode from "qrcode-generator";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useLanguage } from "@/context/langcontext";
 import { useTabPosition } from "@/context/tabpositioncontext";
+import { useTabContext } from "@/context/tabcontext";
 import {
   store,
   patchStore,
@@ -41,10 +42,37 @@ function getThemeName() {
 // cette colonne React à droite — l'utilisateur discute EN voyant la page.
 // C'est la même mécanique que la barre d'onglets latérale (tabSideWidth).
 // ═══════════════════════════════════════════════════════════════
+// Découpe un message en texte + liens cliquables. Les URLs collées dans la
+// discussion passaient comme du texte mort (retour de test terrain) — ici
+// elles s'ouvrent dans un nouvel onglet, le dock restant visible à côté.
+const URL_SPLIT = /(https?:\/\/[^\s]+)/g;
+function MessageText({ text, accent, onOpen }: { text: string; accent: string; onOpen: (url: string) => void }) {
+  const parts = String(text).split(URL_SPLIT);
+  return (
+    <div style={{ fontSize: 13, wordBreak: "break-word" }}>
+      {parts.map((p, i) =>
+        /^https?:\/\//.test(p) ? (
+          <a
+            key={i}
+            onClick={(e) => { e.preventDefault(); onOpen(p); }}
+            href={p}
+            style={{ color: accent, textDecoration: "underline", cursor: "pointer", direction: "ltr", unicodeBidi: "embed" }}
+          >
+            {p}
+          </a>
+        ) : (
+          <span key={i}>{p}</span>
+        )
+      )}
+    </div>
+  );
+}
+
 export default function ChatPanel({ onClose }: ChatPanelProps) {
   const { t } = useTranslation();
   const { isRTL } = useLanguage();
   const { position } = useTabPosition();
+  const { addTab } = useTabContext();
   const dir = isRTL ? "rtl" : "ltr";
   useChatSnapshot();
 
@@ -66,6 +94,16 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
   const [messageInput, setMessageInput] = useState("");
   const [setupBusy, setSetupBusy] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
+
+  // ✅ Fil ouvert sur le DERNIER message (retour de test terrain) : au
+  // montage du panneau ET à chaque nouveau message, défiler en bas.
+  // "auto" (pas "smooth") pour l'arrivée sur un long historique.
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (store.status === "joined") {
+      messagesEndRef.current?.scrollIntoView({ block: "end" });
+    }
+  }, [store.messages.length, store.status]);
 
   // QR d'invitation mobile — recalculé uniquement quand l'URL change
   const inviteQrSvg = useMemo(() => {
@@ -489,10 +527,12 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
                     ...btnStyle(showInvite), padding: "4px 8px", fontSize: 10,
                     display: "flex", alignItems: "center", gap: 4, flexShrink: 0,
                   }}
-                  title={t("Chat.invitePhone")}
+                  title={showInvite ? t("Chat.inviteClose") : t("Chat.invitePhone")}
                 >
                   <Smartphone size={12} />
-                  {t("Chat.invitePhone")}
+                  {/* Le bouton devient « Fermer » quand le QR est affiché —
+                      demande explicite du test terrain (dégager le dock) */}
+                  {showInvite ? t("Chat.inviteClose") : t("Chat.invitePhone")}
                 </button>
               )}
             </div>
@@ -541,11 +581,17 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
                       borderRadius: 10, padding: "6px 10px",
                     }}>
                       {!isMine && <div style={{ fontSize: 10, color: muted, fontWeight: 700 }}>{m.from}</div>}
-                      <div style={{ fontSize: 13 }}>{m.text}</div>
+                      <MessageText
+                        text={m.text}
+                        accent={theme === "sunset" ? "#ffb060" : "#00c853"}
+                        onOpen={(url) => addTab(url)}
+                      />
                     </div>
                   );
                 })
               )}
+              {/* Ancre de défilement — toujours en dernier */}
+              <div ref={messagesEndRef} />
             </div>
 
             <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
