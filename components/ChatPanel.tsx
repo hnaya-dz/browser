@@ -1,9 +1,10 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 // ✅ Icônes vectorielles (lucide, déjà dans les dépendances) plutôt
 // qu'emoji : les emoji sont rendus par la police du système et diffèrent
 // visuellement entre Windows 10 et 11 — incohérent d'un poste à l'autre.
-import { MessageSquare, Shield, Lock } from "lucide-react";
+import { MessageSquare, Shield, Lock, Smartphone } from "lucide-react";
+import qrcode from "qrcode-generator";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useLanguage } from "@/context/langcontext";
 import { useTabPosition } from "@/context/tabpositioncontext";
@@ -64,6 +65,16 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
   const [pinInput, setPinInput] = useState("");
   const [messageInput, setMessageInput] = useState("");
   const [setupBusy, setSetupBusy] = useState(false);
+  const [showInvite, setShowInvite] = useState(false);
+
+  // QR d'invitation mobile — recalculé uniquement quand l'URL change
+  const inviteQrSvg = useMemo(() => {
+    if (!store.inviteUrl) return "";
+    const qr = qrcode(0, "M");
+    qr.addData(store.inviteUrl);
+    qr.make();
+    return qr.createSvgTag({ cellSize: 3, margin: 0 });
+  }, [store.inviteUrl]);
 
   const theme = getThemeName();
   const isDark = theme === "dark";
@@ -171,7 +182,13 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
     // Même remise à zéro qu'à la création — le backlog fait foi.
     // ✅ Retenir aussi le nom du salon rejoint : affiché dans l'en-tête
     // du dock une fois connecté (on doit savoir OÙ on discute).
-    patchStore({ messages: [], online: [], sessionName: store.selectedSession.sessionName || "" });
+    patchStore({
+      messages: [], online: [],
+      sessionName: store.selectedSession.sessionName || "",
+      // L'invitation mobile pointe vers l'HÔTE (c'est lui qui sert la
+      // page) — un participant peut donc aussi montrer le QR
+      inviteUrl: `http://${store.selectedSession.address}:${store.selectedSession.httpPort || 4803}`,
+    });
     startConnecting();
     api.send("chat-join", {
       address: store.selectedSession.address,
@@ -198,7 +215,7 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
     if (store.isHost) api?.send("chat-stop-host");
     patchStore({
       status: "idle", isHost: false, pin: null, messages: [], online: [],
-      discovered: new Map(), selectedSession: null, error: null,
+      discovered: new Map(), selectedSession: null, error: null, inviteUrl: null,
     });
     setPinInput("");
   };
@@ -461,8 +478,45 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
 
             <div style={{ fontSize: 11, color: muted, display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
               <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#00c853", flexShrink: 0 }} />
-              {store.online.length} {t("Chat.online")}
+              <span style={{ flex: 1 }}>{store.online.length} {t("Chat.online")}</span>
+              {/* Inviter un téléphone : QR vers la page mobile servie par
+                  l'hôte — visible pour tous les participants (l'URL pointe
+                  toujours vers l'hôte), masqué si le poste n'a pas de LAN */}
+              {store.inviteUrl && (
+                <button
+                  onClick={() => setShowInvite(v => !v)}
+                  style={{
+                    ...btnStyle(showInvite), padding: "4px 8px", fontSize: 10,
+                    display: "flex", alignItems: "center", gap: 4, flexShrink: 0,
+                  }}
+                  title={t("Chat.invitePhone")}
+                >
+                  <Smartphone size={12} />
+                  {t("Chat.invitePhone")}
+                </button>
+              )}
             </div>
+
+            {/* Panneau QR d'invitation mobile */}
+            {showInvite && store.inviteUrl && (
+              <div style={{
+                background: `${accent}12`, border: `1px solid ${accent}35`, borderRadius: 10,
+                padding: 10, textAlign: "center", flexShrink: 0,
+              }}>
+                <div style={{
+                  background: "#fff", borderRadius: 8, padding: 6,
+                  display: "inline-block", lineHeight: 0,
+                }}
+                  // QR noir sur fond blanc quel que soit le thème — condition
+                  // de lisibilité pour les caméras de téléphone
+                  dangerouslySetInnerHTML={{ __html: inviteQrSvg }}
+                />
+                <div style={{ fontSize: 11, fontWeight: 700, marginTop: 6, direction: "ltr" }}>{store.inviteUrl}</div>
+                <div style={{ fontSize: 9.5, color: muted, marginTop: 4, lineHeight: 1.5 }}>
+                  {t("Chat.inviteHint")}
+                </div>
+              </div>
+            )}
 
             {/* Fil de messages : occupe tout l'espace restant du dock,
                 défile indépendamment (minHeight: 0 requis en flex) */}

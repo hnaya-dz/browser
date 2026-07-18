@@ -896,6 +896,13 @@ ipcMain.on("chat-leave", () => { chatWorker?.send({ cmd: "leave" }); });
 // mobile classé « Public ».
 const FIREWALL_RULE_TCP = "Hnaya Messagerie locale (TCP 4802)";
 const FIREWALL_RULE_UDP = "Hnaya Messagerie locale (UDP 41234)";
+// Accès mobile (C-bis) : page web servie aux téléphones sur le port 4803
+const FIREWALL_RULE_HTTP = "Hnaya Messagerie locale (TCP 4803 mobile)";
+// Version du dispositif : incrémentée quand une NOUVELLE règle devient
+// nécessaire (v2 = ajout du port mobile 4803). Un drapeau d'une version
+// antérieure ne vaut plus « configuré » — l'utilisateur verra une nouvelle
+// demande d'autorisation, une seule fois.
+const NETWORK_SETUP_VERSION = 2;
 
 function runPowerShell(args) {
   return new Promise((resolve) => {
@@ -919,7 +926,8 @@ async function checkFirewallRules() {
     "$null = Get-NetFirewallRule -ErrorAction Stop | Select-Object -First 1; " +
     "$t = Get-NetFirewallRule -DisplayName '" + FIREWALL_RULE_TCP + "' -ErrorAction SilentlyContinue; " +
     "$u = Get-NetFirewallRule -DisplayName '" + FIREWALL_RULE_UDP + "' -ErrorAction SilentlyContinue; " +
-    "Write-Output ('READ|' + [string]([bool]$t -and [bool]$u)) " +
+    "$m = Get-NetFirewallRule -DisplayName '" + FIREWALL_RULE_HTTP + "' -ErrorAction SilentlyContinue; " +
+    "Write-Output ('READ|' + [string]([bool]$t -and [bool]$u -and [bool]$m)) " +
     "} catch { Write-Output 'DENIED|False' }",
   ]);
   const [access, ok] = (out || "DENIED|False").split("|");
@@ -947,10 +955,17 @@ let networkCheckCache = null;
 
 ipcMain.handle("chat-network-check", async () => {
   if (networkCheckCache) return networkCheckCache;
-  if (existsSync(networkSetupFlagPath())) {
-    networkCheckCache = { rulesOk: true };
-    return networkCheckCache;
-  }
+  // Le drapeau ne vaut que pour la version courante du dispositif : un
+  // drapeau v1 (avant le port mobile 4803) déclenche une nouvelle
+  // autorisation — sinon les téléphones ne pourraient jamais atteindre la
+  // page d'invitation sur les postes configurés avant la mise à jour.
+  try {
+    const flag = JSON.parse(readFileSync(networkSetupFlagPath(), "utf8"));
+    if (flag?.done && (flag.setupVersion || 1) >= NETWORK_SETUP_VERSION) {
+      networkCheckCache = { rulesOk: true };
+      return networkCheckCache;
+    }
+  } catch { /* pas de drapeau — vérification réelle ci-dessous */ }
   const check = await checkFirewallRules();
   if (check.rulesOk) {
     networkCheckCache = { rulesOk: true };
@@ -994,9 +1009,11 @@ ipcMain.handle("chat-network-setup", async () => {
     // remove+create y produit des règles en double à chaque exécution.
     "if (-not (Get-NetFirewallRule -DisplayName '" + FIREWALL_RULE_TCP + "' -ErrorAction SilentlyContinue)) { New-NetFirewallRule -DisplayName '" + FIREWALL_RULE_TCP + "' -Direction Inbound -Action Allow -Protocol TCP -LocalPort 4802 -Program $exe -RemoteAddress LocalSubnet -Profile Any | Out-Null }",
     "if (-not (Get-NetFirewallRule -DisplayName '" + FIREWALL_RULE_UDP + "' -ErrorAction SilentlyContinue)) { New-NetFirewallRule -DisplayName '" + FIREWALL_RULE_UDP + "' -Direction Inbound -Action Allow -Protocol UDP -LocalPort 41234 -Program $exe -RemoteAddress LocalSubnet -Profile Any | Out-Null }",
+    "if (-not (Get-NetFirewallRule -DisplayName '" + FIREWALL_RULE_HTTP + "' -ErrorAction SilentlyContinue)) { New-NetFirewallRule -DisplayName '" + FIREWALL_RULE_HTTP + "' -Direction Inbound -Action Allow -Protocol TCP -LocalPort 4803 -Program $exe -RemoteAddress LocalSubnet -Profile Any | Out-Null }",
     "$t = Get-NetFirewallRule -DisplayName '" + FIREWALL_RULE_TCP + "' -ErrorAction SilentlyContinue",
     "$u = Get-NetFirewallRule -DisplayName '" + FIREWALL_RULE_UDP + "' -ErrorAction SilentlyContinue",
-    "if ($t -and $u) { Set-Content -LiteralPath '" + resultEsc + "' -Value 'OK' } else { Set-Content -LiteralPath '" + resultEsc + "' -Value 'FAIL' }",
+    "$m = Get-NetFirewallRule -DisplayName '" + FIREWALL_RULE_HTTP + "' -ErrorAction SilentlyContinue",
+    "if ($t -and $u -and $m) { Set-Content -LiteralPath '" + resultEsc + "' -Value 'OK' } else { Set-Content -LiteralPath '" + resultEsc + "' -Value 'FAIL' }",
     "exit 0",
   ].join("\r\n");
   writeFileSync(ps1, script, "utf8");
@@ -1022,7 +1039,7 @@ ipcMain.handle("chat-network-setup", async () => {
   if (ok) {
     // Mémorise la réussite — évite de redemander l'UAC sur les postes où
     // la vérification directe restera à jamais impossible.
-    try { writeFileSync(networkSetupFlagPath(), JSON.stringify({ done: true, ts: Date.now() })); } catch {}
+    try { writeFileSync(networkSetupFlagPath(), JSON.stringify({ done: true, setupVersion: NETWORK_SETUP_VERSION, ts: Date.now() })); } catch {}
     networkCheckCache = { rulesOk: true };
     return { ok: true };
   }

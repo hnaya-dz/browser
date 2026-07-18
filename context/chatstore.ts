@@ -24,6 +24,9 @@ export interface DiscoveredSession {
   address: string;
   wsPort: number;
   hostname: string;
+  // Port de la page d'invitation mobile — absent des beacons émis par les
+  // versions antérieures à l'accès mobile (repli : 4803)
+  httpPort?: number | null;
 }
 
 export type ChatStatus =
@@ -46,6 +49,10 @@ export interface ChatStore {
   discovered: Map<string, DiscoveredSession>;
   error: string | null;
   selectedSession: DiscoveredSession | null;
+  // URL de la page mobile du salon courant (QR « Inviter un téléphone ») —
+  // fournie par le worker côté hôte, composée depuis la session découverte
+  // côté participant ; null si le poste n'a pas d'adresse LAN
+  inviteUrl: string | null;
   // null = pas encore vérifié ; false = autorisation pare-feu absente
   // (le bouton « Autoriser » ne s'affiche que dans ce cas)
   networkOk: boolean | null;
@@ -68,6 +75,7 @@ export const store: ChatStore = {
   discovered: new Map(),
   error: null,
   selectedSession: null,
+  inviteUrl: null,
   networkOk: null,
   unreadCount: 0,
   panelOpen: false,
@@ -138,7 +146,7 @@ export function ensureListening() {
       case "host-started": {
         // ✅ L'hôte rejoint automatiquement son propre salon pour pouvoir
         // discuter — sans ça, "Créer un salon" ouvrirait un serveur muet.
-        patchStore({ pin: evt.pin, isHost: true });
+        patchStore({ pin: evt.pin, isHost: true, inviteUrl: evt.inviteUrl || null });
         startConnecting();
         api.send("chat-join", {
           address: "127.0.0.1",
