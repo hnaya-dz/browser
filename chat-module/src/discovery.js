@@ -26,7 +26,7 @@ const BEACON_INTERVAL_MS = 2000;
  * Côté hôte : diffuse périodiquement l'existence du salon sur le réseau.
  * Retourne une fonction stop() à appeler quand le salon est fermé.
  */
-export function startBeacon({ sessionName, wsPort }) {
+export function startBeacon({ sessionName, wsPort, httpPort }) {
   const socket = dgram.createSocket({ type: "udp4", reuseAddr: true });
 
   socket.on("error", (err) => {
@@ -44,6 +44,9 @@ export function startBeacon({ sessionName, wsPort }) {
     v: 1,
     sessionName,
     wsPort,
+    // Port de la page mobile (accès téléphone) — optionnel : les vieux
+    // hôtes ne l'annoncent pas, les clients prévoient un repli
+    httpPort: httpPort || null,
     hostname: os.hostname(),
   }));
 

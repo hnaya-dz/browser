@@ -31,8 +31,27 @@
 //   { event: "presence", online }
 //   { event: "error", message }
 
+import os from "node:os";
 import { startHost } from "./server.js";
 import { discoverSessions, joinSession } from "./client.js";
+
+// IP LAN du poste — pour composer l'URL d'invitation mobile du QR code.
+// Plusieurs interfaces possibles (VirtualBox, VPN…) : on privilégie les
+// plages domestiques/PME dans l'ordre où on les rencontre réellement en
+// Algérie (box 192.168.x.x d'abord), sinon la première IPv4 non interne.
+function getLanAddress() {
+  const candidates = [];
+  for (const addrs of Object.values(os.networkInterfaces())) {
+    for (const a of addrs || []) {
+      if (a.family === "IPv4" && !a.internal) candidates.push(a.address);
+    }
+  }
+  return candidates.find(ip => ip.startsWith("192.168."))
+      || candidates.find(ip => ip.startsWith("10."))
+      || candidates.find(ip => /^172\.(1[6-9]|2\d|3[01])\./.test(ip))
+      || candidates[0]
+      || null;
+}
 
 let hostHandle = null;      // { pin, stop } si on héberge un salon
 let clientHandle = null;    // { send, markRead, close } si on a rejoint un salon
@@ -51,7 +70,16 @@ function handleCommand(msg) {
     case "start-host": {
       if (hostHandle) hostHandle.stop(); // évite deux hôtes simultanés sur ce poste
       hostHandle = startHost({ sessionName: msg.sessionName || "Hnaya Chat" });
-      process.send({ event: "host-started", pin: hostHandle.pin, wsPort: hostHandle.wsPort });
+      // inviteUrl : ce que le QR du dock encode — null si aucune IP LAN
+      // (poste hors réseau : salon local possible, accès mobile non)
+      const lanIp = getLanAddress();
+      process.send({
+        event: "host-started",
+        pin: hostHandle.pin,
+        wsPort: hostHandle.wsPort,
+        httpPort: hostHandle.httpPort,
+        inviteUrl: lanIp ? `http://${lanIp}:${hostHandle.httpPort}` : null,
+      });
       break;
     }
 

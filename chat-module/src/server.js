@@ -11,6 +11,7 @@ import { pathToFileURL } from "node:url";
 import { deriveKeyFromPin, encryptPayload, decryptPayload, generatePin } from "./crypto.js";
 import { startBeacon } from "./discovery.js";
 import { saveMessage, getMessagesSince, purgeOldMessages } from "./db.js";
+import { startMobileServer } from "./mobile-server.js";
 
 const WS_PORT = 4802; // port local arbitraire pour le chat LAN Hnaya
 const PURGE_INTERVAL_MS = 6 * 60 * 60 * 1000; // purge de rétention toutes les 6h
@@ -113,7 +114,11 @@ export function startHost({ sessionName = "Hnaya Chat", pin = generatePin() } = 
     }
   }
 
-  const stopBeacon = startBeacon({ sessionName, wsPort: WS_PORT });
+  // ✅ Accès mobile (C-bis) : page web servie aux téléphones du même wifi.
+  // httpPort est annoncé dans le beacon pour que les postes déjà connectés
+  // puissent aussi afficher le QR d'invitation (URL = adresse de l'hôte).
+  const mobileServer = startMobileServer({ sessionName, wsPort: WS_PORT });
+  const stopBeacon = startBeacon({ sessionName, wsPort: WS_PORT, httpPort: mobileServer.httpPort });
   const purgeInterval = setInterval(purgeOldMessages, PURGE_INTERVAL_MS);
 
   // Ping périodique de chaque participant — sans pong avant le cycle
@@ -130,7 +135,9 @@ export function startHost({ sessionName = "Hnaya Chat", pin = generatePin() } = 
   return {
     pin,
     wsPort: WS_PORT,
+    httpPort: mobileServer.httpPort,
     stop() {
+      mobileServer.stop();
       stopBeacon();
       clearInterval(purgeInterval);
       clearInterval(heartbeatInterval);

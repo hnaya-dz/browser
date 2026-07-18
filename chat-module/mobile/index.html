@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Hnaya — Messagerie locale</title>
+<style>
+  :root { --bg:#0d1a12; --panel:#122419; --border:rgba(255,255,255,0.12); --text:#fff;
+          --muted:rgba(255,255,255,0.5); --accent:#006341; --accent2:#00c853; --danger:#ff5252; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html,body { height:100%; }
+  body { background:var(--bg); color:var(--text); font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+         display:flex; flex-direction:column; }
+  header { padding:12px 16px; background:var(--panel); border-bottom:1px solid var(--border);
+           display:flex; align-items:center; gap:10px; flex-shrink:0; }
+  header .logo { width:26px; height:26px; border-radius:6px; background:var(--accent);
+                 display:flex; align-items:center; justify-content:center; font-weight:700; font-size:14px; }
+  header .title { font-size:14px; font-weight:700; flex:1; min-width:0; }
+  header .title small { display:block; font-size:11px; font-weight:400; color:var(--muted);
+                        overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  header select { background:var(--panel); color:var(--text); border:1px solid var(--border);
+                  border-radius:6px; font-size:12px; padding:4px 6px; }
+  main { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+  .screen { flex:1; display:none; flex-direction:column; overflow:hidden; }
+  .screen.active { display:flex; }
+  /* — Écran de connexion — */
+  #join { justify-content:center; padding:24px; gap:14px; max-width:420px; width:100%; margin:0 auto; }
+  #join h1 { font-size:18px; }
+  #join p.sub { color:var(--muted); font-size:13px; line-height:1.5; }
+  label { font-size:12px; color:var(--muted); display:block; margin-bottom:4px; }
+  input { width:100%; padding:12px; border-radius:10px; border:1px solid var(--border);
+          background:rgba(255,255,255,0.06); color:var(--text); font-size:16px; outline:none; }
+  input:focus { border-color:var(--accent2); }
+  #pin { letter-spacing:8px; text-align:center; font-size:22px; font-variant-numeric:tabular-nums; }
+  button.primary { padding:13px; border-radius:10px; border:none; background:var(--accent); color:#fff;
+                   font-size:15px; font-weight:700; cursor:pointer; }
+  button.primary:disabled { opacity:.45; }
+  .error { color:var(--danger); font-size:13px; min-height:18px; }
+  .notice { font-size:11.5px; color:var(--muted); line-height:1.5; }
+  /* — Écran de discussion — */
+  #status { padding:6px 16px; font-size:12px; background:rgba(255,82,82,0.12); color:var(--danger);
+            display:none; align-items:center; gap:8px; flex-shrink:0; }
+  #status.show { display:flex; }
+  #status button { margin-inline-start:auto; background:none; border:1px solid var(--danger);
+                   color:var(--danger); border-radius:6px; padding:2px 10px; font-size:12px; cursor:pointer; }
+  #messages { flex:1; overflow-y:auto; padding:14px 16px; display:flex; flex-direction:column; gap:8px; }
+  .msg { max-width:80%; padding:8px 12px; border-radius:12px; background:rgba(255,255,255,0.07);
+         align-self:flex-start; font-size:14px; line-height:1.4; word-break:break-word; }
+  .msg.mine { background:var(--accent); align-self:flex-end; }
+  .msg .from { font-size:11px; color:var(--accent2); font-weight:600; margin-bottom:2px; }
+  .msg.mine .from { display:none; }
+  .msg .time { font-size:10px; color:rgba(255,255,255,0.45); margin-top:3px; text-align:end; }
+  #composer { display:flex; gap:8px; padding:10px 12px calc(10px + env(safe-area-inset-bottom));
+              background:var(--panel); border-top:1px solid var(--border); flex-shrink:0; }
+  #composer input { flex:1; }
+  #composer button { padding:0 18px; border-radius:10px; border:none; background:var(--accent);
+                     color:#fff; font-weight:700; cursor:pointer; font-size:14px; }
+  #presence { font-size:11px; color:var(--accent2); }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">ح</div>
+  <div class="title"><span data-i18n="appTitle">Messagerie locale</span>
+    <small id="roomName"></small>
+    <span id="presence"></span>
+  </div>
+  <select id="lang">
+    <option value="ar">العربية</option>
+    <option value="fr">Français</option>
+    <option value="en">English</option>
+  </select>
+</header>
+<main>
+  <section id="join" class="screen active">
+    <h1 data-i18n="joinTitle">Rejoindre le salon</h1>
+    <p class="sub" data-i18n="joinSub">Communication chiffrée sur votre réseau interne — rien ne transite par Internet.</p>
+    <div>
+      <label data-i18n="nickname">Pseudo</label>
+      <input id="nickname" maxlength="24" autocomplete="off">
+    </div>
+    <div>
+      <label data-i18n="pinLabel">Code PIN (6 chiffres, communiqué par l'hôte)</label>
+      <input id="pin" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off">
+    </div>
+    <div class="error" id="joinError"></div>
+    <button class="primary" id="joinBtn" disabled data-i18n="joinBtn">Rejoindre</button>
+    <p class="notice" data-i18n="notice">Gardez cette page ouverte pour recevoir les messages — les notifications d'écran verrouillé ne sont pas disponibles dans cette version.</p>
+  </section>
+  <section id="chat" class="screen">
+    <div id="status"><span data-i18n="connectionLost">Connexion au salon perdue.</span>
+      <button id="rejoinBtn" data-i18n="rejoin">Reconnecter</button></div>
+    <div id="messages"></div>
+    <div id="composer">
+      <input id="draft" maxlength="2000" autocomplete="off">
+      <button id="sendBtn" data-i18n="send">Envoyer</button>
+    </div>
+  </section>
+</main>
+<script type="module">
+import { deriveKeyFromPin, encryptPayload, decryptPayload } from "./vendor/crypto-bundle.js";
+
+// ── i18n ──────────────────────────────────────────────────────
+const I18N = {
+  fr: { appTitle:"Messagerie locale", joinTitle:"Rejoindre le salon", joinSub:"Communication chiffrée sur votre réseau interne — rien ne transite par Internet.", nickname:"Pseudo", pinLabel:"Code PIN (6 chiffres, communiqué par l'hôte)", joinBtn:"Rejoindre", notice:"Gardez cette page ouverte pour recevoir les messages — les notifications d'écran verrouillé ne sont pas disponibles dans cette version.", connectionLost:"Connexion au salon perdue.", rejoin:"Reconnecter", send:"Envoyer", wrongPin:"PIN incorrect — vérifiez le code auprès de l'hôte.", cantReach:"Salon injoignable — vérifiez que vous êtes sur le même wifi.", online:"en ligne", draftPlaceholder:"Écrire un message…", connecting:"Connexion…" },
+  en: { appTitle:"Local Messaging", joinTitle:"Join the room", joinSub:"Encrypted communication over your internal network — nothing goes through the Internet.", nickname:"Nickname", pinLabel:"PIN code (6 digits, provided by the host)", joinBtn:"Join", notice:"Keep this page open to receive messages — lock-screen notifications are not available in this version.", connectionLost:"Connection to the room lost.", rejoin:"Reconnect", send:"Send", wrongPin:"Incorrect PIN — check the code with the host.", cantReach:"Room unreachable — make sure you are on the same wifi.", online:"online", draftPlaceholder:"Write a message…", connecting:"Connecting…" },
+  ar: { appTitle:"المراسلة المحلية", joinTitle:"الانضمام إلى الغرفة", joinSub:"تواصل مشفّر عبر شبكتك الداخلية — لا شيء يمر عبر الإنترنت.", nickname:"الاسم المستعار", pinLabel:"رمز PIN (6 أرقام، يقدّمه المضيف)", joinBtn:"انضمام", notice:"أبقِ هذه الصفحة مفتوحة لاستقبال الرسائل — إشعارات شاشة القفل غير متاحة في هذا الإصدار.", connectionLost:"انقطع الاتصال بالغرفة.", rejoin:"إعادة الاتصال", send:"إرسال", wrongPin:"رمز PIN غير صحيح — تحقّق من الرمز لدى المضيف.", cantReach:"تعذّر الوصول إلى الغرفة — تأكّد أنك على نفس شبكة الواي فاي.", online:"متصل", draftPlaceholder:"اكتب رسالة…", connecting:"جارٍ الاتصال…" },
+};
+let lang = localStorage.getItem("hnaya-mobile-lang")
+  || (navigator.language || "fr").slice(0, 2);
+if (!I18N[lang]) lang = "fr";
+const t = (k) => I18N[lang][k] || I18N.fr[k] || k;
+function applyLang() {
+  document.documentElement.lang = lang;
+  document.documentElement.dir = lang === "ar" ? "rtl" : "ltr";
+  document.querySelectorAll("[data-i18n]").forEach(el => { el.textContent = t(el.dataset.i18n); });
+  draft.placeholder = t("draftPlaceholder");
+  langSel.value = lang;
+}
+
+// ── Références DOM ────────────────────────────────────────────
+const $ = (id) => document.getElementById(id);
+const joinScreen = $("join"), chatScreen = $("chat"), joinBtn = $("joinBtn"),
+  nicknameInput = $("nickname"), pinInput = $("pin"), joinError = $("joinError"),
+  messagesEl = $("messages"), draft = $("draft"), sendBtn = $("sendBtn"),
+  statusBar = $("status"), rejoinBtn = $("rejoinBtn"), presenceEl = $("presence"),
+  roomNameEl = $("roomName"), langSel = $("lang");
+
+langSel.onchange = () => { lang = langSel.value; localStorage.setItem("hnaya-mobile-lang", lang); applyLang(); };
+nicknameInput.value = localStorage.getItem("hnaya-chat-nickname") || "";
+applyLang();
+
+// Nom du salon + port WS — servis par l'hôte
+let wsPort = 4802;
+fetch("/info.json").then(r => r.json()).then(info => {
+  wsPort = info.wsPort || 4802;
+  roomNameEl.textContent = info.sessionName || "";
+}).catch(() => {});
+
+const validate = () => { joinBtn.disabled = !(nicknameInput.value.trim() && /^\d{6}$/.test(pinInput.value)); };
+nicknameInput.oninput = validate; pinInput.oninput = validate;
+
+// ── Connexion au salon (même protocole que les postes) ────────
+let ws = null, key = null, userId = "", lastSeenTs = 0, joined = false;
+const seenIds = new Set(); // dédoublonnage backlog/reconnexion (règle du module)
+
+function showStatus(show) { statusBar.classList.toggle("show", show); }
+
+function addMessage(m) {
+  if (m.id && seenIds.has(m.id)) return;
+  if (m.id) seenIds.add(m.id);
+  if (m.ts) lastSeenTs = Math.max(lastSeenTs, m.ts);
+  const div = document.createElement("div");
+  div.className = "msg" + (m.from === userId ? " mine" : "");
+  const from = document.createElement("div"); from.className = "from"; from.textContent = m.from || "";
+  const text = document.createElement("div"); text.textContent = m.text || "";
+  const time = document.createElement("div"); time.className = "time";
+  time.textContent = m.ts ? new Date(m.ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
+  div.append(from, text, time);
+  messagesEl.appendChild(div);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+async function connect() {
+  joinError.textContent = "";
+  joinBtn.disabled = true; joinBtn.textContent = t("connecting");
+  userId = nicknameInput.value.trim();
+  localStorage.setItem("hnaya-chat-nickname", userId);
+  key = await deriveKeyFromPin(pinInput.value);
+
+  ws = new WebSocket(`ws://${location.hostname}:${wsPort}`);
+  let gotBacklog = false;
+
+  // Sans backlog dans les 12 s → échec (PIN silencieusement faux ou réseau) —
+  // même garde-fou de délai que le dock des postes
+  const timeout = setTimeout(() => { if (!gotBacklog) { try { ws.close(); } catch {} fail(t("cantReach")); } }, 12000);
+  const fail = (msg) => {
+    clearTimeout(timeout);
+    joinBtn.textContent = t("joinBtn"); validate();
+    if (!joined) { joinError.textContent = msg; }
+    else showStatus(true);
+  };
+
+  ws.onopen = () => {
+    ws.send(encryptPayload(key, { v: 1, type: "join", userId, groups: ["all"], lastSeenTs }));
+  };
+  ws.onmessage = (ev) => {
+    let payload;
+    try { payload = decryptPayload(key, ev.data); } catch { return; }
+    if (payload.type === "backlog") {
+      gotBacklog = true; clearTimeout(timeout);
+      if (!joined) {
+        joined = true;
+        joinScreen.classList.remove("active"); chatScreen.classList.add("active");
+      }
+      showStatus(false);
+      payload.messages.forEach(addMessage);
+    } else if (payload.type === "message") addMessage(payload);
+    else if (payload.type === "presence") presenceEl.textContent = `● ${payload.online.length} ${t("online")}`;
+  };
+  ws.onclose = (ev) => {
+    // 4001 = l'hôte n'a pas pu déchiffrer notre "join" → PIN incorrect
+    if (ev.code === 4001) fail(t("wrongPin"));
+    else fail(t("connectionLost"));
+    presenceEl.textContent = "";
+  };
+  ws.onerror = () => { /* onclose suit toujours — géré là-bas */ };
+}
+
+joinBtn.onclick = connect;
+rejoinBtn.onclick = () => { showStatus(false); connect(); };
+
+// Retour sur la page (téléphone déverrouillé, onglet réactivé) : si la
+// connexion est morte pendant la veille, reconnexion automatique — le
+// backlog + lastSeenTs récupèrent les messages manqués
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && joined && (!ws || ws.readyState > 1)) connect();
+});
+
+function sendDraft() {
+  const text = draft.value.trim();
+  if (!text || !ws || ws.readyState !== 1) return;
+  ws.send(encryptPayload(key, { v: 1, type: "message", text, groupId: "all", media: null }));
+  draft.value = "";
+}
+sendBtn.onclick = sendDraft;
+draft.addEventListener("keydown", (e) => { if (e.key === "Enter") sendDraft(); });
+</script>
+</body>
+</html>
