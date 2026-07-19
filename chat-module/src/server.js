@@ -13,6 +13,8 @@ import { startBeacon } from "./discovery.js";
 import {
   initStore, saveMessage, getMessagesSince, purgeOldMessages, upsertDeviceSeen,
   listDevices, setDeviceLabel, searchMessages, getConfig, setConfig,
+  createRoom, getRoom, touchRoom, setRoomAdminPin, setRoomPin,
+  banDevice, unbanDevice, isBanned, listBans,
 } from "./store.js";
 import { fingerprintFromRawPublicKey, rawFromSpkiBase64, verifyMessage } from "./identity.js";
 import { startMobileServer } from "./mobile-server.js";
@@ -36,30 +38,49 @@ const HEARTBEAT_MS = 10000;
  * @param {string} [opts.pin] PIN à 6 chiffres ; généré aléatoirement si absent
  * @returns {{ pin: string, stop: () => void }}
  */
-export function startHost({ sessionName = "Hnaya Chat", pin = generatePin(), dataDir, onError } = {}) {
-  const sessionKey = deriveKeyFromPin(pin);
+export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, wsPort = WS_PORT, httpPort, onError } = {}) {
   const clients = new Map(); // userId -> { ws, groups, device }
   initStore(dataDir); // dataDir undefined → défaut du module (chat-module/data)
 
-  // ✅ Étape D — PIN ADMIN, distinct du PIN du salon : protège le registre
-  // des appareils, l'historique complet et les réglages. Persisté en base
-  // (stable d'un redémarrage à l'autre — indispensable au mode serveur
-  // permanent) ; généré à la première ouverture et montré à l'hôte.
-  let adminPin = getConfig("admin_pin");
-  if (!adminPin) {
-    adminPin = generatePin();
-    setConfig("admin_pin", adminPin);
+  // ✅ D.2 — le salon est une entité à part entière (historique, PINs et
+  // blocages cloisonnés). roomId fourni → RÉOUVERTURE (continuité :
+  // même PIN d'accès, même PIN admin, même historique) ; absent →
+  // salon NEUF. Le PIN admin peut être choisi à la création (sinon
+  // généré) — il est montré à l'hôte par host-started.
+  let room;
+  if (roomId) {
+    room = getRoom(roomId);
+    if (!room) throw new Error(`Salon inconnu : ${roomId}`);
+    // Renommage uniquement si un nom est EXPLICITEMENT fourni — une
+    // réouverture sans nom garde le nom existant
+    room = touchRoom(roomId, sessionName ? { name: sessionName } : {});
+    // PIN d'accès imposé à la réouverture (serveur permanent : --pin)
+    if (/^\d{6}$/.test(String(pin ?? "")) && String(pin) !== room.roomPin) {
+      setRoomPin(roomId, String(pin));
+      room = getRoom(roomId);
+    }
+  } else {
+    room = createRoom({
+      name: sessionName || "Hnaya Chat",
+      roomPin: /^\d{6}$/.test(String(pin ?? "")) ? String(pin) : generatePin(),
+      adminPin: /^\d{6}$/.test(String(adminPin ?? "")) ? String(adminPin) : generatePin(),
+    });
   }
+  const activeRoomId = room.roomId;
+  const roomPin = room.roomPin || (pin ?? generatePin());
+  let currentAdminPin = room.adminPin;
+  const sessionKey = deriveKeyFromPin(roomPin);
+  sessionName = room.name;
 
-  const wss = new WebSocketServer({ port: WS_PORT });
-  console.log(`[hnaya-chat] Salon "${sessionName}" ouvert sur le port ${WS_PORT} — PIN : ${pin}`);
+  const wss = new WebSocketServer({ port: wsPort });
+  console.log(`[hnaya-chat] Salon "${sessionName}" ouvert sur le port ${wsPort} — PIN : ${roomPin}`);
 
   // ✅ Étape D — plus de crash brut sur EADDRINUSE (un salon tourne déjà
   // sur ce poste) : nettoyage puis remontée d'une erreur lisible. Sans ce
   // gestionnaire, l'événement "error" non écouté TUE le process entier.
   wss.on("error", (err) => {
     const friendly = err?.code === "EADDRINUSE"
-      ? `Le port ${WS_PORT} est déjà utilisé — un salon est probablement déjà ouvert sur ce poste.`
+      ? `Le port ${wsPort} est déjà utilisé — un salon est probablement déjà ouvert sur ce poste.`
       : (err?.message || String(err));
     try { handle.stop(); } catch { /* ressources partiellement créées */ }
     if (onError) onError(friendly, err);
@@ -106,11 +127,20 @@ export function startHost({ sessionName = "Hnaya Chat", pin = generatePin(), dat
             });
           } catch { device = null; /* clé malformée → traité comme v1 */ }
         }
+
+        // ✅ D.2 — appareil bloqué par l'admin de CE salon : refus net
+        // (code 4004, distinct du 4001 « PIN incorrect » pour un message
+        // clair côté client). Vérifié à CHAQUE join — un blocage prononcé
+        // pendant l'absence de l'appareil s'applique à son retour.
+        if (device && isBanned(activeRoomId, device.fingerprint)) {
+          ws.close(4004, "device-banned");
+          return;
+        }
         clients.set(userId, { ws, groups: payload.groups || ["all"], device });
 
         // Renvoie les messages manqués depuis la dernière connexion
         const since = payload.lastSeenTs || 0;
-        const missed = (payload.groups || ["all"]).flatMap((g) => getMessagesSince(g, since));
+        const missed = (payload.groups || ["all"]).flatMap((g) => getMessagesSince(g, since, activeRoomId));
         ws.send(encryptPayload(sessionKey, { v: 1, type: "backlog", messages: missed }));
 
         broadcastPresence();
@@ -134,6 +164,7 @@ export function startHost({ sessionName = "Hnaya Chat", pin = generatePin(), dat
             v: 1,
             type: "message",
             id: core.id,
+            roomId: activeRoomId,
             groupId: payload.groupId || "all",
             from: userId,
             text: core.text,
@@ -149,6 +180,7 @@ export function startHost({ sessionName = "Hnaya Chat", pin = generatePin(), dat
             v: 1,
             type: "message",
             id: "msg_" + crypto.randomUUID(),
+            roomId: activeRoomId,
             groupId: payload.groupId || "all",
             from: userId,
             text: payload.text ?? "",
@@ -168,6 +200,46 @@ export function startHost({ sessionName = "Hnaya Chat", pin = generatePin(), dat
         // réseau) n'est ni réenregistré ni rediffusé.
         if (!saveMessage(msg).inserted) return;
         broadcastToGroup(msg.groupId, msg);
+        return;
+      }
+
+      // ✅ D.2 — INVITATION vers un autre salon (typiquement un
+      // sous-salon que l'expéditeur héberge). Deux modes :
+      //   • ciblée (to = pseudo) : remise directe au seul destinataire
+      //     connecté, JAMAIS persistée — le PIN du salon invité ne reste
+      //     pas dans l'historique d'ici ;
+      //   • à tous (to absent) : message persistant type "invite" — les
+      //     absents la découvrent dans le backlog à leur retour.
+      // Le serveur ne relaie que des champs connus (pas de passthrough).
+      if (payload.type === "invite") {
+        const roomInfo = payload.room || {};
+        const inv = {
+          v: 1,
+          type: "invite",
+          id: "inv_" + crypto.randomUUID(),
+          roomId: activeRoomId,
+          groupId: payload.groupId || "all",
+          from: userId,
+          text: String(roomInfo.name || ""), // repli texte (clients anciens / exports)
+          ts: Date.now(),
+          targeted: !!payload.to,
+          extra: {
+            name: String(roomInfo.name || "Salon"),
+            address: String(roomInfo.address || ""),
+            wsPort: Number(roomInfo.wsPort) || 4802,
+            httpPort: Number(roomInfo.httpPort) || 4803,
+            pin: /^\d{6}$/.test(String(roomInfo.pin ?? "")) ? String(roomInfo.pin) : null,
+          },
+        };
+        if (payload.to) {
+          const target = clients.get(String(payload.to));
+          if (target) target.ws.send(encryptPayload(sessionKey, inv));
+          // accusé à l'expéditeur (le destinataire peut être déconnecté)
+          ws.send(encryptPayload(sessionKey, { v: 1, type: "invite-sent", to: String(payload.to), delivered: !!target }));
+        } else {
+          if (!saveMessage(inv).inserted) return;
+          broadcastToGroup(inv.groupId, inv);
+        }
         return;
       }
 
@@ -191,7 +263,7 @@ export function startHost({ sessionName = "Hnaya Chat", pin = generatePin(), dat
           v: 1, type: "admin-result", action: payload.action, reqId: payload.reqId || null, ...res,
         }));
 
-        if (!checkAdminPin(payload.adminPin, adminPin)) {
+        if (!checkAdminPin(payload.adminPin, currentAdminPin)) {
           ws.adminTries += 1;
           reply({ ok: false, error: "admin-pin" });
           // 5 tentatives ratées → connexion fermée (frein brutal mais sain
@@ -210,8 +282,43 @@ export function startHost({ sessionName = "Hnaya Chat", pin = generatePin(), dat
               reply({ ok: true, data: listDevices() });
               break;
             case "search":
-              reply({ ok: true, data: searchMessages(payload.filters || {}) });
+              // roomId imposé côté serveur : l'admin de CE salon ne peut
+              // pas fouiller l'historique des autres salons de la machine
+              reply({ ok: true, data: searchMessages({ ...(payload.filters || {}), roomId: activeRoomId }) });
               break;
+            case "ban": {
+              // Blocage + expulsion immédiate de toutes les connexions
+              // actives de cet appareil (sinon il resterait dans le salon
+              // jusqu'à sa prochaine reconnexion)
+              const fp = String(payload.fingerprint || "");
+              banDevice(activeRoomId, fp);
+              for (const [uid, c] of clients) {
+                if (c.device?.fingerprint === fp) {
+                  try { c.ws.close(4004, "device-banned"); } catch {}
+                  clients.delete(uid);
+                }
+              }
+              broadcastPresence();
+              reply({ ok: true, data: { devices: listDevices(), bans: listBans(activeRoomId) } });
+              break;
+            }
+            case "unban":
+              unbanDevice(activeRoomId, String(payload.fingerprint || ""));
+              reply({ ok: true, data: { devices: listDevices(), bans: listBans(activeRoomId) } });
+              break;
+            case "bans":
+              reply({ ok: true, data: listBans(activeRoomId) });
+              break;
+            case "set-admin-pin": {
+              // L'admin authentifié choisit son PIN — action dédiée,
+              // jamais par la config générique pilotée par le réseau
+              const newPin = String(payload.newPin || "");
+              if (!/^\d{6}$/.test(newPin)) { reply({ ok: false, error: "pin-format" }); break; }
+              setRoomAdminPin(activeRoomId, newPin);
+              currentAdminPin = newPin;
+              reply({ ok: true, data: { changed: true } });
+              break;
+            }
             case "config-get":
               reply({ ok: true, data: { retention_days: Number(getConfig("retention_days", 90)) } });
               break;
@@ -262,8 +369,8 @@ export function startHost({ sessionName = "Hnaya Chat", pin = generatePin(), dat
   // ✅ Accès mobile (C-bis) : page web servie aux téléphones du même wifi.
   // httpPort est annoncé dans le beacon pour que les postes déjà connectés
   // puissent aussi afficher le QR d'invitation (URL = adresse de l'hôte).
-  const mobileServer = startMobileServer({ sessionName, wsPort: WS_PORT });
-  const stopBeacon = startBeacon({ sessionName, wsPort: WS_PORT, httpPort: mobileServer.httpPort });
+  const mobileServer = startMobileServer({ sessionName, wsPort, httpPort });
+  const stopBeacon = startBeacon({ sessionName, wsPort, httpPort: mobileServer.httpPort });
   const purgeInterval = setInterval(purgeOldMessages, PURGE_INTERVAL_MS);
 
   // Ping périodique de chaque participant — sans pong avant le cycle
@@ -278,12 +385,18 @@ export function startHost({ sessionName = "Hnaya Chat", pin = generatePin(), dat
   }, HEARTBEAT_MS);
 
   const handle = {
-    pin,
-    adminPin,
-    wsPort: WS_PORT,
+    pin: roomPin,
+    adminPin: currentAdminPin,
+    roomId: activeRoomId,
+    wsPort,
     httpPort: mobileServer.httpPort,
     stop() {
-      mobileServer.stop();
+      // Retourne une promesse résolue quand les DEUX ports (4802/4803)
+      // sont réellement libérés — un stop puis un start immédiat (changer
+      // de salon, redémarrage de service) ne tombe plus sur un
+      // EADDRINUSE de course. Les appels legacy sans await restent
+      // valides : le nettoyage synchrone est fait avant le retour.
+      const mobileClosed = mobileServer.stop();
       stopBeacon();
       clearInterval(purgeInterval);
       clearInterval(heartbeatInterval);
@@ -293,8 +406,11 @@ export function startHost({ sessionName = "Hnaya Chat", pin = generatePin(), dat
       for (const { ws } of clients.values()) {
         try { ws.close(1001, "host-closed"); } catch { /* déjà fermée */ }
       }
-      wss.close();
+      const wssClosed = new Promise((resolve) => {
+        try { wss.close(() => resolve()); } catch { resolve(); }
+      });
       console.log(`[hnaya-chat] Salon "${sessionName}" fermé.`);
+      return Promise.all([mobileClosed, wssClosed]);
     },
   };
   return handle;

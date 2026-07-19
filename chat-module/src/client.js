@@ -53,6 +53,7 @@ export function joinSession({
   onMessage,
   onPresence,
   onAdminResult,
+  onInviteSent,
 }) {
   const sessionKey = deriveKeyFromPin(pin);
   // ✅ Étape D — identité d'appareil : pseudo libre en surface, clé Ed25519
@@ -105,6 +106,11 @@ export function joinSession({
     if (payload.type === "backlog") payload.messages.forEach((m) => onMessage?.(m));
     else if (payload.type === "presence") onPresence?.(payload.online);
     else if (payload.type === "message") onMessage?.(payload);
+    // Invitation vers un autre salon : mêmes champs qu'un message (id,
+    // from, ts) + type "invite" et extra {name, address, pin…} — l'UI en
+    // fait une carte cliquable
+    else if (payload.type === "invite") onMessage?.(payload);
+    else if (payload.type === "invite-sent") onInviteSent?.(payload);
     else if (payload.type === "admin-result") onAdminResult?.(payload);
     // "read" (accusés de lecture) : à relayer vers l'UI selon les besoins
   });
@@ -138,10 +144,17 @@ export function joinSession({
     ws.send(encryptPayload(sessionKey, { v: 1, type: "admin", adminPin, action, reqId, ...rest }));
   }
 
+  // ✅ D.2 — invitation vers un autre salon : ciblée (to = pseudo) ou à
+  // tous (to absent). room = { name, address, wsPort, httpPort, pin }.
+  function sendInvite({ to = null, room }) {
+    ws.send(encryptPayload(sessionKey, { v: 1, type: "invite", to, room }));
+  }
+
   return {
     send,
     markRead,
     sendAdmin,
+    sendInvite,
     close: () => ws.close(),
     raw: ws, // accès direct si besoin (ex. écouter "close"/"error" côté Electron)
   };

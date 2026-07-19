@@ -14,13 +14,13 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const tmp = (p) => fs.mkdtempSync(path.join(os.tmpdir(), p));
 
 const PIN = "515151";
-const host = startHost({ sessionName: "Test admin", pin: PIN, dataDir: tmp("hnaya-adm-host-") });
+const host = startHost({ sessionName: "Test admin", pin: PIN, dataDir: tmp("hnaya-adm-host-"), wsPort: 14822, httpPort: 14823 });
 assert.match(host.adminPin, /^\d{6}$/, "PIN admin à 6 chiffres généré et exposé à l'hôte");
 
 try {
   const results = [];
   const alice = joinSession({
-    address: "127.0.0.1", wsPort: 4802, pin: PIN, userId: "Alice",
+    address: "127.0.0.1", wsPort: 14822, pin: PIN, userId: "Alice",
     dataDir: tmp("hnaya-adm-cli-"),
     onAdminResult: (r) => results.push(r),
   });
@@ -73,7 +73,7 @@ try {
 
   // 6) Anti-énumération : 5 PIN faux → connexion fermée (code 4003)
   const bob = joinSession({
-    address: "127.0.0.1", wsPort: 4802, pin: PIN, userId: "Bob", dataDir: tmp("hnaya-adm-bob-"),
+    address: "127.0.0.1", wsPort: 14822, pin: PIN, userId: "Bob", dataDir: tmp("hnaya-adm-bob-"),
   });
   const closed = new Promise((res) => bob.raw.on("close", (code) => res(code)));
   await sleep(500);

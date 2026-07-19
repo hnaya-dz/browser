@@ -20,6 +20,7 @@
 // rétention indéfinie sans décision explicite de l'admin.
 
 import { DatabaseSync } from "node:sqlite";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -67,7 +68,48 @@ export function initStore(dataDir = DEFAULT_DATA_DIR) {
       key   TEXT PRIMARY KEY,
       value TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS rooms (
+      roomId    TEXT PRIMARY KEY,
+      name      TEXT NOT NULL,
+      roomPin   TEXT,
+      adminPin  TEXT NOT NULL,
+      createdAt INTEGER NOT NULL,
+      lastUsed  INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS bans (
+      roomId      TEXT NOT NULL,
+      fingerprint TEXT NOT NULL,
+      bannedAt    INTEGER NOT NULL,
+      PRIMARY KEY (roomId, fingerprint)
+    );
   `);
+
+  // ── Migration D.2 : salons distincts ──────────────────────────────────
+  // Les bases antérieures avaient UN salon implicite (config admin_pin /
+  // room_pin / session_name, messages sans roomId). On matérialise cet
+  // existant en salon « default » réouvrable — rien n'est perdu, et les
+  // colonnes/valeurs par défaut gardent l'API compatible.
+  const msgCols = db.prepare("PRAGMA table_info(messages)").all().map((c) => c.name);
+  if (!msgCols.includes("roomId")) {
+    db.exec("ALTER TABLE messages ADD COLUMN roomId TEXT NOT NULL DEFAULT 'default'");
+    db.exec("CREATE INDEX IF NOT EXISTS idx_messages_room_group_ts ON messages(roomId, groupId, ts)");
+  }
+  // type = "message" | "invite" (carte d'invitation persistée) ;
+  // extra = charge JSON du type (ex. coordonnées du salon invité)
+  if (!msgCols.includes("type") && !db.prepare("PRAGMA table_info(messages)").all().some((c) => c.name === "type")) {
+    db.exec("ALTER TABLE messages ADD COLUMN type TEXT NOT NULL DEFAULT 'message'");
+    db.exec("ALTER TABLE messages ADD COLUMN extra TEXT");
+  }
+  const legacyAdminPin = db.prepare("SELECT value FROM config WHERE key = 'admin_pin'").get()?.value;
+  const hasDefault = db.prepare("SELECT roomId FROM rooms WHERE roomId = 'default'").get();
+  if (legacyAdminPin && !hasDefault) {
+    const now = Date.now();
+    db.prepare("INSERT INTO rooms (roomId, name, roomPin, adminPin, createdAt, lastUsed) VALUES (?, ?, ?, ?, ?, ?)")
+      .run("default",
+           db.prepare("SELECT value FROM config WHERE key = 'session_name'").get()?.value || "Salon",
+           db.prepare("SELECT value FROM config WHERE key = 'room_pin'").get()?.value || null,
+           legacyAdminPin, now, now);
+  }
   return db;
 }
 
@@ -87,10 +129,11 @@ export function closeStore() {
 export function saveMessage(msg) {
   const res = ensureDb()
     .prepare(`INSERT OR IGNORE INTO messages
-      (id, groupId, sender, text, ts, deviceFp, signature, signatureValid)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+      (id, roomId, groupId, sender, text, ts, deviceFp, signature, signatureValid, type, extra)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
     .run(
       String(msg.id),
+      String(msg.roomId || "default"),
       String(msg.groupId || "all"),
       String(msg.from),
       String(msg.text),
@@ -98,16 +141,18 @@ export function saveMessage(msg) {
       msg.deviceFp || null,
       msg.signature || null,
       msg.signatureValid ? 1 : 0,
+      msg.type === "invite" ? "invite" : "message",
+      msg.extra ? JSON.stringify(msg.extra) : null,
     );
   // inserted=false ⇒ id déjà en base (doublon/rejeu) — le serveur s'en sert
   // pour ne pas rediffuser
   return { ...msg, inserted: Number(res.changes) > 0 };
 }
 
-export function getMessagesSince(groupId, sinceTs = 0) {
+export function getMessagesSince(groupId, sinceTs = 0, roomId = "default") {
   return ensureDb()
-    .prepare("SELECT * FROM messages WHERE groupId = ? AND ts > ? ORDER BY ts ASC")
-    .all(String(groupId), Number(sinceTs))
+    .prepare("SELECT * FROM messages WHERE roomId = ? AND groupId = ? AND ts > ? ORDER BY ts ASC")
+    .all(String(roomId), String(groupId), Number(sinceTs))
     .map(rowToMessage);
 }
 
@@ -126,6 +171,7 @@ function countMessages() {
 function rowToMessage(r) {
   return {
     id: r.id,
+    roomId: r.roomId,
     groupId: r.groupId,
     from: r.sender,
     text: r.text,
@@ -133,6 +179,8 @@ function rowToMessage(r) {
     deviceFp: r.deviceFp || null,
     signature: r.signature || null,
     signatureValid: !!r.signatureValid,
+    type: r.type || "message",
+    extra: r.extra ? safeJson(r.extra, null) : null,
   };
 }
 
@@ -186,9 +234,10 @@ function safeJson(s, fallback) {
 // ── Recherche admin ────────────────────────────────────────────────────────
 // Tous les critères sont optionnels et cumulables. `q` cherche dans le
 // texte ET le pseudo (LIKE, insensible à la casse pour l'ASCII).
-export function searchMessages({ groupId, deviceFp, from, q, fromTs, toTs, limit = 500 } = {}) {
+export function searchMessages({ roomId, groupId, deviceFp, from, q, fromTs, toTs, limit = 500 } = {}) {
   const where = [];
   const params = [];
+  if (roomId) { where.push("roomId = ?"); params.push(roomId); }
   if (groupId) { where.push("groupId = ?"); params.push(groupId); }
   if (deviceFp) { where.push("deviceFp = ?"); params.push(deviceFp); }
   if (from) { where.push("sender = ?"); params.push(from); }
@@ -199,6 +248,67 @@ export function searchMessages({ groupId, deviceFp, from, q, fromTs, toTs, limit
                ORDER BY ts DESC LIMIT ?`;
   params.push(Math.min(Number(limit) || 500, 5000));
   return ensureDb().prepare(sql).all(...params).map(rowToMessage);
+}
+
+// ── Salons (D.2 : plusieurs salons cloisonnés par machine) ─────────────────
+// « Créer » = toujours un salon NEUF (historique vierge, PINs propres) ;
+// la continuité passe par la réouverture explicite d'un salon existant.
+export function createRoom({ name, roomPin = null, adminPin }) {
+  const roomId = crypto.randomUUID();
+  const now = Date.now();
+  ensureDb().prepare(
+    "INSERT INTO rooms (roomId, name, roomPin, adminPin, createdAt, lastUsed) VALUES (?, ?, ?, ?, ?, ?)"
+  ).run(roomId, String(name), roomPin, String(adminPin), now, now);
+  return getRoom(roomId);
+}
+
+export function getRoom(roomId) {
+  return ensureDb().prepare("SELECT * FROM rooms WHERE roomId = ?").get(String(roomId)) || null;
+}
+
+/** Réouverture : met à jour lastUsed (tri de la liste « Rouvrir ») et
+ *  permet de renommer au passage. */
+export function touchRoom(roomId, { name } = {}) {
+  const d = ensureDb();
+  if (name) d.prepare("UPDATE rooms SET name = ?, lastUsed = ? WHERE roomId = ?").run(String(name), Date.now(), String(roomId));
+  else d.prepare("UPDATE rooms SET lastUsed = ? WHERE roomId = ?").run(Date.now(), String(roomId));
+  return getRoom(roomId);
+}
+
+export function listRooms() {
+  return ensureDb().prepare("SELECT roomId, name, createdAt, lastUsed FROM rooms ORDER BY lastUsed DESC").all();
+}
+
+export function setRoomAdminPin(roomId, adminPin) {
+  ensureDb().prepare("UPDATE rooms SET adminPin = ? WHERE roomId = ?").run(String(adminPin), String(roomId));
+}
+
+export function setRoomPin(roomId, roomPin) {
+  ensureDb().prepare("UPDATE rooms SET roomPin = ? WHERE roomId = ?").run(roomPin, String(roomId));
+}
+
+// ── Blocages (par salon, par empreinte d'appareil) ─────────────────────────
+// ⚠️ Ne concerne que les clients signés (0.4.0+) : un client v1 n'a pas
+// d'empreinte. Un appareil qui régénère son identité échappe au blocage —
+// c'est un verrou administratif, pas une muraille (l'exclusion absolue
+// passe par la re-création du salon avec un nouveau PIN).
+export function banDevice(roomId, fingerprint) {
+  ensureDb().prepare("INSERT OR IGNORE INTO bans (roomId, fingerprint, bannedAt) VALUES (?, ?, ?)")
+    .run(String(roomId), String(fingerprint), Date.now());
+}
+
+export function unbanDevice(roomId, fingerprint) {
+  ensureDb().prepare("DELETE FROM bans WHERE roomId = ? AND fingerprint = ?")
+    .run(String(roomId), String(fingerprint));
+}
+
+export function isBanned(roomId, fingerprint) {
+  return !!ensureDb().prepare("SELECT 1 FROM bans WHERE roomId = ? AND fingerprint = ?")
+    .get(String(roomId), String(fingerprint));
+}
+
+export function listBans(roomId) {
+  return ensureDb().prepare("SELECT fingerprint, bannedAt FROM bans WHERE roomId = ?").all(String(roomId));
 }
 
 // ── Configuration persistante ──────────────────────────────────────────────

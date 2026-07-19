@@ -23,44 +23,55 @@
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { startHost } from "./server.js";
-import { initStore, getConfig, setConfig, closeStore } from "./store.js";
-import { generatePin } from "./crypto.js";
+import { initStore, getConfig, setConfig, closeStore, getRoom } from "./store.js";
 
 function parseArgs(argv) {
   const args = {};
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === "--name") args.name = argv[++i];
     else if (argv[i] === "--pin") args.pin = argv[++i];
+    else if (argv[i] === "--admin-pin") args.adminPin = argv[++i];
     else if (argv[i] === "--data") args.data = argv[++i];
+    else if (argv[i] === "--ws-port") args.wsPort = Number(argv[++i]);
+    else if (argv[i] === "--http-port") args.httpPort = Number(argv[++i]);
     else if (argv[i] === "--help" || argv[i] === "-h") args.help = true;
   }
   return args;
 }
 
-export function startPermanentServer({ name, pin, data } = {}) {
+export function startPermanentServer({ name, pin, data, adminPin, wsPort, httpPort } = {}) {
   const dataDir = data ? path.resolve(data) : undefined;
   initStore(dataDir);
 
-  // PIN d'accès : priorité à l'argument (persisté pour les fois
-  // suivantes), sinon celui déjà en base, sinon généré puis persisté.
   if (pin !== undefined && !/^\d{6}$/.test(String(pin))) {
     throw new Error("--pin doit être un code à 6 chiffres");
   }
-  const roomPin = String(pin ?? getConfig("room_pin") ?? generatePin());
-  setConfig("room_pin", roomPin);
 
-  const sessionName = String(name ?? getConfig("session_name") ?? "Salon Hnaya");
-  setConfig("session_name", sessionName);
+  // D.2 — le salon permanent est ÉPINGLÉ : son roomId vit en config et
+  // est réouvert à chaque démarrage (même PIN, même historique). Les
+  // installations antérieures (salon implicite migré en « default »)
+  // reprennent ce salon-là — continuité totale.
+  let roomId = getConfig("current_room_id");
+  if (!roomId && getRoom("default")) roomId = "default";
 
   const host = startHost({
-    sessionName,
-    pin: roomPin,
+    sessionName: name ?? undefined,
+    pin: pin !== undefined ? String(pin) : undefined,
+    adminPin,
+    roomId: roomId || undefined,
     dataDir,
+    // Ports configurables : PLUSIEURS salons permanents sur une même
+    // machine (un par direction) — chaque instance avec --data, --ws-port
+    // et --http-port distincts
+    wsPort: wsPort || undefined,
+    httpPort: httpPort || undefined,
     onError: (friendly) => {
       console.error(`[hnaya-serve] ${friendly}`);
       process.exit(1);
     },
   });
+  setConfig("current_room_id", host.roomId);
+  const sessionName = getRoom(host.roomId).name;
 
   console.log(`[hnaya-serve] Salon permanent "${sessionName}"`);
   console.log(`[hnaya-serve] Données : ${dataDir || "(répertoire du module)"}`);
@@ -88,6 +99,10 @@ Usage : node src/serve.js [options]
   --name "Salon RH"   nom du salon (persisté ; défaut : valeur précédente)
   --pin 123456        PIN d'accès à 6 chiffres (persisté ; défaut : valeur
                       précédente, générée au premier lancement)
+  --admin-pin 654321  PIN administrateur choisi (à la création uniquement)
+  --ws-port 4802      port WebSocket (plusieurs salons par machine :
+                      instances avec --data et ports distincts)
+  --http-port 4803    port de la page mobile
   --data <dossier>    répertoire des données (base SQLite, identité)
   --help              cette aide`);
     process.exit(0);

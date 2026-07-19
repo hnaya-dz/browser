@@ -42,7 +42,7 @@ const MIME = {
  * @param {number} opts.wsPort port WebSocket du salon (la page s'y connecte)
  * @returns {{ httpPort: number, stop: () => void }}
  */
-export function startMobileServer({ sessionName = "Hnaya", wsPort = 4802 } = {}) {
+export function startMobileServer({ sessionName = "Hnaya", wsPort = 4802, httpPort = MOBILE_HTTP_PORT } = {}) {
   const server = http.createServer((req, res) => {
     const urlPath = (req.url || "/").split("?")[0];
 
@@ -86,8 +86,8 @@ export function startMobileServer({ sessionName = "Hnaya", wsPort = 4802 } = {})
 
   // 0.0.0.0 : accessible depuis les autres appareils du LAN (contrairement
   // au serveur statique de l'application, volontairement limité à 127.0.0.1)
-  server.listen(MOBILE_HTTP_PORT, "0.0.0.0", () => {
-    console.log(`[hnaya-chat] Page mobile servie sur le port ${MOBILE_HTTP_PORT}`);
+  server.listen(httpPort, "0.0.0.0", () => {
+    console.log(`[hnaya-chat] Page mobile servie sur le port ${httpPort}`);
   });
   server.on("error", (e) => {
     // Port occupé (autre salon déjà hôte sur ce poste ?) — le salon reste
@@ -97,11 +97,16 @@ export function startMobileServer({ sessionName = "Hnaya", wsPort = 4802 } = {})
 
   let stopped = false; // stop() idempotent — règle du module (voir TECHNIQUES §11)
   return {
-    httpPort: MOBILE_HTTP_PORT,
+    httpPort,
     stop() {
-      if (stopped) return;
+      // Retourne une promesse résolue quand le port est réellement rendu
+      // au système — permet d'enchaîner un stop puis un start sans course
+      // de libération (EADDRINUSE aléatoire, surtout sous Windows)
+      if (stopped) return Promise.resolve();
       stopped = true;
-      try { server.close(); } catch { /* déjà fermé */ }
+      return new Promise((resolve) => {
+        try { server.close(() => resolve()); } catch { resolve(); }
+      });
     },
   };
 }

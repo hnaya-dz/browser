@@ -10,6 +10,8 @@ import {
   initStore, closeStore, saveMessage, getMessagesSince, purgeOldMessages,
   upsertDeviceSeen, setDeviceLabel, listDevices, getDevice,
   searchMessages, getConfig, setConfig,
+  createRoom, getRoom, touchRoom, listRooms, setRoomAdminPin,
+  banDevice, unbanDevice, isBanned, listBans,
 } from "../src/store.js";
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "hnaya-store-"));
@@ -65,5 +67,43 @@ initStore(dir);
 assert.equal(getMessagesSince("rh", 0).length, 1, "données présentes après réouverture");
 assert.equal(getConfig("retention_days"), String(1 / 24 / 60), "config persistée");
 
+// 6) D.2 — salons distincts : cloisonnement des messages
+const rA = createRoom({ name: "Département X", roomPin: "111111", adminPin: "222222" });
+const rB = createRoom({ name: "Service Y", adminPin: "333333" });
+saveMessage({ id: "ra1", roomId: rA.roomId, groupId: "all", from: "Karim", text: "réservé à X", ts: now });
+saveMessage({ id: "rb1", roomId: rB.roomId, groupId: "all", from: "Karim", text: "réservé à Y", ts: now });
+assert.equal(getMessagesSince("all", 0, rA.roomId).length, 1, "X ne voit que X");
+assert.equal(getMessagesSince("all", 0, rA.roomId)[0].text, "réservé à X");
+assert.equal(searchMessages({ roomId: rB.roomId }).length, 1, "recherche admin cloisonnée");
+assert.equal(getMessagesSince("all", 0).length, 2, "salon default intact (messages historiques)");
+assert.equal(getRoom(rA.roomId).roomPin, "111111", "PIN d'accès persisté");
+touchRoom(rB.roomId, { name: "Service Y bis" });
+assert.equal(listRooms()[0].name, "Service Y bis", "réouverture : lastUsed trie + renommage");
+setRoomAdminPin(rA.roomId, "999999");
+assert.equal(getRoom(rA.roomId).adminPin, "999999", "PIN admin modifiable");
+
+// 7) D.2 — blocages par salon
+banDevice(rA.roomId, "aabbccdd11223344");
+assert.equal(isBanned(rA.roomId, "aabbccdd11223344"), true, "banni dans X");
+assert.equal(isBanned(rB.roomId, "aabbccdd11223344"), false, "pas banni dans Y (cloisonné)");
+assert.equal(listBans(rA.roomId).length, 1);
+unbanDevice(rA.roomId, "aabbccdd11223344");
+assert.equal(isBanned(rA.roomId, "aabbccdd11223344"), false, "déblocage effectif");
+
+// 8) D.2 — migration : une base héritée (config seule) devient un salon
+// « default » réouvrable
+import fs2 from "node:fs";
+const legacyDir = fs2.mkdtempSync(path.join(os.tmpdir(), "hnaya-legacy-"));
 closeStore();
-console.log("✅ store.test.mjs : 5 groupes d'assertions PASSÉS (" + dir + ")");
+initStore(legacyDir);
+setConfig("admin_pin", "424242");
+setConfig("session_name", "Ancien salon");
+closeStore();
+initStore(legacyDir); // ré-ouverture → migration
+const migrated = getRoom("default");
+assert.ok(migrated, "salon default créé depuis l'héritage");
+assert.equal(migrated.adminPin, "424242");
+assert.equal(migrated.name, "Ancien salon");
+
+closeStore();
+console.log("✅ store.test.mjs : 8 groupes d'assertions PASSÉS (" + dir + ")");

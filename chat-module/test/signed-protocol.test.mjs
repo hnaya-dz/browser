@@ -26,13 +26,13 @@ const hostDataDir = tmp("hnaya-host-");
 const clientDataDir = tmp("hnaya-cli-");
 
 const errors = [];
-const host = startHost({ sessionName: "Test D", pin: PIN, dataDir: hostDataDir, onError: (m) => errors.push(m) });
+const host = startHost({ sessionName: "Test D", pin: PIN, dataDir: hostDataDir, wsPort: 14812, httpPort: 14813, onError: (m) => errors.push(m) });
 
 try {
   // ── 1+2 : client v2 signé ──
   const received = [];
   const alice = joinSession({
-    address: "127.0.0.1", wsPort: 4802, pin: PIN, userId: "Alice",
+    address: "127.0.0.1", wsPort: 14812, pin: PIN, userId: "Alice",
     dataDir: clientDataDir,
     onMessage: (m) => received.push(m),
   });
@@ -59,7 +59,7 @@ try {
 
   // ── 3 : client v1 historique (0.3.1) — sans identité ──
   const key = deriveKeyFromPin(PIN);
-  const legacy = new WebSocket("ws://127.0.0.1:4802");
+  const legacy = new WebSocket("ws://127.0.0.1:14812");
   const legacyReceived = [];
   legacy.on("message", (raw) => { try { legacyReceived.push(decryptPayload(key, raw.toString())); } catch {} });
   await new Promise((res) => legacy.on("open", res));
@@ -85,10 +85,10 @@ try {
   assert.equal(received.length, countBefore, "id déjà vu : non rediffusé");
 
   // ── 5 : EADDRINUSE lisible ──
-  const dup = startHost({ sessionName: "Doublon", pin: PIN, onError: (m) => errors.push(m) });
+  const dup = startHost({ sessionName: "Doublon", pin: PIN, wsPort: 14812, httpPort: 14813, onError: (m) => errors.push(m) });
   await sleep(400);
   assert.equal(errors.length, 1, "erreur remontée via onError");
-  assert.match(errors[0], /4802.*déjà/u, "message lisible mentionnant le port");
+  assert.match(errors[0], /14812.*déjà/u, "message lisible mentionnant le port");
   try { dup.stop(); } catch {}
 
   alice.close();

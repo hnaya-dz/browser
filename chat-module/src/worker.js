@@ -36,6 +36,7 @@
 import os from "node:os";
 import { startHost } from "./server.js";
 import { discoverSessions, joinSession } from "./client.js";
+import { initStore, listRooms } from "./store.js";
 
 // IP LAN du poste — pour composer l'URL d'invitation mobile du QR code.
 // Plusieurs interfaces possibles (VirtualBox, VPN…) : on privilégie les
@@ -77,7 +78,13 @@ function handleCommand(msg) {
     case "start-host": {
       if (hostHandle) hostHandle.stop(); // évite deux hôtes simultanés sur ce poste
       hostHandle = startHost({
-        sessionName: msg.sessionName || "Hnaya Chat",
+        // Nom transmis seulement s'il est fourni : une réouverture sans
+        // nom (roomId seul) conserve le nom existant du salon
+        sessionName: msg.sessionName || undefined,
+        // D.2 : roomId → réouverture d'un salon existant ; adminPin →
+        // PIN admin choisi par l'utilisateur à la création (optionnel)
+        roomId: msg.roomId || undefined,
+        adminPin: msg.adminPin || undefined,
         dataDir: DATA_DIR,
         // EADDRINUSE & co : le serveur ne crash plus — on remonte une
         // erreur lisible à l'UI et on considère l'hôte arrêté.
@@ -93,8 +100,11 @@ function handleCommand(msg) {
         event: "host-started",
         pin: hostHandle.pin,
         adminPin: hostHandle.adminPin,
+        roomId: hostHandle.roomId,
+        sessionName: msg.sessionName || "Hnaya Chat",
         wsPort: hostHandle.wsPort,
         httpPort: hostHandle.httpPort,
+        lanIp,
         inviteUrl: lanIp ? `http://${lanIp}:${hostHandle.httpPort}` : null,
       });
       break;
@@ -131,6 +141,7 @@ function handleCommand(msg) {
         onMessage: (message) => process.send({ event: "message", message }),
         onPresence: (online) => process.send({ event: "presence", online }),
         onAdminResult: (result) => process.send({ event: "admin-result", result }),
+        onInviteSent: (r) => process.send({ event: "invite-sent", to: r.to, delivered: r.delivered }),
       });
       clientHandle = handle;
       handle.raw.on("open", () => process.send({ event: "joined" }));
@@ -143,6 +154,10 @@ function handleCommand(msg) {
         // d'une simple déconnexion réseau pour un message clair côté UI
         if (code === 4001) {
           process.send({ event: "join-failed", reason: "pin-incorrect" });
+        } else if (code === 4004) {
+          // D.2 — appareil bloqué par l'admin (au join OU expulsé en
+          // pleine session) : message spécifique, pas un aléa réseau
+          process.send({ event: "join-failed", reason: "banned" });
         } else {
           // ✅ Déconnexion involontaire (hôte fermé, réseau perdu…) —
           // sans cet événement, l'UI resterait « connectée » et les
@@ -170,6 +185,19 @@ function handleCommand(msg) {
       break;
     }
 
+    case "list-rooms": {
+      // Liste des salons hébergés par CE poste (écran « Rouvrir un salon »)
+      initStore(DATA_DIR);
+      process.send({ event: "rooms", rooms: listRooms() });
+      break;
+    }
+
+    case "send-invite": {
+      if (!clientHandle) { process.send({ event: "disconnected" }); break; }
+      clientHandle.sendInvite({ to: msg.to || null, room: msg.room });
+      break;
+    }
+
     case "admin": {
       // Panneau admin du dock — passthrough vers le salon (le serveur
       // vérifie le PIN admin, la réponse revient par "admin-result")
@@ -183,6 +211,7 @@ function handleCommand(msg) {
         filters: msg.filters,
         key: msg.key,
         value: msg.value,
+        newPin: msg.newPin,
       });
       break;
     }
