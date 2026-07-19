@@ -6,7 +6,8 @@
   "type": "module",
   "main": "src/server.js",
   "scripts": {
-    "host": "node src/server.js"
+    "host": "node src/server.js",
+    "serve": "node src/serve.js"
   },
   "dependencies": {
     "ws": "^8.18.0"

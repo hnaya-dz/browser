@@ -169,6 +169,8 @@
     "adminRetention": "Rétention des messages (jours)",
     "adminRetentionHint": "Les messages plus anciens sont supprimés automatiquement. 0 = conservation illimitée.",
     "adminPinYours": "PIN administrateur de ce salon",
+    "manualIpHint": "Salon introuvable ? Saisissez l'adresse IP du serveur (multi-sites, VPN, serveur permanent).",
+    "manualIpJoin": "Rejoindre",
     "inviteHint": "Scannez avec l'appareil photo du mobile (même wifi), puis saisissez le PIN du salon. Gardez la page ouverte pour recevoir les messages."
   },
   "Privacy": {

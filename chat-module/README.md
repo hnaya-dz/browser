@@ -163,6 +163,47 @@ New-NetFirewallRule -DisplayName "Hnaya Messagerie locale (TCP 4803 mobile)" -Di
 
 ---
 
+## Mode serveur permanent (étape D — entreprises et administrations)
+
+Pour un salon **toujours disponible** (une instance par direction/service,
+sur une machine allumée en continu) :
+
+```bash
+node src/serve.js --name "Salon RH" --pin 123456 --data /srv/hnaya-rh
+```
+
+- **PIN d'accès stable** : fourni une fois puis persisté en base — les
+  redémarrages le conservent (idem pour le nom et le PIN admin).
+- **Données** (`--data`) : historique SQLite, registre des appareils,
+  configuration — répertoire sauvegardable par l'IT.
+- **Démarrage automatique** : `service/install-windows.ps1` (tâche
+  planifiée SYSTEM au démarrage) ou `service/install-linux.sh` (systemd).
+  Prérequis : Node.js ≥ 22.5 (pour `node:sqlite`), ou le binaire Electron
+  du navigateur en mode nœud (`ELECTRON_RUN_AS_NODE`).
+- **Clients hors sous-réseau** (multi-sites, VPN, VLAN cloisonnés) : la
+  découverte multicast ne traverse pas les routeurs — utiliser le champ
+  **« Rejoindre par IP »** du dock (l'adresse est mémorisée). Le dock
+  récupère le nom du salon via `/info.json` (seul endpoint avec CORS
+  ouvert — contenu déjà public via le beacon).
+- **Cloisonnement** : une instance par machine (ports fixes 4802/4803).
+  Chaque direction héberge la sienne — l'information ne circule pas
+  entre salons, par construction.
+
+### Identité des appareils et audit (étape D)
+
+Pseudo libre en surface, identité **Ed25519** stable en dessous : chaque
+appareil signe ses messages (`src/identity.js`, pendant navigateur dans
+`mobile/crypto-src.mjs`). Le serveur vérifie et consigne tout dans le
+registre (pseudos utilisés, machine, IP, étiquette posée par l'admin).
+Panneau d'administration dans le dock (PIN admin distinct) : registre,
+recherche d'historique, exports JSON/CSV, rétention (90 j par défaut,
+0 = illimitée). Tests obligatoires après toute modification :
+`node test/crypto-interop.test.mjs` (8 assertions, interop bit-à-bit),
+`test/store.test.mjs`, `test/signed-protocol.test.mjs`,
+`test/admin-protocol.test.mjs`, `test/serve.test.mjs`.
+
+---
+
 ## Étapes suivantes (non incluses dans ce squelette)
 
 1. **`ChatPanel.tsx`** — composant React côté renderer : saisie du PIN,

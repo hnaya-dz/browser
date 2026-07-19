@@ -232,6 +232,34 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
     patchStore({ selectedSession: session, status: "entering-pin", error: null });
   };
 
+  // ✅ Étape D — rejoindre par adresse IP : indispensable quand la
+  // découverte multicast ne passe pas (multi-sites, VPN, VLAN cloisonnés,
+  // salon permanent dans un autre sous-réseau). L'adresse est retenue
+  // pour la prochaine fois — cas typique : serveur permanent de service.
+  const [manualIp, setManualIp] = useState(() =>
+    typeof window !== "undefined" ? localStorage.getItem("hnaya-chat-manual-ip") || "" : ""
+  );
+  const manualIpValid = /^[a-zA-Z0-9][a-zA-Z0-9.\-]{2,}$/.test(manualIp.trim());
+  const handleManualJoin = async () => {
+    if (!manualIpValid) return;
+    const address = manualIp.trim();
+    localStorage.setItem("hnaya-chat-manual-ip", address);
+    // Récupère le vrai nom du salon via /info.json du serveur (CORS ouvert
+    // sur ce seul endpoint) — sinon l'en-tête n'afficherait que l'IP.
+    // 1,5 s maximum : ne jamais bloquer la connexion sur ce confort.
+    let sessionName = address;
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 1500);
+      const info = await fetch(`http://${address}:4803/info.json`, { signal: ctrl.signal }).then((r) => r.json());
+      clearTimeout(timer);
+      if (info?.sessionName) sessionName = String(info.sessionName);
+    } catch { /* serveur sans page mobile ou délai — l'IP fera l'affaire */ }
+    handlePickSession({
+      sessionName, address, wsPort: 4802, httpPort: 4803, hostname: address,
+    });
+  };
+
   const handleJoin = () => {
     const api = getApi();
     if (!api?.send || !store.selectedSession || pinInput.length !== 6 || !nickname.trim()) return;
@@ -429,6 +457,23 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
                 </button>
               ))
             )}
+            {/* Rejoindre par IP (étape D) : serveurs permanents ou salons
+                hors de portée du multicast */}
+            <div style={{ borderTop: `1px solid ${border}`, paddingTop: 8, marginTop: 2 }}>
+              <div style={{ fontSize: 10.5, color: muted, marginBottom: 5 }}>{t("Chat.manualIpHint")}</div>
+              <div style={{ display: "flex", gap: 6 }}>
+                <input
+                  style={{ ...inputStyle, flex: 1, direction: "ltr", textAlign: "start" }}
+                  value={manualIp}
+                  onChange={(e) => setManualIp(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleManualJoin()}
+                  placeholder="192.168.1.10"
+                />
+                <button onClick={handleManualJoin} disabled={!manualIpValid} style={btnStyle(true, !manualIpValid)}>
+                  {t("Chat.manualIpJoin")}
+                </button>
+              </div>
+            </div>
             <div style={{ display: "flex", gap: 8 }}>
               <button onClick={() => patchStore({ status: "idle" })} style={{ ...btnStyle(), flex: 1 }}>
                 {t("Chat.back")}

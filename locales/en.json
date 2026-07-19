@@ -169,6 +169,8 @@
     "adminRetention": "Message retention (days)",
     "adminRetentionHint": "Older messages are deleted automatically. 0 = keep forever.",
     "adminPinYours": "This room's administrator PIN",
+    "manualIpHint": "Room not found? Enter the server's IP address (multi-site, VPN, permanent server).",
+    "manualIpJoin": "Join",
     "inviteHint": "Scan with the smartphone's camera (same wifi), then enter the room PIN. Keep the page open to receive messages."
   },
   "Privacy": {

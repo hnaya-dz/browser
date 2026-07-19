@@ -48,7 +48,15 @@ export function startMobileServer({ sessionName = "Hnaya", wsPort = 4802 } = {})
 
     // Infos dynamiques pour la page (nom du salon, port WS)
     if (urlPath === "/info.json") {
-      res.writeHead(200, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
+      // CORS ouvert sur CE endpoint uniquement : le dock (origine
+      // localhost:47823/3000) l'interroge pour afficher le VRAI nom du
+      // salon lors d'une connexion par IP manuelle (étape D). Contenu
+      // non sensible : nom public + port — déjà diffusés par le beacon.
+      res.writeHead(200, {
+        "Content-Type": MIME[".json"],
+        "Cache-Control": "no-store",
+        "Access-Control-Allow-Origin": "*",
+      });
       res.end(JSON.stringify({ sessionName, wsPort }));
       return;
     }

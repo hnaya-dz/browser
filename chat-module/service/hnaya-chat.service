@@ -1,0 +1,29 @@
+# ═══════════════════════════════════════════════════════════════
+# Unité systemd — salon permanent Hnaya Messagerie locale (Linux)
+# ═══════════════════════════════════════════════════════════════
+# Installation (voir install-linux.sh pour l'automatisation) :
+#   1. Adapter WorkingDirectory, ExecStart (--name/--pin/--data) ci-dessous
+#   2. sudo cp hnaya-chat.service /etc/systemd/system/
+#   3. sudo systemctl daemon-reload && sudo systemctl enable --now hnaya-chat
+# Journal : journalctl -u hnaya-chat -f   (le PIN s'affiche au démarrage)
+
+[Unit]
+Description=Hnaya Messagerie locale — salon permanent
+After=network.target
+
+[Service]
+Type=simple
+# Adapter le chemin vers le module (répertoire chat-module)
+WorkingDirectory=/opt/hnaya/chat-module
+ExecStart=/usr/bin/node src/serve.js --name "Salon Hnaya" --data /var/lib/hnaya-chat
+Restart=on-failure
+RestartSec=5
+# Compte de service dédié recommandé (créé par install-linux.sh)
+User=hnaya-chat
+# Durcissement minimal
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/hnaya-chat
+
+[Install]
+WantedBy=multi-user.target
