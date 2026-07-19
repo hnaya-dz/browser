@@ -13,7 +13,7 @@
 import { useState } from "react";
 import { useTranslation } from "@/hooks/useTranslation";
 import { Laptop, Smartphone as PhoneIcon, BadgeCheck, BadgeX, Download, Lock, LockOpen, Ban, Undo2 } from "lucide-react";
-import { store, sendAdminCommand, resetAdminState, getApi, type AdminDevice } from "@/context/chatstore";
+import { store, patchStore, sendAdminCommand, resetAdminState, getApi, type AdminDevice } from "@/context/chatstore";
 
 interface Props {
   accent: string;
@@ -298,6 +298,15 @@ export default function ChatAdminPanel({ accent, muted, border, inputBg, inputSt
                   if (!/^\d{6}$/.test(newAdminPin)) return;
                   sendAdminCommand({ adminPin, action: "set-admin-pin", newPin: newAdminPin });
                   setAdminPin(newAdminPin); // les prochaines actions utilisent le nouveau
+                  // Synchroniser aussi le pré-remplissage de l'hôte (bloc
+                  // PINs + prochaine ouverture du panneau) — sinon
+                  // l'ancien PIN resterait proposé
+                  if (store.isHost) {
+                    patchStore({
+                      adminPin: newAdminPin,
+                      hosting: store.hosting ? { ...store.hosting, adminPin: newAdminPin } : null,
+                    });
+                  }
                   setNewAdminPin("");
                 }}
                 disabled={!/^\d{6}$/.test(newAdminPin)}
@@ -306,6 +315,11 @@ export default function ChatAdminPanel({ accent, muted, border, inputBg, inputSt
                 {t("Chat.adminSave")}
               </button>
             </div>
+            {/* Confirmation du serveur — sans elle, le clic semblait mort
+                (retour terrain) */}
+            {store.adminPinChanged && (
+              <div style={{ fontSize: 11, color: "#00c853" }}>{t("Chat.adminPinChangedOk")}</div>
+            )}
           </>
         )}
       </div>

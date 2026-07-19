@@ -134,10 +134,12 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
   // l'état d'authentification est réinitialisé à chaque fermeture
   const [showAdmin, setShowAdmin] = useState(false);
   const toggleAdmin = () => {
-    setShowAdmin((v) => {
-      if (v) resetAdminState();
-      return !v;
-    });
+    // ⚠️ resetAdminState HORS de la fonction de mise à jour d'état :
+    // React exécute les updaters PENDANT le rendu — un patchStore là-dedans
+    // déclenche « Cannot update a component while rendering » (vu en test
+    // terrain sur le bouton Fermer du panneau admin).
+    if (showAdmin) resetAdminState();
+    setShowAdmin(!showAdmin);
   };
 
   // ── D.2 : création enrichie, réouverture, invitations ──

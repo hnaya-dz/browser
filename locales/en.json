@@ -198,6 +198,7 @@
     "adminUnlockedState": "Room open to new devices",
     "adminLockHint": "Locked: known members come and go freely; no new device is accepted — even with the right PIN.",
     "adminChangePin": "Change the administrator PIN",
+    "adminPinChangedOk": "✓ Administrator PIN changed — use the new code from the next opening.",
     "inviteHint": "Scan with the smartphone's camera (same wifi), then enter the room PIN. Keep the page open to receive messages."
   },
   "Privacy": {

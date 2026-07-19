@@ -198,6 +198,7 @@
     "adminUnlockedState": "Salon ouvert aux nouveaux appareils",
     "adminLockHint": "Verrouillé : les membres connus entrent et sortent librement, aucun nouvel appareil n'est accepté — même avec le bon PIN.",
     "adminChangePin": "Changer le PIN administrateur",
+    "adminPinChangedOk": "✓ PIN administrateur modifié — utilisez le nouveau code dès la prochaine ouverture.",
     "inviteHint": "Scannez avec l'appareil photo du mobile (même wifi), puis saisissez le PIN du salon. Gardez la page ouverte pour recevoir les messages."
   },
   "Privacy": {

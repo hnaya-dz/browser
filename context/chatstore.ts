@@ -115,6 +115,9 @@ export interface ChatStore {
   rooms: KnownRoom[];
   // Retour de la dernière invitation ciblée (null | "delivered" | "offline")
   inviteFeedback: string | null;
+  // Confirmation visuelle du changement de PIN admin (retour terrain :
+  // « le bouton n'a pas cliqué » — la commande passait, sans le dire)
+  adminPinChanged: boolean;
 }
 
 export interface AdminDevice {
@@ -157,6 +160,7 @@ export const store: ChatStore = {
   joinedRoomIsHosted: false,
   rooms: [],
   inviteFeedback: null,
+  adminPinChanged: false,
 };
 
 /** Envoie une commande admin au salon (réponse via l'événement
@@ -181,7 +185,7 @@ export function sendAdminCommand(params: {
 export function resetAdminState() {
   patchStore({
     adminAuthed: false, adminError: null, adminDevices: [], adminSearch: [],
-    adminRetention: null, adminBans: [], adminLocked: null,
+    adminRetention: null, adminBans: [], adminLocked: null, adminPinChanged: false,
   });
 }
 
@@ -355,6 +359,7 @@ export function ensureListening() {
         }
         else if (r.action === "bans") patch.adminBans = (r.data || []).map((b: any) => b.fingerprint);
         else if (r.action === "set-locked") patch.adminLocked = !!r.data?.locked;
+        else if (r.action === "set-admin-pin") patch.adminPinChanged = true;
         else if (r.action === "room-info") {
           patch.adminLocked = !!r.data?.locked;
           patch.adminRetention = r.data?.retention_days ?? null;
