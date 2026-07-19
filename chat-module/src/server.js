@@ -10,7 +10,10 @@ import crypto from "node:crypto";
 import { pathToFileURL } from "node:url";
 import { deriveKeyFromPin, encryptPayload, decryptPayload, generatePin } from "./crypto.js";
 import { startBeacon } from "./discovery.js";
-import { initStore, saveMessage, getMessagesSince, purgeOldMessages, upsertDeviceSeen } from "./store.js";
+import {
+  initStore, saveMessage, getMessagesSince, purgeOldMessages, upsertDeviceSeen,
+  listDevices, setDeviceLabel, searchMessages, getConfig, setConfig,
+} from "./store.js";
 import { fingerprintFromRawPublicKey, rawFromSpkiBase64, verifyMessage } from "./identity.js";
 import { startMobileServer } from "./mobile-server.js";
 
@@ -37,6 +40,16 @@ export function startHost({ sessionName = "Hnaya Chat", pin = generatePin(), dat
   const sessionKey = deriveKeyFromPin(pin);
   const clients = new Map(); // userId -> { ws, groups, device }
   initStore(dataDir); // dataDir undefined → défaut du module (chat-module/data)
+
+  // ✅ Étape D — PIN ADMIN, distinct du PIN du salon : protège le registre
+  // des appareils, l'historique complet et les réglages. Persisté en base
+  // (stable d'un redémarrage à l'autre — indispensable au mode serveur
+  // permanent) ; généré à la première ouverture et montré à l'hôte.
+  let adminPin = getConfig("admin_pin");
+  if (!adminPin) {
+    adminPin = generatePin();
+    setConfig("admin_pin", adminPin);
+  }
 
   const wss = new WebSocketServer({ port: WS_PORT });
   console.log(`[hnaya-chat] Salon "${sessionName}" ouvert sur le port ${WS_PORT} — PIN : ${pin}`);
@@ -165,6 +178,63 @@ export function startHost({ sessionName = "Hnaya Chat", pin = generatePin(), dat
           messageId: payload.messageId,
           userId,
         });
+        return;
+      }
+
+      // ✅ Étape D — commandes d'ADMINISTRATION (registre, historique,
+      // réglages). Même canal chiffré que le reste : il faut déjà le PIN
+      // du salon pour parler au serveur, PUIS le PIN admin pour ces
+      // commandes. Réponses envoyées uniquement à l'appelant.
+      if (payload.type === "admin") {
+        ws.adminTries = (ws.adminTries || 0);
+        const reply = (res) => ws.send(encryptPayload(sessionKey, {
+          v: 1, type: "admin-result", action: payload.action, reqId: payload.reqId || null, ...res,
+        }));
+
+        if (!checkAdminPin(payload.adminPin, adminPin)) {
+          ws.adminTries += 1;
+          reply({ ok: false, error: "admin-pin" });
+          // 5 tentatives ratées → connexion fermée (frein brutal mais sain
+          // contre l'énumération d'un PIN à 6 chiffres depuis le LAN)
+          if (ws.adminTries >= 5) ws.close(4003, "admin-pin-attempts");
+          return;
+        }
+
+        try {
+          switch (payload.action) {
+            case "devices":
+              reply({ ok: true, data: listDevices() });
+              break;
+            case "label":
+              setDeviceLabel(String(payload.fingerprint || ""), payload.label ?? null);
+              reply({ ok: true, data: listDevices() });
+              break;
+            case "search":
+              reply({ ok: true, data: searchMessages(payload.filters || {}) });
+              break;
+            case "config-get":
+              reply({ ok: true, data: { retention_days: Number(getConfig("retention_days", 90)) } });
+              break;
+            case "config-set": {
+              // Seules les clés explicitement autorisées — jamais un
+              // set générique piloté par le réseau (admin_pin se change
+              // par une action dédiée si besoin, pas ici)
+              if (payload.key === "retention_days") {
+                const days = Math.max(0, Math.min(3650, Number(payload.value) || 0));
+                setConfig("retention_days", String(days));
+                purgeOldMessages();
+                reply({ ok: true, data: { retention_days: days } });
+              } else {
+                reply({ ok: false, error: "config-key" });
+              }
+              break;
+            }
+            default:
+              reply({ ok: false, error: "unknown-action" });
+          }
+        } catch (err) {
+          reply({ ok: false, error: err?.message || "admin-error" });
+        }
       }
     });
 
@@ -209,6 +279,7 @@ export function startHost({ sessionName = "Hnaya Chat", pin = generatePin(), dat
 
   const handle = {
     pin,
+    adminPin,
     wsPort: WS_PORT,
     httpPort: mobileServer.httpPort,
     stop() {
@@ -229,6 +300,15 @@ export function startHost({ sessionName = "Hnaya Chat", pin = generatePin(), dat
   return handle;
 }
 
+// Comparaison à temps constant du PIN admin — évite qu'un chronométrage
+// fin des réponses depuis le LAN ne révèle les chiffres un à un.
+function checkAdminPin(given, expected) {
+  const a = Buffer.from(String(given ?? ""));
+  const b = Buffer.from(String(expected));
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
+}
+
 // ── Exécution directe (yarn host / node src/server.js) ──
 // Ne se déclenche PAS quand ce fichier est importé par le processus
 // principal d'Electron — uniquement en lancement autonome, pratique
@@ -240,7 +320,7 @@ export function startHost({ sessionName = "Hnaya Chat", pin = generatePin(), dat
 // était toujours fausse et yarn host ne démarrait jamais rien.
 const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 if (isMain) {
-  const { pin } = startHost({
+  const { pin, adminPin } = startHost({
     sessionName: "Salon de test",
     onError: (friendly) => {
       console.error(`[hnaya-chat] ${friendly}`);
@@ -248,5 +328,6 @@ if (isMain) {
     },
   });
   console.log(`→ Partage ce PIN avec les autres participants : ${pin}`);
+  console.log(`→ PIN ADMIN (registre/historique/réglages — à garder pour vous) : ${adminPin}`);
   process.on("SIGINT", () => process.exit(0));
 }

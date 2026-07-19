@@ -19,10 +19,12 @@
 //   { cmd: "join", address, wsPort, pin, userId, groups, lastSeenTs }
 //   { cmd: "send-message", text, groupId, media }
 //   { cmd: "mark-read", messageId, groupId }
+//   { cmd: "admin", adminPin, action, reqId, ... }   (étape D)
 //   { cmd: "leave" }
 //
 // Événements envoyés (process.send) :
-//   { event: "host-started", pin }
+//   { event: "host-started", pin, adminPin, wsPort, httpPort, inviteUrl }
+//   { event: "admin-result", result }               (étape D)
 //   { event: "host-stopped" }
 //   { event: "session-found", session }
 //   { event: "joined" }
@@ -90,6 +92,7 @@ function handleCommand(msg) {
       process.send({
         event: "host-started",
         pin: hostHandle.pin,
+        adminPin: hostHandle.adminPin,
         wsPort: hostHandle.wsPort,
         httpPort: hostHandle.httpPort,
         inviteUrl: lanIp ? `http://${lanIp}:${hostHandle.httpPort}` : null,
@@ -127,6 +130,7 @@ function handleCommand(msg) {
         dataDir: DATA_DIR,
         onMessage: (message) => process.send({ event: "message", message }),
         onPresence: (online) => process.send({ event: "presence", online }),
+        onAdminResult: (result) => process.send({ event: "admin-result", result }),
       });
       clientHandle = handle;
       handle.raw.on("open", () => process.send({ event: "joined" }));
@@ -163,6 +167,23 @@ function handleCommand(msg) {
 
     case "mark-read": {
       clientHandle?.markRead(msg.messageId, msg.groupId);
+      break;
+    }
+
+    case "admin": {
+      // Panneau admin du dock — passthrough vers le salon (le serveur
+      // vérifie le PIN admin, la réponse revient par "admin-result")
+      if (!clientHandle) { process.send({ event: "disconnected" }); break; }
+      clientHandle.sendAdmin({
+        adminPin: msg.adminPin,
+        action: msg.action,
+        reqId: msg.reqId,
+        fingerprint: msg.fingerprint,
+        label: msg.label,
+        filters: msg.filters,
+        key: msg.key,
+        value: msg.value,
+      });
       break;
     }
 

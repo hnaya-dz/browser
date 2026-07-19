@@ -3,7 +3,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 // ✅ Icônes vectorielles (lucide, déjà dans les dépendances) plutôt
 // qu'emoji : les emoji sont rendus par la police du système et diffèrent
 // visuellement entre Windows 10 et 11 — incohérent d'un poste à l'autre.
-import { MessageSquare, Shield, Lock, Smartphone } from "lucide-react";
+import { MessageSquare, Shield, Lock, Smartphone, KeyRound } from "lucide-react";
+import ChatAdminPanel from "./ChatAdminPanel";
 import qrcode from "qrcode-generator";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useLanguage } from "@/context/langcontext";
@@ -16,6 +17,7 @@ import {
   clearConnectTimer,
   startConnecting,
   useChatSnapshot,
+  resetAdminState,
   type DiscoveredSession,
 } from "@/context/chatstore";
 
@@ -103,6 +105,15 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
   const [messageInput, setMessageInput] = useState("");
   const [setupBusy, setSetupBusy] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
+  // Panneau admin (étape D) — remplace le fil tant qu'il est ouvert ;
+  // l'état d'authentification est réinitialisé à chaque fermeture
+  const [showAdmin, setShowAdmin] = useState(false);
+  const toggleAdmin = () => {
+    setShowAdmin((v) => {
+      if (v) resetAdminState();
+      return !v;
+    });
+  };
 
   // ✅ Fil ouvert sur le DERNIER message (retour de test terrain) : au
   // montage du panneau ET à chaque nouveau message, défiler en bas.
@@ -260,8 +271,10 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
     clearConnectTimer();
     api?.send("chat-leave");
     if (store.isHost) api?.send("chat-stop-host");
+    resetAdminState();
+    setShowAdmin(false);
     patchStore({
-      status: "idle", isHost: false, pin: null, messages: [], online: [],
+      status: "idle", isHost: false, pin: null, adminPin: null, messages: [], online: [],
       discovered: new Map(), selectedSession: null, error: null, inviteUrl: null,
     });
     setPinInput("");
@@ -512,7 +525,7 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
         {/* Salon rejoint — fil de discussion */}
         {store.status === "joined" && (
           <>
-            {store.isHost && store.pin && (
+            {store.isHost && store.pin && !showAdmin && (
               <div style={{
                 background: `${accent}18`, border: `1px solid ${accent}40`, borderRadius: 10,
                 padding: "6px 10px", textAlign: "center", flexShrink: 0,
@@ -529,7 +542,7 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
               {/* Inviter un téléphone : QR vers la page mobile servie par
                   l'hôte — visible pour tous les participants (l'URL pointe
                   toujours vers l'hôte), masqué si le poste n'a pas de LAN */}
-              {store.inviteUrl && (
+              {store.inviteUrl && !showAdmin && (
                 <button
                   onClick={() => setShowInvite(v => !v)}
                   style={{
@@ -544,10 +557,35 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
                   {showInvite ? t("Chat.inviteClose") : t("Chat.invitePhone")}
                 </button>
               )}
+              {/* Administration (étape D) : registre des appareils,
+                  historique, réglages — protégé par le PIN admin */}
+              <button
+                onClick={toggleAdmin}
+                style={{
+                  ...btnStyle(showAdmin), padding: "4px 8px", fontSize: 10,
+                  display: "flex", alignItems: "center", gap: 4, flexShrink: 0,
+                }}
+                title={showAdmin ? t("Chat.inviteClose") : t("Chat.admin")}
+              >
+                <KeyRound size={12} />
+                {showAdmin ? t("Chat.inviteClose") : t("Chat.admin")}
+              </button>
             </div>
 
+            {/* Panneau admin (étape D) — remplace fil + composeur */}
+            {showAdmin && (
+              <ChatAdminPanel
+                accent={accent}
+                muted={muted}
+                border={border}
+                inputBg={inputBg}
+                inputStyle={inputStyle}
+                btnStyle={btnStyle}
+              />
+            )}
+
             {/* Panneau QR d'invitation mobile */}
-            {showInvite && store.inviteUrl && (
+            {!showAdmin && showInvite && store.inviteUrl && (
               <div style={{
                 background: `${accent}12`, border: `1px solid ${accent}35`, borderRadius: 10,
                 padding: 10, textAlign: "center", flexShrink: 0,
@@ -569,7 +607,7 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
 
             {/* Fil de messages : occupe tout l'espace restant du dock,
                 défile indépendamment (minHeight: 0 requis en flex) */}
-            <div style={{
+            {!showAdmin && <div style={{
               flex: 1, minHeight: 0, overflowY: "auto",
               display: "flex", flexDirection: "column", gap: 8,
               background: "rgba(255,255,255,0.03)", borderRadius: 10, padding: 10,
@@ -601,9 +639,9 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
               )}
               {/* Ancre de défilement — toujours en dernier */}
               <div ref={messagesEndRef} />
-            </div>
+            </div>}
 
-            <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+            {!showAdmin && <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
               <input
                 style={{ ...inputStyle, flex: 1 }}
                 value={messageInput}
@@ -614,7 +652,7 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
               <button onClick={handleSend} disabled={!messageInput.trim()} style={btnStyle(true, !messageInput.trim())}>
                 {t("Chat.send")}
               </button>
-            </div>
+            </div>}
           </>
         )}
       </div>

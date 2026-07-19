@@ -52,6 +52,7 @@ export function joinSession({
   dataDir = DEFAULT_DATA_DIR,
   onMessage,
   onPresence,
+  onAdminResult,
 }) {
   const sessionKey = deriveKeyFromPin(pin);
   // ✅ Étape D — identité d'appareil : pseudo libre en surface, clé Ed25519
@@ -104,6 +105,7 @@ export function joinSession({
     if (payload.type === "backlog") payload.messages.forEach((m) => onMessage?.(m));
     else if (payload.type === "presence") onPresence?.(payload.online);
     else if (payload.type === "message") onMessage?.(payload);
+    else if (payload.type === "admin-result") onAdminResult?.(payload);
     // "read" (accusés de lecture) : à relayer vers l'UI selon les besoins
   });
 
@@ -129,9 +131,17 @@ export function joinSession({
     ws.send(encryptPayload(sessionKey, { v: 1, type: "read", messageId, groupId }));
   }
 
+  // ✅ Étape D — commande d'administration (registre/historique/réglages).
+  // Le PIN admin transite chiffré (canal AES du salon) et n'est jamais
+  // stocké côté client : l'UI le demande à chaque ouverture du panneau.
+  function sendAdmin({ adminPin, action, reqId, ...rest }) {
+    ws.send(encryptPayload(sessionKey, { v: 1, type: "admin", adminPin, action, reqId, ...rest }));
+  }
+
   return {
     send,
     markRead,
+    sendAdmin,
     close: () => ws.close(),
     raw: ws, // accès direct si besoin (ex. écouter "close"/"error" côté Electron)
   };

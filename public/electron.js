@@ -162,21 +162,24 @@ const NATIVE_LABELS = {
         reloadPage: "إعادة تحميل الصفحة", back: "السابق", forward: "التالي",
         copyPageUrl: "نسخ عنوان الصفحة", images: "الصور", allFiles: "كل الملفات",
         chooseFolder: "اختر مجلد التحميل",
-        noSuggestions: "لا توجد اقتراحات", addToDictionary: "إضافة إلى القاموس" },
+        noSuggestions: "لا توجد اقتراحات", addToDictionary: "إضافة إلى القاموس",
+        adminExportTitle: "تصدير سجل المراسلة" },
   fr: { copy: "Copier", cut: "Couper", paste: "Coller", selectAll: "Tout sélectionner",
         saveImage: "Enregistrer l'image", copyImageUrl: "Copier l'adresse de l'image",
         openLinkNewTab: "Ouvrir le lien dans un nouvel onglet", copyLinkUrl: "Copier l'adresse du lien",
         reloadPage: "Recharger la page", back: "Précédent", forward: "Suivant",
         copyPageUrl: "Copier l'URL de la page", images: "Images", allFiles: "Tous les fichiers",
         chooseFolder: "Choisir le dossier de téléchargement",
-        noSuggestions: "Aucune suggestion", addToDictionary: "Ajouter au dictionnaire" },
+        noSuggestions: "Aucune suggestion", addToDictionary: "Ajouter au dictionnaire",
+        adminExportTitle: "Exporter l'historique de la messagerie" },
   en: { copy: "Copy", cut: "Cut", paste: "Paste", selectAll: "Select all",
         saveImage: "Save image", copyImageUrl: "Copy image address",
         openLinkNewTab: "Open link in new tab", copyLinkUrl: "Copy link address",
         reloadPage: "Reload page", back: "Back", forward: "Forward",
         copyPageUrl: "Copy page URL", images: "Images", allFiles: "All files",
         chooseFolder: "Choose download folder",
-        noSuggestions: "No suggestions", addToDictionary: "Add to dictionary" },
+        noSuggestions: "No suggestions", addToDictionary: "Add to dictionary",
+        adminExportTitle: "Export messaging history" },
 };
 const nativeT = (key) => (NATIVE_LABELS[appLang] || NATIVE_LABELS.fr)[key] || key;
 
@@ -939,6 +942,32 @@ ipcMain.on("chat-mark-read", (event, { messageId, groupId }) => {
 });
 
 ipcMain.on("chat-leave", () => { chatWorker?.send({ cmd: "leave" }); });
+
+// ✅ Étape D — commandes d'administration (registre des appareils,
+// historique, rétention). Le PIN admin transite vers le worker puis au
+// salon via le canal chiffré — jamais stocké ici.
+ipcMain.on("chat-admin", (event, params) => {
+  chatWorker?.send({ cmd: "admin", ...params });
+});
+
+// Export admin (JSON/CSV) : le renderer fournit le contenu, l'utilisateur
+// choisit l'emplacement. writeFileSync après validation du dialogue.
+ipcMain.handle("chat-admin-export", async (event, { filename, content }) => {
+  const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
+    title: nativeT("adminExportTitle"),
+    defaultPath: join(app.getPath("documents"), String(filename || "export.json")),
+    filters: [
+      { name: "JSON", extensions: ["json"] },
+      { name: "CSV", extensions: ["csv"] },
+      { name: nativeT("allFiles"), extensions: ["*"] },
+    ],
+  });
+  if (canceled || !filePath) return { saved: false };
+  const { writeFileSync } = await import("fs");
+  // BOM UTF-8 (﻿) pour que l'arabe s'affiche correctement dans Excel
+  writeFileSync(filePath, String(filename).endsWith(".csv") ? "﻿" + content : content, "utf8");
+  return { saved: true, filePath };
+});
 
 // ── Pare-feu Windows — autorisation réseau adaptative ──────────────────────
 // Le poste qui HÉBERGE un salon doit accepter des connexions ENTRANTES :

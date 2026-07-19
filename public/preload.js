@@ -31,6 +31,7 @@ const ALLOWED_INVOKE = [
   "chat-start-host",
   "chat-network-check",
   "chat-network-setup",
+  "chat-admin-export",
   // ✅ Confidentialité — interrupteurs utilisateur
   "privacy-get-settings",
 ];
@@ -61,6 +62,7 @@ const ALLOWED_SEND = [
   "chat-send-message",
   "chat-mark-read",
   "chat-leave",
+  "chat-admin",
   // ✅ Confidentialité — interrupteurs utilisateur
   "privacy-set-settings",
 ];

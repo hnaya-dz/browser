@@ -62,6 +62,29 @@ export interface ChatStore {
   // Le panneau (dock) est-il actuellement affiché ? Piloté par setPanelOpen
   // — source unique de vérité pour le montage du panneau ET le badge
   panelOpen: boolean;
+  // ── Administration (étape D) ──
+  // PIN admin du salon — connu uniquement de l'hôte (event host-started).
+  // Les participants qui le connaissent le saisissent dans le panneau.
+  adminPin: string | null;
+  // true dès la première réponse admin acceptée par le serveur
+  adminAuthed: boolean;
+  adminError: string | null;
+  adminDevices: AdminDevice[];
+  adminSearch: ChatMessage[];
+  adminRetention: number | null;
+}
+
+export interface AdminDevice {
+  fingerprint: string;
+  publicKeySpki: string;
+  firstSeen: number;
+  lastSeen: number;
+  lastNickname: string | null;
+  nicknames: string[];
+  hostname: string | null;
+  platform: string | null;
+  lastIp: string | null;
+  label: string | null;
 }
 
 export const store: ChatStore = {
@@ -79,7 +102,33 @@ export const store: ChatStore = {
   networkOk: null,
   unreadCount: 0,
   panelOpen: false,
+  adminPin: null,
+  adminAuthed: false,
+  adminError: null,
+  adminDevices: [],
+  adminSearch: [],
+  adminRetention: null,
 };
+
+/** Envoie une commande admin au salon (réponse via l'événement
+ *  "admin-result"). Le PIN est fourni à chaque appel — jamais persisté. */
+export function sendAdminCommand(params: {
+  adminPin: string;
+  action: "devices" | "label" | "search" | "config-get" | "config-set";
+  reqId?: string;
+  fingerprint?: string;
+  label?: string | null;
+  filters?: Record<string, unknown>;
+  key?: string;
+  value?: unknown;
+}) {
+  getApi()?.send("chat-admin", params);
+}
+
+/** Réinitialise l'état admin (fermeture du panneau admin ou du salon). */
+export function resetAdminState() {
+  patchStore({ adminAuthed: false, adminError: null, adminDevices: [], adminSearch: [], adminRetention: null });
+}
 
 const listeners = new Set<() => void>();
 function notify() { listeners.forEach((fn) => fn()); }
@@ -146,7 +195,7 @@ export function ensureListening() {
       case "host-started": {
         // ✅ L'hôte rejoint automatiquement son propre salon pour pouvoir
         // discuter — sans ça, "Créer un salon" ouvrirait un serveur muet.
-        patchStore({ pin: evt.pin, isHost: true, inviteUrl: evt.inviteUrl || null });
+        patchStore({ pin: evt.pin, adminPin: evt.adminPin || null, isHost: true, inviteUrl: evt.inviteUrl || null });
         startConnecting();
         api.send("chat-join", {
           address: "127.0.0.1",
@@ -159,7 +208,7 @@ export function ensureListening() {
         break;
       }
       case "host-stopped":
-        patchStore({ isHost: false });
+        patchStore({ isHost: false, adminPin: null });
         break;
       case "session-found": {
         const key = `${evt.session.address}:${evt.session.wsPort}`;
@@ -205,6 +254,22 @@ export function ensureListening() {
       case "presence":
         patchStore({ online: evt.online || [] });
         break;
+      case "admin-result": {
+        const r = evt.result || {};
+        if (!r.ok) {
+          // "admin-pin" → retour à la saisie du PIN ; autre erreur → bandeau
+          patchStore({ adminError: r.error || "admin-error", ...(r.error === "admin-pin" ? { adminAuthed: false } : {}) });
+          break;
+        }
+        const patch: Partial<ChatStore> = { adminError: null, adminAuthed: true };
+        if (r.action === "devices" || r.action === "label") patch.adminDevices = r.data || [];
+        else if (r.action === "search") patch.adminSearch = r.data || [];
+        else if (r.action === "config-get" || r.action === "config-set") {
+          patch.adminRetention = r.data?.retention_days ?? null;
+        }
+        patchStore(patch);
+        break;
+      }
       case "error":
         // Ne bascule vers l'écran d'erreur QUE si on était en train de se
         // connecter — un aléa réseau pendant une session déjà établie ne
