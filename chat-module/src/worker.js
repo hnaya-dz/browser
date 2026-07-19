@@ -53,6 +53,11 @@ function getLanAddress() {
       || null;
 }
 
+// ✅ Étape D — répertoire des données persistantes (base SQLite +
+// identité Ed25519 de l'appareil). Electron le passe via l'environnement
+// (userData/chat-data) ; en lancement autonome, défaut du module.
+const DATA_DIR = process.env.HNAYA_CHAT_DATA || undefined;
+
 let hostHandle = null;      // { pin, stop } si on héberge un salon
 let clientHandle = null;    // { send, markRead, close } si on a rejoint un salon
 let stopDiscovery = null;   // fonction pour arrêter une découverte en cours
@@ -69,7 +74,16 @@ function handleCommand(msg) {
   switch (msg.cmd) {
     case "start-host": {
       if (hostHandle) hostHandle.stop(); // évite deux hôtes simultanés sur ce poste
-      hostHandle = startHost({ sessionName: msg.sessionName || "Hnaya Chat" });
+      hostHandle = startHost({
+        sessionName: msg.sessionName || "Hnaya Chat",
+        dataDir: DATA_DIR,
+        // EADDRINUSE & co : le serveur ne crash plus — on remonte une
+        // erreur lisible à l'UI et on considère l'hôte arrêté.
+        onError: (friendly) => {
+          hostHandle = null;
+          process.send?.({ event: "error", message: friendly });
+        },
+      });
       // inviteUrl : ce que le QR du dock encode — null si aucune IP LAN
       // (poste hors réseau : salon local possible, accès mobile non)
       const lanIp = getLanAddress();
@@ -110,6 +124,7 @@ function handleCommand(msg) {
         userId: msg.userId,
         groups: msg.groups || ["all"],
         lastSeenTs: msg.lastSeenTs || 0,
+        dataDir: DATA_DIR,
         onMessage: (message) => process.send({ event: "message", message }),
         onPresence: (online) => process.send({ event: "presence", online }),
       });

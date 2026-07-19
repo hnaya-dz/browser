@@ -10,11 +10,17 @@ import crypto from "node:crypto";
 import { pathToFileURL } from "node:url";
 import { deriveKeyFromPin, encryptPayload, decryptPayload, generatePin } from "./crypto.js";
 import { startBeacon } from "./discovery.js";
-import { saveMessage, getMessagesSince, purgeOldMessages } from "./db.js";
+import { initStore, saveMessage, getMessagesSince, purgeOldMessages, upsertDeviceSeen } from "./store.js";
+import { fingerprintFromRawPublicKey, rawFromSpkiBase64, verifyMessage } from "./identity.js";
 import { startMobileServer } from "./mobile-server.js";
 
 const WS_PORT = 4802; // port local arbitraire pour le chat LAN Hnaya
 const PURGE_INTERVAL_MS = 6 * 60 * 60 * 1000; // purge de rétention toutes les 6h
+// Dérive d'horloge tolérée sur l'horodatage SIGNÉ par le client (protocole
+// v2) : au-delà, on garde le message mais horodaté par le serveur et marqué
+// non valide — une signature sur un horodatage fantaisiste ne vaut rien
+// pour un audit.
+const MAX_CLOCK_DRIFT_MS = 10 * 60 * 1000;
 // Battement de cœur : détecte les connexions mortes (wifi coupé, veille,
 // crash) — sans ping/pong, une connexion TCP peut rester silencieusement
 // « établie » indéfiniment et les messages partent dans le vide.
@@ -27,15 +33,29 @@ const HEARTBEAT_MS = 10000;
  * @param {string} [opts.pin] PIN à 6 chiffres ; généré aléatoirement si absent
  * @returns {{ pin: string, stop: () => void }}
  */
-export function startHost({ sessionName = "Hnaya Chat", pin = generatePin() } = {}) {
+export function startHost({ sessionName = "Hnaya Chat", pin = generatePin(), dataDir, onError } = {}) {
   const sessionKey = deriveKeyFromPin(pin);
-  const clients = new Map(); // userId -> { ws, groups }
+  const clients = new Map(); // userId -> { ws, groups, device }
+  initStore(dataDir); // dataDir undefined → défaut du module (chat-module/data)
 
   const wss = new WebSocketServer({ port: WS_PORT });
   console.log(`[hnaya-chat] Salon "${sessionName}" ouvert sur le port ${WS_PORT} — PIN : ${pin}`);
 
-  wss.on("connection", (ws) => {
+  // ✅ Étape D — plus de crash brut sur EADDRINUSE (un salon tourne déjà
+  // sur ce poste) : nettoyage puis remontée d'une erreur lisible. Sans ce
+  // gestionnaire, l'événement "error" non écouté TUE le process entier.
+  wss.on("error", (err) => {
+    const friendly = err?.code === "EADDRINUSE"
+      ? `Le port ${WS_PORT} est déjà utilisé — un salon est probablement déjà ouvert sur ce poste.`
+      : (err?.message || String(err));
+    try { handle.stop(); } catch { /* ressources partiellement créées */ }
+    if (onError) onError(friendly, err);
+    else console.error(`[hnaya-chat] Erreur serveur : ${friendly}`);
+  });
+
+  wss.on("connection", (ws, req) => {
     let userId = null;
+    const remoteIp = req?.socket?.remoteAddress || null;
     ws.isAlive = true;
     ws.on("pong", () => { ws.isAlive = true; });
 
@@ -52,7 +72,28 @@ export function startHost({ sessionName = "Hnaya Chat", pin = generatePin() } = 
 
       if (payload.type === "join") {
         userId = payload.userId;
-        clients.set(userId, { ws, groups: payload.groups || ["all"] });
+
+        // ✅ Étape D — registre des appareils : le join v2 annonce la clé
+        // publique Ed25519. L'empreinte est calculée ICI (jamais confiée
+        // au client) et la fiche appareil est mise à jour (pseudos vus,
+        // machine, IP). Clients 0.3.1 (v1, sans device) : accueillis tels
+        // quels, leurs messages seront simplement « non signés ».
+        let device = null;
+        if (payload.device?.publicKey) {
+          try {
+            const fingerprint = fingerprintFromRawPublicKey(rawFromSpkiBase64(payload.device.publicKey));
+            device = { fingerprint, publicKeySpki: payload.device.publicKey };
+            upsertDeviceSeen({
+              fingerprint,
+              publicKeySpki: payload.device.publicKey,
+              nickname: userId,
+              hostname: payload.device.hostname || null,
+              platform: payload.device.platform || null,
+              ip: remoteIp,
+            });
+          } catch { device = null; /* clé malformée → traité comme v1 */ }
+        }
+        clients.set(userId, { ws, groups: payload.groups || ["all"], device });
 
         // Renvoie les messages manqués depuis la dernière connexion
         const since = payload.lastSeenTs || 0;
@@ -64,21 +105,55 @@ export function startHost({ sessionName = "Hnaya Chat", pin = generatePin() } = 
       }
 
       if (payload.type === "message") {
-        const msg = {
-          v: 1,
-          type: "message",
-          id: "msg_" + crypto.randomUUID(),
-          groupId: payload.groupId || "all",
-          from: userId,
-          text: payload.text ?? "",
-          // media : réservé à la V2 (image/audio/vidéo) — voir README.md,
-          // section "Étape suivante". Ne pas mettre de gros binaires ici
-          // tel quel : prévoir un transfert par chunks ou un endpoint
-          // HTTP local séparé pour les fichiers volumineux.
-          media: payload.media || null,
-          ts: Date.now(),
-        };
-        saveMessage(msg);
+        const now = Date.now();
+        const device = clients.get(userId)?.device || null;
+        let msg;
+
+        if (payload.signature && payload.id && payload.ts && device) {
+          // ── Protocole v2 : message signé par l'appareil ──
+          // La signature couvre (id, from, text, ts) tels qu'écrits par le
+          // client. Horodatage trop dérivé → on garde le message (horodaté
+          // serveur) mais signatureValid=false : pas d'antidatage signé.
+          const core = { id: String(payload.id), from: userId, text: payload.text ?? "", ts: Number(payload.ts) };
+          const verified = verifyMessage(core, payload.signature, device.publicKeySpki);
+          const driftOk = Math.abs(now - core.ts) <= MAX_CLOCK_DRIFT_MS;
+          msg = {
+            v: 1,
+            type: "message",
+            id: core.id,
+            groupId: payload.groupId || "all",
+            from: userId,
+            text: core.text,
+            media: payload.media || null,
+            ts: driftOk ? core.ts : now,
+            deviceFp: device.fingerprint,
+            signature: payload.signature,
+            signatureValid: verified && driftOk,
+          };
+        } else {
+          // ── Protocole v1 (clients 0.3.1) : id/horodatage serveur ──
+          msg = {
+            v: 1,
+            type: "message",
+            id: "msg_" + crypto.randomUUID(),
+            groupId: payload.groupId || "all",
+            from: userId,
+            text: payload.text ?? "",
+            // media : réservé à la V2 (image/audio/vidéo) — voir README.md,
+            // section "Étape suivante". Ne pas mettre de gros binaires ici
+            // tel quel : prévoir un transfert par chunks ou un endpoint
+            // HTTP local séparé pour les fichiers volumineux.
+            media: payload.media || null,
+            ts: now,
+            deviceFp: device?.fingerprint || null,
+            signature: null,
+            signatureValid: false,
+          };
+        }
+
+        // Anti-rejeu : un id déjà en base (client malveillant ou doublon
+        // réseau) n'est ni réenregistré ni rediffusé.
+        if (!saveMessage(msg).inserted) return;
         broadcastToGroup(msg.groupId, msg);
         return;
       }
@@ -132,7 +207,7 @@ export function startHost({ sessionName = "Hnaya Chat", pin = generatePin() } = 
     }
   }, HEARTBEAT_MS);
 
-  return {
+  const handle = {
     pin,
     wsPort: WS_PORT,
     httpPort: mobileServer.httpPort,
@@ -151,6 +226,7 @@ export function startHost({ sessionName = "Hnaya Chat", pin = generatePin() } = 
       console.log(`[hnaya-chat] Salon "${sessionName}" fermé.`);
     },
   };
+  return handle;
 }
 
 // ── Exécution directe (yarn host / node src/server.js) ──
@@ -164,7 +240,13 @@ export function startHost({ sessionName = "Hnaya Chat", pin = generatePin() } = 
 // était toujours fausse et yarn host ne démarrait jamais rien.
 const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 if (isMain) {
-  const { pin } = startHost({ sessionName: "Salon de test" });
+  const { pin } = startHost({
+    sessionName: "Salon de test",
+    onError: (friendly) => {
+      console.error(`[hnaya-chat] ${friendly}`);
+      process.exit(1);
+    },
+  });
   console.log(`→ Partage ce PIN avec les autres participants : ${pin}`);
   process.on("SIGINT", () => process.exit(0));
 }

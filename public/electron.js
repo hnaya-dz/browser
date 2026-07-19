@@ -890,7 +890,14 @@ function ensureChatWorker() {
     console.warn("[hnaya-chat] Module introuvable :", chatModulePath);
     return null;
   }
-  chatWorker = fork(chatModulePath, [], { silent: false });
+  // ✅ Étape D — données persistantes du chat (base SQLite + identité
+  // Ed25519 de l'appareil) dans userData : survivent aux mises à jour de
+  // l'app, jamais dans Program Files (non inscriptible), jamais dans le
+  // dossier du module (écrasé à chaque installation).
+  chatWorker = fork(chatModulePath, [], {
+    silent: false,
+    env: { ...process.env, HNAYA_CHAT_DATA: join(app.getPath("userData"), "chat-data") },
+  });
 
   // Relaie chaque événement du worker vers le renderer via un seul canal
   // ("chat-event") — évite d'avoir à whitelister un canal par type

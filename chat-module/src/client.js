@@ -7,8 +7,17 @@
 // section 1, pattern preload.js déjà en place dans le navigateur).
 
 import WebSocket from "ws";
+import crypto from "node:crypto";
+import os from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { deriveKeyFromPin, encryptPayload, decryptPayload } from "./crypto.js";
 import { listenForSessions } from "./discovery.js";
+import { loadOrCreateIdentity } from "./identity.js";
+
+// Répertoire par défaut de l'identité d'appareil (même défaut que store.js) ;
+// le worker Electron passe son propre dataDir (userData) via joinSession.
+const DEFAULT_DATA_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "data");
 
 /**
  * Découvre les salons Hnaya Chat disponibles sur le réseau local pendant
@@ -40,14 +49,30 @@ export function joinSession({
   userId,
   groups = ["all"],
   lastSeenTs = 0,
+  dataDir = DEFAULT_DATA_DIR,
   onMessage,
   onPresence,
 }) {
   const sessionKey = deriveKeyFromPin(pin);
+  // ✅ Étape D — identité d'appareil : pseudo libre en surface, clé Ed25519
+  // stable en dessous. Le join annonce la clé publique + le nom de machine ;
+  // chaque message est signé (traçabilité admin, voir identity.js).
+  const identity = loadOrCreateIdentity(dataDir);
   const ws = new WebSocket(`ws://${address}:${wsPort}`);
 
   ws.on("open", () => {
-    ws.send(encryptPayload(sessionKey, { v: 1, type: "join", userId, groups, lastSeenTs }));
+    ws.send(encryptPayload(sessionKey, {
+      v: 2,
+      type: "join",
+      userId,
+      groups,
+      lastSeenTs,
+      device: {
+        publicKey: identity.publicKeySpki,
+        hostname: os.hostname(),
+        platform: process.platform,
+      },
+    }));
   });
 
   // Battement de cœur côté client : si l'hôte ne répond plus au ping
@@ -83,7 +108,21 @@ export function joinSession({
   });
 
   function send(text, groupId = "all", media = null) {
-    ws.send(encryptPayload(sessionKey, { v: 1, type: "message", text, groupId, media }));
+    // Protocole v2 : id + horodatage générés ICI puis signés — le serveur
+    // vérifie la signature avec la clé publique annoncée au join. Il ne
+    // peut pas générer ces champs lui-même : la signature doit couvrir
+    // exactement ce que l'appareil a écrit (non-répudiation).
+    const core = { id: "msg_" + crypto.randomUUID(), from: userId, text: text ?? "", ts: Date.now() };
+    ws.send(encryptPayload(sessionKey, {
+      v: 2,
+      type: "message",
+      id: core.id,
+      text: core.text,
+      ts: core.ts,
+      groupId,
+      media,
+      signature: identity.signMessage(core),
+    }));
   }
 
   function markRead(messageId, groupId) {
