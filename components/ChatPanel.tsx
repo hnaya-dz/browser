@@ -144,12 +144,12 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
   const inputBg = isDark ? "rgba(255,255,255,0.07)" : theme === "light" ? "rgba(0,99,65,0.05)" : "rgba(255,80,20,0.07)";
 
   const inputStyle: React.CSSProperties = {
-    width: "100%", padding: "8px 12px", borderRadius: 8,
+    width: "100%", padding: "8px 12px", borderRadius: 4,
     border: `1px solid ${border}`, background: inputBg,
     color: text, fontSize: 13, outline: "none",
   };
   const btnStyle = (primary = false, disabled = false): React.CSSProperties => ({
-    padding: "9px 16px", borderRadius: 8, border: primary ? "none" : `1px solid ${border}`,
+    padding: "9px 16px", borderRadius: 4, border: primary ? "none" : `1px solid ${border}`,
     background: primary ? `linear-gradient(135deg,${accent},${accent}cc)` : "transparent",
     color: primary ? "#fff" : text, fontWeight: 600, fontSize: 13,
     cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.5 : 1, transition: "all .15s",
@@ -636,7 +636,7 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
                 padding: 10, textAlign: "center", flexShrink: 0,
               }}>
                 <div style={{
-                  background: "#fff", borderRadius: 8, padding: 6,
+                  background: "#fff", borderRadius: 6, padding: 6,
                   display: "inline-block", lineHeight: 0,
                 }}
                   // QR noir sur fond blanc quel que soit le thème — condition
@@ -655,7 +655,7 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
             {!showAdmin && <div style={{
               flex: 1, minHeight: 0, overflowY: "auto",
               display: "flex", flexDirection: "column", gap: 8,
-              background: "rgba(255,255,255,0.03)", borderRadius: 10, padding: 10,
+              background: "rgba(255,255,255,0.03)", borderRadius: 8, padding: 10,
             }}>
               {store.messages.length === 0 ? (
                 <div style={{ textAlign: "center", color: muted, fontSize: 12, padding: "16px 0" }}>
@@ -670,7 +670,7 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
                       maxWidth: "85%",
                       background: isMine ? `${accent}30` : "rgba(255,255,255,0.06)",
                       border: `1px solid ${isMine ? accent + "40" : border}`,
-                      borderRadius: 10, padding: "6px 10px",
+                      borderRadius: 8, padding: "6px 10px",
                     }}>
                       {!isMine && <div style={{ fontSize: 10, color: muted, fontWeight: 700 }}>{m.from}</div>}
                       <MessageText

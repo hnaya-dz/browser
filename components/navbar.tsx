@@ -52,7 +52,7 @@ export const Navbar = () => {
           <button
             key={link.key}
             onClick={() => addTab(link.url)}
-            className="flex-shrink-0 px-3 py-1 rounded-lg text-white/70 text-xs font-medium hover:text-white hover:bg-white/10 transition-all duration-150"
+            className="flex-shrink-0 px-3 py-1 rounded text-white/70 text-xs font-medium hover:text-white hover:bg-white/10 transition-all duration-150"
           >
             {link.labels[language as keyof typeof link.labels] ?? link.labels.fr}
           </button>

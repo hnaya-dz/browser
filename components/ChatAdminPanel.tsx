@@ -89,7 +89,7 @@ export default function ChatAdminPanel({ accent, muted, border, inputBg, inputSt
         flex: 1, padding: "5px 0", fontSize: 10.5, fontWeight: 700, cursor: "pointer",
         background: tab === id ? `${accent}25` : "transparent",
         border: `1px solid ${tab === id ? accent + "60" : border}`,
-        borderRadius: 8, color: "inherit",
+        borderRadius: 4, color: "inherit",
       }}
     >
       {label}
@@ -140,7 +140,7 @@ export default function ChatAdminPanel({ accent, muted, border, inputBg, inputSt
           store.adminDevices.length === 0 ? (
             <div style={{ fontSize: 11, color: muted, textAlign: "center", padding: 12 }}>{t("Chat.adminNoResults")}</div>
           ) : store.adminDevices.map((d: AdminDevice) => (
-            <div key={d.fingerprint} style={{ border: `1px solid ${border}`, borderRadius: 10, padding: 8, background: inputBg }}>
+            <div key={d.fingerprint} style={{ border: `1px solid ${border}`, borderRadius: 6, padding: 8, background: inputBg }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 {(d.platform || "").startsWith("mobile-web") ? <PhoneIcon size={13} /> : <Laptop size={13} />}
                 <span style={{ fontSize: 12, fontWeight: 700, flex: 1 }}>
@@ -197,7 +197,7 @@ export default function ChatAdminPanel({ accent, muted, border, inputBg, inputSt
             {store.adminSearch.length === 0 ? (
               <div style={{ fontSize: 11, color: muted, textAlign: "center", padding: 12 }}>{t("Chat.adminNoResults")}</div>
             ) : store.adminSearch.map((m) => (
-              <div key={m.id} style={{ border: `1px solid ${border}`, borderRadius: 8, padding: "5px 8px", fontSize: 11 }}>
+              <div key={m.id} style={{ border: `1px solid ${border}`, borderRadius: 6, padding: "5px 8px", fontSize: 11 }}>
                 <div style={{ display: "flex", gap: 6, alignItems: "center", color: muted, fontSize: 9.5 }}>
                   <span style={{ fontWeight: 700 }}>{m.from}</span>
                   {(m as any).deviceFp && <span>({deviceName((m as any).deviceFp)})</span>}
@@ -236,7 +236,7 @@ export default function ChatAdminPanel({ accent, muted, border, inputBg, inputSt
               </button>
             </div>
             {store.isHost && store.adminPin && (
-              <div style={{ marginTop: 8, border: `1px solid ${accent}40`, background: `${accent}12`, borderRadius: 10, padding: 8, textAlign: "center" }}>
+              <div style={{ marginTop: 8, border: `1px solid ${accent}40`, background: `${accent}12`, borderRadius: 6, padding: 8, textAlign: "center" }}>
                 <div style={{ fontSize: 10, color: muted }}>{t("Chat.adminPinYours")}</div>
                 <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: 4, color: accent }}>{store.adminPin}</div>
               </div>
