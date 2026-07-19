@@ -10,7 +10,10 @@ const TR = {
     algeriePlaceholder: "ابحث في الجزائر...", algerieButton: "بحث",
     worldPlaceholder: "ابحث في العالم...", worldButton: "بحث عالمي",
     discover: "اكتشف الويب الجزائري",
-    tagline: "متصفح الجزائر · Navigateur Algérien",
+    // Signature volontairement NON géographique (décision produit
+    // 2026-07-19) : « algérien » limitait la portée de la marque —
+    // on met en avant les trois piliers, pas une frontière.
+    tagline: "متصفحك، شبكتك، بياناتك",
   },
   fr: {
     title: "Recherche", algerie: "Algérie", monde: "Monde",
@@ -18,7 +21,7 @@ const TR = {
     algeriePlaceholder: "Rechercher en Algérie...", algerieButton: "Rechercher",
     worldPlaceholder: "Rechercher dans le monde...", worldButton: "Recherche monde",
     discover: "Découvrez le web algérien",
-    tagline: "متصفح الجزائر · Navigateur Algérien",
+    tagline: "Votre navigateur, votre réseau, vos données",
   },
   en: {
     title: "Search", algerie: "Algeria", monde: "World",
@@ -26,7 +29,7 @@ const TR = {
     algeriePlaceholder: "Search in Algeria...", algerieButton: "Search",
     worldPlaceholder: "Search the world...", worldButton: "World search",
     discover: "Discover the Algerian web",
-    tagline: "متصفح الجزائر · Navigateur Algérien",
+    tagline: "Your browser, your network, your data",
   },
 };
 
@@ -382,24 +385,24 @@ export default function Home() {
         .gsc-above-wrapper-area{border-bottom:0!important;padding:0!important;}
         .gsc-adBlock{display:none!important;}
         .gsc-control-cse{padding:0!important;border:0!important;background:transparent!important;}
-        .gs-title,.gs-title b{font-size:16px!important;font-weight:700!important;}
+        .gs-title,.gs-title b{font-size:15px!important;font-weight:700!important;}
 
         .dark .gsc-result-info{color:rgba(255,255,255,0.4)!important;font-size:11px!important;padding:0 0 8px!important;}
-        .dark .gsc-webResult.gsc-result{background:rgba(255,255,255,0.06)!important;border:1px solid rgba(255,255,255,0.1)!important;border-radius:12px!important;padding:12px 14px!important;margin:0 0 10px!important;backdrop-filter:blur(10px)!important;}
+        .dark .gsc-webResult.gsc-result{background:rgba(255,255,255,0.06)!important;border:1px solid rgba(255,255,255,0.1)!important;border-radius:8px!important;padding:12px 14px!important;margin:0 0 10px!important;backdrop-filter:blur(10px)!important;}
         .dark .gs-title a,.dark .gs-title a b{color:#4ade80!important;text-decoration:none!important;}
         .dark .gs-snippet{color:rgba(255,255,255,0.6)!important;}
         .dark .gsc-cursor-page{color:rgba(255,255,255,0.5)!important;}
         .dark .gsc-cursor-current-page{color:#4ade80!important;font-weight:bold!important;}
 
         .light .gsc-result-info{color:rgba(0,60,30,0.5)!important;font-size:11px!important;padding:0 0 8px!important;}
-        .light .gsc-webResult.gsc-result{background:rgba(255,255,255,0.8)!important;border:1px solid rgba(0,99,65,0.12)!important;border-radius:12px!important;padding:12px 14px!important;margin:0 0 10px!important;backdrop-filter:blur(8px)!important;box-shadow:0 2px 12px rgba(0,99,65,0.06)!important;}
+        .light .gsc-webResult.gsc-result{background:rgba(255,255,255,0.8)!important;border:1px solid rgba(0,99,65,0.12)!important;border-radius:8px!important;padding:12px 14px!important;margin:0 0 10px!important;backdrop-filter:blur(8px)!important;box-shadow:0 2px 12px rgba(0,99,65,0.06)!important;}
         .light .gs-title a,.light .gs-title a b{color:#006341!important;text-decoration:none!important;}
         .light .gs-snippet{color:#374151!important;}
         .light .gsc-cursor-page{color:rgba(0,60,30,0.5)!important;}
         .light .gsc-cursor-current-page{color:#006341!important;font-weight:bold!important;}
 
         .sunset .gsc-result-info{color:rgba(255,150,80,0.5)!important;font-size:11px!important;padding:0 0 8px!important;}
-        .sunset .gsc-webResult.gsc-result{background:rgba(50,5,5,0.6)!important;border:1px solid rgba(255,80,20,0.2)!important;border-radius:12px!important;padding:12px 14px!important;margin:0 0 10px!important;backdrop-filter:blur(12px)!important;box-shadow:0 4px 20px rgba(180,20,0,0.2)!important;}
+        .sunset .gsc-webResult.gsc-result{background:rgba(50,5,5,0.6)!important;border:1px solid rgba(255,80,20,0.2)!important;border-radius:8px!important;padding:12px 14px!important;margin:0 0 10px!important;backdrop-filter:blur(12px)!important;box-shadow:0 4px 20px rgba(180,20,0,0.2)!important;}
         .sunset .gs-title a,.sunset .gs-title a b{color:#ff9060!important;text-decoration:none!important;}
         .sunset .gs-snippet{color:rgba(255,180,120,0.7)!important;}
         .sunset .gsc-cursor-page{color:rgba(255,120,60,0.5)!important;}
@@ -445,7 +448,7 @@ export default function Home() {
         /* Résultats PSE en thème custom */
         .custom .gsc-control-cse{background:transparent!important;border:none!important;}
         .custom .gsc-result-info{color:rgba(255,255,255,0.5)!important;font-size:11px!important;padding:0 0 8px!important;}
-        .custom .gsc-webResult.gsc-result{background:rgba(0,0,0,0.45)!important;border:1px solid rgba(255,255,255,0.12)!important;border-radius:12px!important;padding:12px 14px!important;margin:0 0 10px!important;backdrop-filter:blur(12px)!important;}
+        .custom .gsc-webResult.gsc-result{background:rgba(0,0,0,0.45)!important;border:1px solid rgba(255,255,255,0.12)!important;border-radius:8px!important;padding:12px 14px!important;margin:0 0 10px!important;backdrop-filter:blur(12px)!important;}
         .custom .gs-title a,.custom .gs-title a b{color:#7dffb3!important;text-decoration:none!important;}
         .custom .gs-snippet{color:rgba(255,255,255,0.65)!important;}
         .custom .gsc-cursor-page{color:rgba(255,255,255,0.45)!important;}
@@ -465,21 +468,23 @@ export default function Home() {
 
         <p className="glass-tagline text-xs tracking-widest uppercase mb-8 font-light">{tr.tagline}</p>
 
-        <div className="glass-card rounded-3xl w-full max-w-3xl overflow-hidden">
+        {/* Arrondis resserrés (retour produit 2026-07-19) : rounded-3xl
+            faisait « gadget » — registre professionnel visé */}
+        <div className="glass-card rounded-xl w-full max-w-3xl overflow-hidden">
           <div className={`flex items-center gap-3 px-5 pt-4 pb-3 glass-divider border-b ${isRTL ? "flex-row-reverse" : ""}`}>
             <span className="glass-title text-xs font-semibold tracking-wider uppercase">{tr.title}</span>
-            <div className="scope-wrap flex rounded-xl p-1 gap-1">
-              <button onClick={() => setScope("algerie")} className={`scope-btn px-4 py-1.5 rounded-lg text-sm font-bold ${scope === "algerie" ? "active-algerie" : ""}`}>{tr.algerie}</button>
-              <button onClick={() => setScope("monde")} className={`scope-btn px-4 py-1.5 rounded-lg text-sm font-bold ${scope === "monde" ? "active-monde" : ""}`}>{tr.monde}</button>
+            <div className="scope-wrap flex rounded-lg p-1 gap-1">
+              <button onClick={() => setScope("algerie")} className={`scope-btn px-4 py-1 rounded-md text-[13px] font-bold ${scope === "algerie" ? "active-algerie" : ""}`}>{tr.algerie}</button>
+              <button onClick={() => setScope("monde")} className={`scope-btn px-4 py-1 rounded-md text-[13px] font-bold ${scope === "monde" ? "active-monde" : ""}`}>{tr.monde}</button>
             </div>
           </div>
 
           <div className="p-5">
             <div style={{ display: scope === "algerie" ? "block" : "none" }}>
               <div className={`flex gap-2 mb-4 ${isRTL ? "flex-row-reverse" : ""}`}>
-                <input type="text" value={algerieQuery} onChange={(e) => setAlgerieQuery(e.target.value)} onKeyDown={(e) => e.key === "Enter" && performAlgerieSearch()} placeholder={tr.algeriePlaceholder} className="glass-input flex-1 h-12 px-4 rounded-xl text-[15px]" dir={isRTL ? "rtl" : "ltr"} />
-                <button onClick={performAlgerieSearch} className="glass-btn-primary h-12 px-5 rounded-xl font-bold text-white text-sm">{tr.algerieButton}</button>
-                <button onClick={() => addTab(algerieQuery.trim() ? `https://hnaya.dz/boutique/?search=${encodeURIComponent(algerieQuery.trim())}` : "https://hnaya.dz/boutique/")} className="glass-btn-amber h-12 px-4 rounded-xl font-bold text-white text-sm flex items-center gap-2">
+                <input type="text" value={algerieQuery} onChange={(e) => setAlgerieQuery(e.target.value)} onKeyDown={(e) => e.key === "Enter" && performAlgerieSearch()} placeholder={tr.algeriePlaceholder} className="glass-input flex-1 h-11 px-4 rounded-lg text-[14px]" dir={isRTL ? "rtl" : "ltr"} />
+                <button onClick={performAlgerieSearch} className="glass-btn-primary h-11 px-5 rounded-lg font-bold text-white text-[13px]">{tr.algerieButton}</button>
+                <button onClick={() => addTab(algerieQuery.trim() ? `https://hnaya.dz/boutique/?search=${encodeURIComponent(algerieQuery.trim())}` : "https://hnaya.dz/boutique/")} className="glass-btn-amber h-11 px-4 rounded-lg font-bold text-white text-[13px] flex items-center gap-2">
                   <img src="/icons/market.png" alt="" className="w-5 h-5 object-contain" />
                   {tr.shop}
                 </button>
@@ -489,14 +494,14 @@ export default function Home() {
 
             {scope === "monde" && (
               <div className={`flex gap-2 ${isRTL ? "flex-row-reverse" : ""}`}>
-                <input type="text" value={worldQuery} onChange={(e) => setWorldQuery(e.target.value)} onKeyDown={(e) => e.key === "Enter" && performWorldSearch()} placeholder={tr.worldPlaceholder} className="glass-input flex-1 h-12 px-4 rounded-xl text-[15px]" dir={isRTL ? "rtl" : "ltr"} />
-                <button onClick={performWorldSearch} className="glass-btn-red h-12 px-5 rounded-xl font-bold text-white text-sm">{tr.worldButton}</button>
+                <input type="text" value={worldQuery} onChange={(e) => setWorldQuery(e.target.value)} onKeyDown={(e) => e.key === "Enter" && performWorldSearch()} placeholder={tr.worldPlaceholder} className="glass-input flex-1 h-11 px-4 rounded-lg text-[14px]" dir={isRTL ? "rtl" : "ltr"} />
+                <button onClick={performWorldSearch} className="glass-btn-red h-11 px-5 rounded-lg font-bold text-white text-[13px]">{tr.worldButton}</button>
               </div>
             )}
           </div>
         </div>
 
-        <button onClick={() => addTab("https://hnaya.dz")} className="discover-btn mt-8 px-8 py-3.5 rounded-2xl font-semibold text-base">
+        <button onClick={() => addTab("https://hnaya.dz")} className="discover-btn mt-8 px-6 py-2.5 rounded-lg font-semibold text-sm">
           🇩🇿 {tr.discover}
         </button>
       </section>

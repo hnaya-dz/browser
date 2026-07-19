@@ -1,7 +1,7 @@
 {
   "name": "hnaya-dz-browser",
   "version": "0.3.1",
-  "description": "Hnaya DZ Browser — Navigateur algérien",
+  "description": "Hnaya DZ Browser — Votre navigateur, votre réseau, vos données",
   "author": "Nacib Hamida",
   "private": true,
   "main": "public/electron.js",
