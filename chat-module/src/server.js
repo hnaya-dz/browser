@@ -15,6 +15,7 @@ import {
   listDevices, setDeviceLabel, searchMessages, getConfig, setConfig,
   createRoom, getRoom, touchRoom, setRoomAdminPin, setRoomPin,
   banDevice, unbanDevice, isBanned, listBans,
+  addRoomMember, isRoomMember, setRoomLocked,
 } from "./store.js";
 import { fingerprintFromRawPublicKey, rawFromSpkiBase64, verifyMessage } from "./identity.js";
 import { startMobileServer } from "./mobile-server.js";
@@ -136,6 +137,17 @@ export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, 
           ws.close(4004, "device-banned");
           return;
         }
+
+        // ✅ D.2 — VERROU : composition figée par l'admin. Seuls les
+        // appareils déjà MEMBRES entrent (un PIN qui fuite ne suffit
+        // plus). Les clients v1 (sans identité vérifiable) sont refusés
+        // sur un salon verrouillé — on ne peut pas prouver leur
+        // appartenance. Code 4005, distinct des autres refus.
+        if (getRoom(activeRoomId).locked && (!device || !isRoomMember(activeRoomId, device.fingerprint))) {
+          ws.close(4005, "room-locked");
+          return;
+        }
+        if (device) addRoomMember(activeRoomId, device.fingerprint);
         clients.set(userId, { ws, groups: payload.groups || ["all"], device });
 
         // Renvoie les messages manqués depuis la dernière connexion
@@ -309,6 +321,20 @@ export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, 
             case "bans":
               reply({ ok: true, data: listBans(activeRoomId) });
               break;
+            case "set-locked": {
+              // Verrouillage/déverrouillage du salon par l'admin — voir
+              // le contrôle au join (code 4005). Les membres CONNECTÉS ne
+              // sont pas éjectés au verrouillage : le verrou fige les
+              // entrées, il ne vide pas la pièce.
+              setRoomLocked(activeRoomId, !!payload.locked);
+              reply({ ok: true, data: { locked: !!payload.locked } });
+              break;
+            }
+            case "room-info": {
+              const r = getRoom(activeRoomId);
+              reply({ ok: true, data: { name: r.name, locked: !!r.locked, retention_days: Number(getConfig("retention_days", 90)) } });
+              break;
+            }
             case "set-admin-pin": {
               // L'admin authentifié choisit son PIN — action dédiée,
               // jamais par la config générique pilotée par le réseau

@@ -139,10 +139,45 @@ alice.sendAdmin({ adminPin: "123123", action: "devices", reqId: "d6" });
 await sleep(300);
 assert.equal(aliceAdmin.find((r) => r.reqId === "d6").ok, true, "nouveau PIN accepté");
 
+// ── 7. Verrou : membres connus OK, nouveaux refusés (4005) ─────────────
+alice.sendAdmin({ adminPin: "123123", action: "set-locked", locked: true, reqId: "d7" });
+await sleep(300);
+assert.equal(aliceAdmin.find((r) => r.reqId === "d7").data.locked, true, "salon verrouillé");
+
+// Bob est déjà membre → il peut se reconnecter malgré le verrou
+bob.close();
+await sleep(300);
+bob = joinSession({
+  address: "127.0.0.1", wsPort: 14832, pin: pinX, userId: "Bob", dataDir: bobData,
+  onMessage: () => {},
+});
+await new Promise((res) => bob.raw.on("open", res));
+await sleep(500);
+assert.equal(bob.raw.readyState, 1, "membre connu : accès maintenu malgré le verrou");
+
+// Un appareil JAMAIS vu → refus 4005 même avec le bon PIN
+const intrus = joinSession({
+  address: "127.0.0.1", wsPort: 14832, pin: pinX, userId: "Nouveau", dataDir: tmp("hnaya-d2-new-"),
+});
+assert.equal(await new Promise((res) => intrus.raw.on("close", (code) => res(code))), 4005,
+  "nouvel appareil refusé sur salon verrouillé (bon PIN insuffisant)");
+
+// Déverrouillage → le nouvel appareil entre
+alice.sendAdmin({ adminPin: "123123", action: "set-locked", locked: false, reqId: "d8" });
+await sleep(300);
+const nouveau = joinSession({
+  address: "127.0.0.1", wsPort: 14832, pin: pinX, userId: "Nouveau", dataDir: tmp("hnaya-d2-new2-"),
+  onMessage: () => {},
+});
+await new Promise((res) => nouveau.raw.on("open", res));
+await sleep(500);
+assert.equal(nouveau.raw.readyState, 1, "déverrouillé : nouvel appareil accepté");
+nouveau.close();
+
 alice.close();
 bob.close();
 host.stop();
 closeStore();
-console.log("✅ rooms-protocol.test.mjs : 6 scénarios D.2 PASSÉS");
+console.log("✅ rooms-protocol.test.mjs : 7 scénarios D.2 PASSÉS (verrou inclus)");
 await sleep(200);
 process.exit(0);

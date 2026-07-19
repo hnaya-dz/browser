@@ -82,7 +82,19 @@ export function initStore(dataDir = DEFAULT_DATA_DIR) {
       bannedAt    INTEGER NOT NULL,
       PRIMARY KEY (roomId, fingerprint)
     );
+    CREATE TABLE IF NOT EXISTS room_members (
+      roomId      TEXT NOT NULL,
+      fingerprint TEXT NOT NULL,
+      firstJoin   INTEGER NOT NULL,
+      lastJoin    INTEGER NOT NULL,
+      PRIMARY KEY (roomId, fingerprint)
+    );
   `);
+  // Verrou de salon (D.2) : composition figée par l'admin — les appareils
+  // déjà membres circulent librement, aucun nouvel appareil n'entre
+  if (!db.prepare("PRAGMA table_info(rooms)").all().some((c) => c.name === "locked")) {
+    db.exec("ALTER TABLE rooms ADD COLUMN locked INTEGER NOT NULL DEFAULT 0");
+  }
 
   // ── Migration D.2 : salons distincts ──────────────────────────────────
   // Les bases antérieures avaient UN salon implicite (config admin_pin /
@@ -285,6 +297,28 @@ export function setRoomAdminPin(roomId, adminPin) {
 
 export function setRoomPin(roomId, roomPin) {
   ensureDb().prepare("UPDATE rooms SET roomPin = ? WHERE roomId = ?").run(roomPin, String(roomId));
+}
+
+// ── Appartenance et verrou (D.2) ───────────────────────────────────────────
+// L'appartenance est enregistrée à chaque join réussi d'un client signé.
+// C'est la référence du VERROU : salon verrouillé = seuls les appareils
+// déjà membres entrent. Cycle d'usage : créer → tout le monde rejoint →
+// verrouiller. Un PIN qui fuite ne suffit alors plus à entrer.
+export function addRoomMember(roomId, fingerprint) {
+  const now = Date.now();
+  ensureDb().prepare(`INSERT INTO room_members (roomId, fingerprint, firstJoin, lastJoin)
+    VALUES (?, ?, ?, ?) ON CONFLICT(roomId, fingerprint) DO UPDATE SET lastJoin = excluded.lastJoin`)
+    .run(String(roomId), String(fingerprint), now, now);
+}
+
+export function isRoomMember(roomId, fingerprint) {
+  return !!ensureDb().prepare("SELECT 1 FROM room_members WHERE roomId = ? AND fingerprint = ?")
+    .get(String(roomId), String(fingerprint));
+}
+
+export function setRoomLocked(roomId, locked) {
+  ensureDb().prepare("UPDATE rooms SET locked = ? WHERE roomId = ?")
+    .run(locked ? 1 : 0, String(roomId));
 }
 
 // ── Blocages (par salon, par empreinte d'appareil) ─────────────────────────

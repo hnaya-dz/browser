@@ -158,6 +158,10 @@ function handleCommand(msg) {
           // D.2 — appareil bloqué par l'admin (au join OU expulsé en
           // pleine session) : message spécifique, pas un aléa réseau
           process.send({ event: "join-failed", reason: "banned" });
+        } else if (code === 4005) {
+          // D.2 — salon verrouillé : cet appareil n'était pas membre
+          // avant le verrouillage
+          process.send({ event: "join-failed", reason: "locked" });
         } else {
           // ✅ Déconnexion involontaire (hôte fermé, réseau perdu…) —
           // sans cet événement, l'UI resterait « connectée » et les
