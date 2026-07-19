@@ -189,6 +189,28 @@ node src/serve.js --name "Salon RH" --pin 123456 --data /srv/hnaya-rh
   Chaque direction héberge la sienne — l'information ne circule pas
   entre salons, par construction.
 
+### Salons multiples, verrou et invitations (D.2)
+
+- **Un salon = une entité** : « Créer » ouvre toujours un salon NEUF
+  (historique vierge, PIN d'accès et PIN admin propres — l'admin peut
+  choisir le sien à la création). La continuité passe par la liste
+  **« Rouvrir un salon »** du dock (mêmes PINs, même historique).
+- **Verrou** (cycle recommandé : créer → tout le monde rejoint →
+  verrouiller) : les appareils membres circulent librement, aucun
+  nouvel appareil n'entre — même avec le bon PIN. Panneau admin →
+  Réglages.
+- **Blocage individuel** (panneau admin → Appareils) : expulsion
+  immédiate + refus au retour ; l'outil d'exception, le verrou gérant
+  le quotidien. Un appareil qui régénère son identité échappe au
+  blocage — exclusion absolue = re-création du salon.
+- **Invitations vers un autre salon** (bouton « Inviter vers… ») :
+  ciblée (remise directe, jamais persistée — le PIN n'entre pas dans
+  l'historique) ou à tous (persistée, les absents la voient au retour).
+  Les cartes d'invitation du fil rejoignent le salon en un clic.
+- **Plusieurs salons permanents par machine** : instances serve.js
+  avec `--data`, `--ws-port`, `--http-port` distincts ; côté client,
+  le champ « Rejoindre par IP » accepte `ip:port`.
+
 ### Identité des appareils et audit (étape D)
 
 Pseudo libre en surface, identité **Ed25519** stable en dessous : chaque

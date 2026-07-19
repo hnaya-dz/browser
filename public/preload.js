@@ -63,6 +63,8 @@ const ALLOWED_SEND = [
   "chat-mark-read",
   "chat-leave",
   "chat-admin",
+  "chat-list-rooms",
+  "chat-send-invite",
   // ✅ Confidentialité — interrupteurs utilisateur
   "privacy-set-settings",
 ];

@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 // ✅ Icônes vectorielles (lucide, déjà dans les dépendances) plutôt
 // qu'emoji : les emoji sont rendus par la police du système et diffèrent
 // visuellement entre Windows 10 et 11 — incohérent d'un poste à l'autre.
-import { MessageSquare, Shield, Lock, Smartphone, KeyRound } from "lucide-react";
+import { MessageSquare, Shield, Lock, Smartphone, KeyRound, Eye, EyeOff, Send, History, DoorOpen } from "lucide-react";
 import ChatAdminPanel from "./ChatAdminPanel";
 import qrcode from "qrcode-generator";
 import { useTranslation } from "@/hooks/useTranslation";
@@ -79,6 +79,31 @@ function MessageText({ text, accent, onOpen }: { text: string; accent: string; o
   );
 }
 
+// D.2 — ligne de PIN masqué avec œil individuel : l'hôte peut montrer le
+// PIN d'accès à un collègue SANS exposer le PIN admin (chaque ligne a son
+// propre interrupteur, tous masqués par défaut).
+function PinRow({ label, pin, accent, muted }: { label: string; pin: string; accent: string; muted: string }) {
+  const [show, setShow] = useState(false);
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <span style={{ fontSize: 10, color: muted, flex: 1, textAlign: "start" }}>{label}</span>
+      <span style={{
+        fontSize: 16, fontWeight: 700, letterSpacing: 3, color: accent,
+        fontVariantNumeric: "tabular-nums", direction: "ltr",
+      }}>
+        {show ? pin : "••••••"}
+      </span>
+      <button
+        onClick={() => setShow((v) => !v)}
+        aria-label={label}
+        style={{ background: "none", border: "none", cursor: "pointer", color: muted, padding: 2, lineHeight: 0 }}
+      >
+        {show ? <EyeOff size={14} /> : <Eye size={14} />}
+      </button>
+    </div>
+  );
+}
+
 export default function ChatPanel({ onClose }: ChatPanelProps) {
   const { t } = useTranslation();
   const { isRTL } = useLanguage();
@@ -113,6 +138,81 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
       if (v) resetAdminState();
       return !v;
     });
+  };
+
+  // ── D.2 : création enrichie, réouverture, invitations ──
+  const [adminPinInput, setAdminPinInput] = useState("");
+  const [showInvitePanel, setShowInvitePanel] = useState(false);
+  const [inviteTarget, setInviteTarget] = useState<string>(""); // "" = à tous
+  const [inviteRoom, setInviteRoom] = useState({ name: "", address: "", pin: "" });
+
+  // Liste des salons de CE poste, rafraîchie à chaque retour à l'accueil
+  useEffect(() => {
+    if (store.status === "idle") getApi()?.send?.("chat-list-rooms");
+  }, [store.status]);
+
+  // Pré-remplissage du formulaire d'invitation : le salon qu'on héberge
+  // (cas type : je viens de créer « Service Y », j'invite depuis « X »),
+  // sinon le dernier hébergé connu
+  const openInvitePanel = () => {
+    let src: any = store.hosting;
+    if (!src) {
+      try { src = JSON.parse(localStorage.getItem("hnaya-chat-last-hosted") || "null"); } catch {}
+    }
+    setInviteRoom({
+      name: src?.name || "",
+      address: src?.lanIp ? `${src.lanIp}${src.wsPort && src.wsPort !== 4802 ? ":" + src.wsPort : ""}` : "",
+      pin: src?.pin || "",
+    });
+    setInviteTarget("");
+    patchStore({ inviteFeedback: null });
+    setShowInvitePanel(true);
+  };
+
+  const sendInvitation = () => {
+    const api = getApi();
+    if (!api?.send || !inviteRoom.name.trim() || !inviteRoom.address.trim()) return;
+    // Adresse au format ip[:portWS] — le port HTTP mobile suit (+1 par
+    // convention 4802→4803 uniquement si port par défaut)
+    const [addr, portStr] = inviteRoom.address.trim().split(":");
+    const wsPort = Number(portStr) || 4802;
+    api.send("chat-send-invite", {
+      to: inviteTarget || null,
+      room: {
+        name: inviteRoom.name.trim(),
+        address: addr,
+        wsPort,
+        httpPort: wsPort === 4802 ? 4803 : wsPort + 1,
+        pin: /^\d{6}$/.test(inviteRoom.pin) ? inviteRoom.pin : null,
+      },
+    });
+    if (!inviteTarget) patchStore({ inviteFeedback: "delivered" });
+  };
+
+  // Rejoindre depuis une carte d'invitation : coordonnées connues, PIN
+  // prérempli s'il a été transmis — l'utilisateur confirme en un clic
+  const joinFromInvite = (extra: NonNullable<import("@/context/chatstore").ChatMessage["extra"]>) => {
+    setPinInput(extra.pin || "");
+    handlePickSession({
+      sessionName: extra.name,
+      address: extra.address,
+      wsPort: extra.wsPort || 4802,
+      httpPort: extra.httpPort || 4803,
+      hostname: extra.address,
+    });
+  };
+
+  const handleReopenRoom = async (roomId: string, name: string) => {
+    const api = getApi();
+    if (!api?.invoke || !nickname.trim()) return;
+    store.userId = nickname.trim();
+    if (typeof window !== "undefined") localStorage.setItem("hnaya-chat-user-id", nickname.trim());
+    patchStore({ status: "connecting", error: null, sessionName: name, messages: [], online: [] });
+    const net = await api.invoke("chat-network-check").catch(() => null);
+    if (net && net.rulesOk === false) { patchStore({ status: "network-setup" }); return; }
+    startConnecting();
+    const res = await api.invoke("chat-start-host", { roomId });
+    if (!res?.ok) { clearConnectTimer(); patchStore({ status: "error", error: "moduleNotFound" }); }
   };
 
   // ✅ Fil ouvert sur le DERNIER message (retour de test terrain) : au
@@ -170,7 +270,11 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
     // précédent (panneau fermé sans « Quitter ») resteraient affichés.
     patchStore({ sessionName: sessionNameInput || "Hnaya Chat", messages: [], online: [] });
     startConnecting();
-    const res = await api.invoke("chat-start-host", sessionNameInput || "Hnaya Chat");
+    // D.2 : PIN admin choisi (optionnel — généré sinon) transmis à la création
+    const res = await api.invoke("chat-start-host", {
+      sessionName: sessionNameInput || "Hnaya Chat",
+      adminPin: /^\d{6}$/.test(adminPinInput) ? adminPinInput : undefined,
+    });
     if (!res?.ok) { clearConnectTimer(); patchStore({ status: "error", error: "moduleNotFound" }); }
   };
 
@@ -239,24 +343,31 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
   const [manualIp, setManualIp] = useState(() =>
     typeof window !== "undefined" ? localStorage.getItem("hnaya-chat-manual-ip") || "" : ""
   );
-  const manualIpValid = /^[a-zA-Z0-9][a-zA-Z0-9.\-]{2,}$/.test(manualIp.trim());
+  // Format accepté : « 192.168.1.10 » ou « 192.168.1.10:4812 » (D.2 —
+  // plusieurs salons permanents par machine, un port WebSocket chacun)
+  const manualIpValid = /^[a-zA-Z0-9][a-zA-Z0-9.\-]{2,}(:\d{2,5})?$/.test(manualIp.trim());
   const handleManualJoin = async () => {
     if (!manualIpValid) return;
-    const address = manualIp.trim();
-    localStorage.setItem("hnaya-chat-manual-ip", address);
+    const raw = manualIp.trim();
+    localStorage.setItem("hnaya-chat-manual-ip", raw);
+    const [address, portStr] = raw.split(":");
+    const wsPort = Number(portStr) || 4802;
+    // Convention : page mobile sur wsPort+1 quand le port n'est pas celui
+    // par défaut (serve.js --ws-port 4812 --http-port 4813)
+    const httpPort = wsPort === 4802 ? 4803 : wsPort + 1;
     // Récupère le vrai nom du salon via /info.json du serveur (CORS ouvert
     // sur ce seul endpoint) — sinon l'en-tête n'afficherait que l'IP.
     // 1,5 s maximum : ne jamais bloquer la connexion sur ce confort.
-    let sessionName = address;
+    let sessionName = raw;
     try {
       const ctrl = new AbortController();
       const timer = setTimeout(() => ctrl.abort(), 1500);
-      const info = await fetch(`http://${address}:4803/info.json`, { signal: ctrl.signal }).then((r) => r.json());
+      const info = await fetch(`http://${address}:${httpPort}/info.json`, { signal: ctrl.signal }).then((r) => r.json());
       clearTimeout(timer);
       if (info?.sessionName) sessionName = String(info.sessionName);
     } catch { /* serveur sans page mobile ou délai — l'IP fera l'affaire */ }
     handlePickSession({
-      sessionName, address, wsPort: 4802, httpPort: 4803, hostname: address,
+      sessionName, address, wsPort, httpPort, hostname: address,
     });
   };
 
@@ -298,11 +409,17 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
     const api = getApi();
     clearConnectTimer();
     api?.send("chat-leave");
-    if (store.isHost) api?.send("chat-stop-host");
+    // D.2 : l'hébergement ne s'arrête QUE si on quitte le salon qu'on
+    // héberge — quitter « X » en hébergeant « Y » laisse Y ouvert (c'est
+    // le mécanisme des invitations vers un sous-salon). Le bandeau de
+    // l'accueil rappelle le salon resté ouvert.
+    if (store.joinedRoomIsHosted) api?.send("chat-stop-host");
     resetAdminState();
     setShowAdmin(false);
+    setShowInvitePanel(false);
     patchStore({
-      status: "idle", isHost: false, pin: null, adminPin: null, messages: [], online: [],
+      status: "idle", isHost: false, pin: null, adminPin: null, joinedRoomIsHosted: false,
+      messages: [], online: [],
       discovered: new Map(), selectedSession: null, error: null, inviteUrl: null,
     });
     setPinInput("");
@@ -343,9 +460,10 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
         </div>
         {store.status === "joined" && (
           <button onClick={handleLeave} style={{ ...btnStyle(), padding: "5px 10px", fontSize: 11 }}>
-            {/* Sur l'hôte, « Quitter » FERME le salon pour tout le monde —
-                le libellé doit le dire, sinon l'hôte croit juste sortir */}
-            {store.isHost ? t("Chat.closeRoom") : t("Chat.leave")}
+            {/* Sur le salon qu'on HÉBERGE, « Quitter » le FERME pour tout
+                le monde — le libellé doit le dire. Ailleurs (même en
+                hébergeant un autre salon), on ne fait que sortir. */}
+            {store.joinedRoomIsHosted ? t("Chat.closeRoom") : t("Chat.leave")}
           </button>
         )}
         <button onClick={onClose} style={{ background: "none", border: "none", color: muted, fontSize: 18, cursor: "pointer", flexShrink: 0 }}>✕</button>
@@ -360,6 +478,31 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
         {/* Menu principal */}
         {store.status === "idle" && (
           <>
+            {/* D.2 — un salon hébergé par ce poste tourne encore (on l'a
+                quitté sans le fermer, ex. pour aller inviter ailleurs) */}
+            {store.hosting && (
+              <div style={{
+                border: `1px solid ${accent}40`, background: `${accent}12`,
+                borderRadius: 6, padding: 8, display: "flex", alignItems: "center", gap: 8,
+              }}>
+                <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#00c853", flexShrink: 0 }} />
+                <span style={{ fontSize: 11, flex: 1 }}>
+                  {t("Chat.hostingBanner")} <b>{store.hosting.name}</b>
+                </span>
+                <button
+                  onClick={() => handleReopenRoom(store.hosting!.roomId, store.hosting!.name)}
+                  style={{ ...btnStyle(true), padding: "4px 9px", fontSize: 10.5 }}
+                >
+                  {t("Chat.hostingRejoin")}
+                </button>
+                <button
+                  onClick={() => getApi()?.send?.("chat-stop-host")}
+                  style={{ ...btnStyle(), padding: "4px 9px", fontSize: 10.5 }}
+                >
+                  {t("Chat.closeRoom")}
+                </button>
+              </div>
+            )}
             <div>
               <div style={{ fontSize: 11, color: muted, marginBottom: 4 }}>
                 {t("Chat.nickname")} <span style={{ color: accent }}>*</span>
@@ -388,6 +531,15 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
                 onChange={(e) => setSessionNameInput(e.target.value)}
                 placeholder={t("Chat.sessionNamePlaceholder")}
               />
+              {/* D.2 — PIN admin choisi (optionnel, généré sinon) : fini
+                  le PIN fantôme découvert après coup dans les Réglages */}
+              <input
+                style={{ ...inputStyle, marginBottom: 8, direction: "ltr", textAlign: "start" }}
+                value={adminPinInput}
+                onChange={(e) => setAdminPinInput(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                placeholder={t("Chat.adminPinOptional")}
+                inputMode="numeric"
+              />
               <button
                 onClick={handleCreateRoom}
                 disabled={!nickname.trim()}
@@ -396,6 +548,35 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
                 {t("Chat.createRoom")}
               </button>
             </div>
+
+            {/* D.2 — réouverture explicite : c'est ICI que vit la
+                continuité (« Créer » = toujours un salon neuf) */}
+            {store.rooms.length > 0 && (
+              <div style={{ borderTop: `1px solid ${border}`, paddingTop: 12 }}>
+                <div style={{ fontSize: 11, color: muted, marginBottom: 6, display: "flex", alignItems: "center", gap: 5 }}>
+                  <History size={12} /> {t("Chat.reopenTitle")}
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 150, overflowY: "auto" }}>
+                  {store.rooms.slice(0, 6).map((r) => (
+                    <button
+                      key={r.roomId}
+                      onClick={() => handleReopenRoom(r.roomId, r.name)}
+                      disabled={!nickname.trim()}
+                      style={{
+                        ...btnStyle(false, !nickname.trim()), width: "100%",
+                        display: "flex", alignItems: "center", gap: 8, textAlign: "start",
+                      }}
+                    >
+                      <DoorOpen size={13} style={{ flexShrink: 0 }} />
+                      <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</span>
+                      <span style={{ fontSize: 9.5, color: muted, flexShrink: 0 }}>
+                        {new Date(r.lastUsed).toLocaleDateString()}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div style={{ borderTop: `1px solid ${border}`, paddingTop: 12 }}>
               <button
@@ -570,14 +751,19 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
         {/* Salon rejoint — fil de discussion */}
         {store.status === "joined" && (
           <>
-            {store.isHost && store.pin && !showAdmin && (
+            {/* D.2 — les DEUX PINs de l'hôte, masqués par défaut avec œil
+                individuel : montrer le PIN d'accès à un collègue n'expose
+                jamais le PIN admin */}
+            {store.joinedRoomIsHosted && store.pin && !showAdmin && (
               <div style={{
-                background: `${accent}18`, border: `1px solid ${accent}40`, borderRadius: 10,
-                padding: "6px 10px", textAlign: "center", flexShrink: 0,
+                background: `${accent}18`, border: `1px solid ${accent}40`, borderRadius: 8,
+                padding: "8px 10px", flexShrink: 0, display: "flex", flexDirection: "column", gap: 4,
               }}>
-                <div style={{ fontSize: 10, color: muted }}>{t("Chat.yourPin")}</div>
-                <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: 4, color: accent }}>{store.pin}</div>
-                <div style={{ fontSize: 9, color: muted, marginTop: 2 }}>{t("Chat.pinHint")}</div>
+                <PinRow label={t("Chat.yourPin")} pin={store.pin} accent={accent} muted={muted} />
+                {store.adminPin && (
+                  <PinRow label={t("Chat.adminPinYours")} pin={store.adminPin} accent={accent} muted={muted} />
+                )}
+                <div style={{ fontSize: 9, color: muted, textAlign: "center" }}>{t("Chat.pinHint")}</div>
               </div>
             )}
 
@@ -602,20 +788,82 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
                   {showInvite ? t("Chat.inviteClose") : t("Chat.invitePhone")}
                 </button>
               )}
+              {/* D.2 — inviter les membres vers un autre salon (sous-salon) */}
+              {!showAdmin && (
+                <button
+                  onClick={() => (showInvitePanel ? setShowInvitePanel(false) : openInvitePanel())}
+                  style={{
+                    ...btnStyle(showInvitePanel), padding: "4px 8px", fontSize: 10,
+                    display: "flex", alignItems: "center", gap: 4, flexShrink: 0,
+                  }}
+                  title={showInvitePanel ? t("Chat.inviteClose") : t("Chat.inviteToRoom")}
+                >
+                  <Send size={12} />
+                  {showInvitePanel ? t("Chat.inviteClose") : t("Chat.inviteToRoom")}
+                </button>
+              )}
               {/* Administration (étape D) : registre des appareils,
                   historique, réglages — protégé par le PIN admin */}
-              <button
-                onClick={toggleAdmin}
-                style={{
-                  ...btnStyle(showAdmin), padding: "4px 8px", fontSize: 10,
-                  display: "flex", alignItems: "center", gap: 4, flexShrink: 0,
-                }}
-                title={showAdmin ? t("Chat.inviteClose") : t("Chat.admin")}
-              >
-                <KeyRound size={12} />
-                {showAdmin ? t("Chat.inviteClose") : t("Chat.admin")}
-              </button>
+              {!showInvitePanel && (
+                <button
+                  onClick={toggleAdmin}
+                  style={{
+                    ...btnStyle(showAdmin), padding: "4px 8px", fontSize: 10,
+                    display: "flex", alignItems: "center", gap: 4, flexShrink: 0,
+                  }}
+                  title={showAdmin ? t("Chat.inviteClose") : t("Chat.admin")}
+                >
+                  <KeyRound size={12} />
+                  {showAdmin ? t("Chat.inviteClose") : t("Chat.admin")}
+                </button>
+              )}
             </div>
+
+            {/* D.2 — panneau d'envoi d'invitation : coordonnées du salon
+                cible (préremplies si on héberge) + destinataire. Ciblée =
+                remise directe jamais persistée ; à tous = message
+                persistant dans le fil. */}
+            {showInvitePanel && !showAdmin && (
+              <div style={{
+                border: `1px solid ${border}`, borderRadius: 8, padding: 10,
+                display: "flex", flexDirection: "column", gap: 8, flexShrink: 0, background: inputBg,
+              }}>
+                <input style={inputStyle} value={inviteRoom.name}
+                  onChange={(e) => setInviteRoom((s) => ({ ...s, name: e.target.value }))}
+                  placeholder={t("Chat.inviteRoomName")} />
+                <input style={{ ...inputStyle, direction: "ltr", textAlign: "start" }} value={inviteRoom.address}
+                  onChange={(e) => setInviteRoom((s) => ({ ...s, address: e.target.value }))}
+                  placeholder={t("Chat.inviteRoomAddress")} />
+                <input style={{ ...inputStyle, direction: "ltr", textAlign: "start" }} value={inviteRoom.pin}
+                  onChange={(e) => setInviteRoom((s) => ({ ...s, pin: e.target.value.replace(/\D/g, "").slice(0, 6) }))}
+                  placeholder={t("Chat.inviteRoomPin")} inputMode="numeric" />
+                <select
+                  value={inviteTarget}
+                  onChange={(e) => setInviteTarget(e.target.value)}
+                  style={{ ...inputStyle, cursor: "pointer" }}
+                >
+                  <option value="">{t("Chat.inviteAll")}</option>
+                  {store.online.filter((u) => u !== store.userId).map((u) => (
+                    <option key={u} value={u}>{u}</option>
+                  ))}
+                </select>
+                <div style={{ fontSize: 9.5, color: muted, lineHeight: 1.5 }}>
+                  {inviteTarget ? t("Chat.inviteTargetedHint") : t("Chat.inviteAllHint")}
+                </div>
+                <button
+                  onClick={sendInvitation}
+                  disabled={!inviteRoom.name.trim() || !inviteRoom.address.trim()}
+                  style={btnStyle(true, !inviteRoom.name.trim() || !inviteRoom.address.trim())}
+                >
+                  {t("Chat.inviteSend")}
+                </button>
+                {store.inviteFeedback && (
+                  <div style={{ fontSize: 10.5, color: store.inviteFeedback === "delivered" ? "#00c853" : "#ffb300" }}>
+                    {store.inviteFeedback === "delivered" ? t("Chat.inviteDelivered") : t("Chat.inviteOffline")}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Panneau admin (étape D) — remplace fil + composeur */}
             {showAdmin && (
@@ -664,6 +912,34 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
               ) : (
                 store.messages.map((m) => {
                   const isMine = m.from === store.userId;
+                  // D.2 — carte d'invitation : cliquable, rejoint le salon
+                  // invité avec le PIN prérempli s'il a été transmis
+                  if (m.type === "invite" && m.extra) {
+                    return (
+                      <div key={m.id} style={{
+                        alignSelf: "center", width: "95%",
+                        background: `${accent}15`, border: `1px dashed ${accent}70`,
+                        borderRadius: 8, padding: "8px 10px", textAlign: "center",
+                      }}>
+                        <div style={{ fontSize: 10, color: muted }}>
+                          <b>{m.from}</b> {t("Chat.inviteCardText")}
+                        </div>
+                        <div style={{ fontSize: 13, fontWeight: 700, margin: "3px 0", color: accent }}>
+                          {m.extra.name}
+                        </div>
+                        <div style={{ fontSize: 9.5, color: muted, direction: "ltr" }}>
+                          {m.extra.address}{m.extra.wsPort !== 4802 ? ":" + m.extra.wsPort : ""}
+                          {m.extra.pin ? " · PIN ✓" : ""}
+                        </div>
+                        <button
+                          onClick={() => joinFromInvite(m.extra!)}
+                          style={{ ...btnStyle(true), padding: "5px 14px", fontSize: 11, marginTop: 5 }}
+                        >
+                          {t("Chat.inviteJoin")}
+                        </button>
+                      </div>
+                    );
+                  }
                   return (
                     <div key={m.id} style={{
                       alignSelf: isMine ? (isRTL ? "flex-start" : "flex-end") : (isRTL ? "flex-end" : "flex-start"),

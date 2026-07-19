@@ -916,14 +916,32 @@ function ensureChatWorker() {
   return chatWorker;
 }
 
-ipcMain.handle("chat-start-host", async (event, sessionName) => {
+// D.2 : accepte soit une chaîne (compat : nom seul), soit un objet
+// { sessionName, adminPin?, roomId? } — roomId = réouverture d'un salon
+ipcMain.handle("chat-start-host", async (event, params) => {
   const worker = ensureChatWorker();
   if (!worker) return { ok: false, error: "module-not-found" };
-  worker.send({ cmd: "start-host", sessionName });
+  const opts = typeof params === "string" ? { sessionName: params } : (params || {});
+  worker.send({
+    cmd: "start-host",
+    sessionName: opts.sessionName,
+    adminPin: opts.adminPin,
+    roomId: opts.roomId,
+  });
   return { ok: true };
 });
 
 ipcMain.on("chat-stop-host", () => { chatWorker?.send({ cmd: "stop-host" }); });
+
+// D.2 : liste des salons hébergés par ce poste (écran « Rouvrir »)
+ipcMain.on("chat-list-rooms", () => {
+  ensureChatWorker()?.send({ cmd: "list-rooms" });
+});
+
+// D.2 : invitation vers un autre salon (ciblée ou à tous)
+ipcMain.on("chat-send-invite", (event, { to, room }) => {
+  chatWorker?.send({ cmd: "send-invite", to: to || null, room });
+});
 
 ipcMain.on("chat-discover", (event, timeoutMs) => {
   ensureChatWorker()?.send({ cmd: "discover", timeoutMs });

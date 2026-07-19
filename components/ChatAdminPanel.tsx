@@ -12,7 +12,7 @@
 
 import { useState } from "react";
 import { useTranslation } from "@/hooks/useTranslation";
-import { Laptop, Smartphone as PhoneIcon, BadgeCheck, BadgeX, Download } from "lucide-react";
+import { Laptop, Smartphone as PhoneIcon, BadgeCheck, BadgeX, Download, Lock, LockOpen, Ban, Undo2 } from "lucide-react";
 import { store, sendAdminCommand, resetAdminState, getApi, type AdminDevice } from "@/context/chatstore";
 
 interface Props {
@@ -34,11 +34,13 @@ export default function ChatAdminPanel({ accent, muted, border, inputBg, inputSt
   const [q, setQ] = useState("");
   const [author, setAuthor] = useState("");
   const [retentionDraft, setRetentionDraft] = useState<string | null>(null);
+  const [newAdminPin, setNewAdminPin] = useState("");
 
   const authenticate = () => {
     if (!/^\d{6}$/.test(adminPin)) return;
     sendAdminCommand({ adminPin, action: "devices" });
-    sendAdminCommand({ adminPin, action: "config-get" });
+    sendAdminCommand({ adminPin, action: "room-info" }); // verrou + rétention
+    sendAdminCommand({ adminPin, action: "bans" });
   };
 
   const runSearch = () => {
@@ -168,7 +170,29 @@ export default function ChatAdminPanel({ accent, muted, border, inputBg, inputSt
                 >
                   {t("Chat.adminSave")}
                 </button>
+                {/* D.2 — blocage : expulsion immédiate + refus au retour ;
+                    outil d'exception (le verrou gère le quotidien) */}
+                {store.adminBans.includes(d.fingerprint) ? (
+                  <button
+                    onClick={() => sendAdminCommand({ adminPin, action: "unban", fingerprint: d.fingerprint })}
+                    style={{ ...btnStyle(), padding: "5px 8px", fontSize: 10.5, display: "flex", alignItems: "center", gap: 3 }}
+                    title={t("Chat.adminUnban")}
+                  >
+                    <Undo2 size={11} /> {t("Chat.adminUnban")}
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => sendAdminCommand({ adminPin, action: "ban", fingerprint: d.fingerprint })}
+                    style={{ ...btnStyle(), padding: "5px 8px", fontSize: 10.5, color: "#ff5252", borderColor: "#ff525260", display: "flex", alignItems: "center", gap: 3 }}
+                    title={t("Chat.adminBan")}
+                  >
+                    <Ban size={11} /> {t("Chat.adminBan")}
+                  </button>
+                )}
               </div>
+              {store.adminBans.includes(d.fingerprint) && (
+                <div style={{ fontSize: 9.5, color: "#ff5252", marginTop: 3 }}>{t("Chat.adminBannedTag")}</div>
+              )}
             </div>
           ))
         )}
@@ -219,6 +243,30 @@ export default function ChatAdminPanel({ accent, muted, border, inputBg, inputSt
         {/* ── Réglages ── */}
         {tab === "settings" && (
           <>
+            {/* D.2 — VERROU du salon : cycle « créer → tout le monde
+                rejoint → verrouiller ». Verrouillé = membres connus
+                libres d'entrer/sortir, aucun nouvel appareil accepté
+                (même avec le bon PIN). */}
+            <div style={{
+              border: `1px solid ${store.adminLocked ? "#ffb300" : border}`,
+              background: store.adminLocked ? "rgba(255,179,0,0.08)" : "transparent",
+              borderRadius: 6, padding: 8, display: "flex", alignItems: "center", gap: 8,
+            }}>
+              {store.adminLocked ? <Lock size={14} color="#ffb300" /> : <LockOpen size={14} />}
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 11, fontWeight: 700 }}>
+                  {store.adminLocked ? t("Chat.adminLockedState") : t("Chat.adminUnlockedState")}
+                </div>
+                <div style={{ fontSize: 9.5, color: muted, lineHeight: 1.45 }}>{t("Chat.adminLockHint")}</div>
+              </div>
+              <button
+                onClick={() => sendAdminCommand({ adminPin, action: "set-locked", locked: !store.adminLocked })}
+                style={{ ...btnStyle(!store.adminLocked), padding: "5px 10px", fontSize: 10.5, flexShrink: 0 }}
+              >
+                {store.adminLocked ? t("Chat.adminUnlock") : t("Chat.adminLock")}
+              </button>
+            </div>
+
             <div style={{ fontSize: 11, fontWeight: 700 }}>{t("Chat.adminRetention")}</div>
             <div style={{ fontSize: 10, color: muted, lineHeight: 1.5 }}>{t("Chat.adminRetentionHint")}</div>
             <div style={{ display: "flex", gap: 6 }}>
@@ -235,12 +283,29 @@ export default function ChatAdminPanel({ accent, muted, border, inputBg, inputSt
                 {t("Chat.adminSave")}
               </button>
             </div>
-            {store.isHost && store.adminPin && (
-              <div style={{ marginTop: 8, border: `1px solid ${accent}40`, background: `${accent}12`, borderRadius: 6, padding: 8, textAlign: "center" }}>
-                <div style={{ fontSize: 10, color: muted }}>{t("Chat.adminPinYours")}</div>
-                <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: 4, color: accent }}>{store.adminPin}</div>
-              </div>
-            )}
+            {/* D.2 — changer le PIN admin (l'admin authentifié choisit) */}
+            <div style={{ fontSize: 11, fontWeight: 700, marginTop: 4 }}>{t("Chat.adminChangePin")}</div>
+            <div style={{ display: "flex", gap: 6 }}>
+              <input
+                style={{ ...inputStyle, flex: 1, direction: "ltr", textAlign: "start" }}
+                value={newAdminPin}
+                onChange={(e) => setNewAdminPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                placeholder="••••••"
+                inputMode="numeric"
+              />
+              <button
+                onClick={() => {
+                  if (!/^\d{6}$/.test(newAdminPin)) return;
+                  sendAdminCommand({ adminPin, action: "set-admin-pin", newPin: newAdminPin });
+                  setAdminPin(newAdminPin); // les prochaines actions utilisent le nouveau
+                  setNewAdminPin("");
+                }}
+                disabled={!/^\d{6}$/.test(newAdminPin)}
+                style={btnStyle(true, !/^\d{6}$/.test(newAdminPin))}
+              >
+                {t("Chat.adminSave")}
+              </button>
+            </div>
           </>
         )}
       </div>

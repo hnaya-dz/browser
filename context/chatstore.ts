@@ -17,6 +17,34 @@ export interface ChatMessage {
   from: string;
   text: string;
   ts: number;
+  // D.2 — type "invite" : carte d'invitation vers un autre salon,
+  // coordonnées dans extra {name, address, wsPort, httpPort, pin}
+  type?: "message" | "invite";
+  extra?: { name: string; address: string; wsPort: number; httpPort: number; pin: string | null } | null;
+  deviceFp?: string | null;
+  signatureValid?: boolean;
+}
+
+/** Salon hébergé par CE poste (liste « Rouvrir un salon ») */
+export interface KnownRoom {
+  roomId: string;
+  name: string;
+  createdAt: number;
+  lastUsed: number;
+}
+
+/** Salon actuellement HÉBERGÉ par ce poste — indépendant du salon
+ *  rejoint : on peut héberger « Service Y » tout en discutant dans
+ *  « Département X » (c'est le mécanisme des invitations). */
+export interface HostingInfo {
+  roomId: string;
+  name: string;
+  pin: string;
+  adminPin: string;
+  wsPort: number;
+  httpPort: number;
+  lanIp: string | null;
+  inviteUrl: string | null;
 }
 
 export interface DiscoveredSession {
@@ -72,6 +100,21 @@ export interface ChatStore {
   adminDevices: AdminDevice[];
   adminSearch: ChatMessage[];
   adminRetention: number | null;
+  // ── D.2 ──
+  // Empreintes bloquées dans le salon courant (boutons Bloquer/Débloquer)
+  adminBans: string[];
+  // Verrou du salon courant (null = pas encore lu)
+  adminLocked: boolean | null;
+  // Salon hébergé par ce poste (bandeau + invitations) — survit au fait
+  // de rejoindre un AUTRE salon ; null si on n'héberge rien
+  hosting: HostingInfo | null;
+  // Le salon actuellement REJOINT est-il celui qu'on héberge ?
+  // (pilote l'affichage du bloc PINs et le bouton Fermer vs Quitter)
+  joinedRoomIsHosted: boolean;
+  // Salons connus de ce poste (écran « Rouvrir un salon »)
+  rooms: KnownRoom[];
+  // Retour de la dernière invitation ciblée (null | "delivered" | "offline")
+  inviteFeedback: string | null;
 }
 
 export interface AdminDevice {
@@ -108,26 +151,38 @@ export const store: ChatStore = {
   adminDevices: [],
   adminSearch: [],
   adminRetention: null,
+  adminBans: [],
+  adminLocked: null,
+  hosting: null,
+  joinedRoomIsHosted: false,
+  rooms: [],
+  inviteFeedback: null,
 };
 
 /** Envoie une commande admin au salon (réponse via l'événement
  *  "admin-result"). Le PIN est fourni à chaque appel — jamais persisté. */
 export function sendAdminCommand(params: {
   adminPin: string;
-  action: "devices" | "label" | "search" | "config-get" | "config-set";
+  action: "devices" | "label" | "search" | "config-get" | "config-set"
+    | "ban" | "unban" | "bans" | "set-locked" | "room-info" | "set-admin-pin";
   reqId?: string;
   fingerprint?: string;
   label?: string | null;
   filters?: Record<string, unknown>;
   key?: string;
   value?: unknown;
+  locked?: boolean;
+  newPin?: string;
 }) {
   getApi()?.send("chat-admin", params);
 }
 
 /** Réinitialise l'état admin (fermeture du panneau admin ou du salon). */
 export function resetAdminState() {
-  patchStore({ adminAuthed: false, adminError: null, adminDevices: [], adminSearch: [], adminRetention: null });
+  patchStore({
+    adminAuthed: false, adminError: null, adminDevices: [], adminSearch: [],
+    adminRetention: null, adminBans: [], adminLocked: null,
+  });
 }
 
 const listeners = new Set<() => void>();
@@ -195,7 +250,23 @@ export function ensureListening() {
       case "host-started": {
         // ✅ L'hôte rejoint automatiquement son propre salon pour pouvoir
         // discuter — sans ça, "Créer un salon" ouvrirait un serveur muet.
-        patchStore({ pin: evt.pin, adminPin: evt.adminPin || null, isHost: true, inviteUrl: evt.inviteUrl || null });
+        const hosting = {
+          roomId: evt.roomId,
+          name: evt.sessionName || "Hnaya Chat",
+          pin: evt.pin,
+          adminPin: evt.adminPin,
+          wsPort: evt.wsPort,
+          httpPort: evt.httpPort,
+          lanIp: evt.lanIp || null,
+          inviteUrl: evt.inviteUrl || null,
+        };
+        // Mémoire des coordonnées du dernier salon hébergé — pré-remplit
+        // le formulaire d'invitation depuis un AUTRE salon
+        try { localStorage.setItem("hnaya-chat-last-hosted", JSON.stringify(hosting)); } catch {}
+        patchStore({
+          pin: evt.pin, adminPin: evt.adminPin || null, isHost: true,
+          inviteUrl: evt.inviteUrl || null, hosting, joinedRoomIsHosted: true,
+        });
         startConnecting();
         api.send("chat-join", {
           address: "127.0.0.1",
@@ -208,7 +279,13 @@ export function ensureListening() {
         break;
       }
       case "host-stopped":
-        patchStore({ isHost: false, adminPin: null });
+        patchStore({ isHost: false, adminPin: null, hosting: null, joinedRoomIsHosted: false });
+        break;
+      case "rooms":
+        patchStore({ rooms: evt.rooms || [] });
+        break;
+      case "invite-sent":
+        patchStore({ inviteFeedback: evt.delivered ? "delivered" : "offline" });
         break;
       case "session-found": {
         const key = `${evt.session.address}:${evt.session.wsPort}`;
@@ -225,7 +302,10 @@ export function ensureListening() {
         clearConnectTimer();
         patchStore({
           status: "error",
-          error: evt.reason === "pin-incorrect" ? "pinIncorrect" : "genericError",
+          error: evt.reason === "pin-incorrect" ? "pinIncorrect"
+            : evt.reason === "banned" ? "accessBanned"     // D.2 : appareil bloqué
+            : evt.reason === "locked" ? "roomLocked"       // D.2 : salon verrouillé
+            : "genericError",
         });
         break;
       case "disconnected":
@@ -265,6 +345,18 @@ export function ensureListening() {
         if (r.action === "devices" || r.action === "label") patch.adminDevices = r.data || [];
         else if (r.action === "search") patch.adminSearch = r.data || [];
         else if (r.action === "config-get" || r.action === "config-set") {
+          patch.adminRetention = r.data?.retention_days ?? null;
+        }
+        // D.2 : blocages (ban/unban renvoient devices + bans), verrou,
+        // fiche du salon (room-info porte aussi la rétention)
+        else if (r.action === "ban" || r.action === "unban") {
+          patch.adminDevices = r.data?.devices || [];
+          patch.adminBans = (r.data?.bans || []).map((b: any) => b.fingerprint);
+        }
+        else if (r.action === "bans") patch.adminBans = (r.data || []).map((b: any) => b.fingerprint);
+        else if (r.action === "set-locked") patch.adminLocked = !!r.data?.locked;
+        else if (r.action === "room-info") {
+          patch.adminLocked = !!r.data?.locked;
           patch.adminRetention = r.data?.retention_days ?? null;
         }
         patchStore(patch);

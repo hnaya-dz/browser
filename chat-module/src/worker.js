@@ -85,6 +85,10 @@ function handleCommand(msg) {
         // PIN admin choisi par l'utilisateur à la création (optionnel)
         roomId: msg.roomId || undefined,
         adminPin: msg.adminPin || undefined,
+        // Ports surchargés par l'environnement (tests/dev : cohabiter
+        // avec une app installée qui occupe 4802/4803) — vides en prod
+        wsPort: Number(process.env.HNAYA_CHAT_WS_PORT) || undefined,
+        httpPort: Number(process.env.HNAYA_CHAT_HTTP_PORT) || undefined,
         dataDir: DATA_DIR,
         // EADDRINUSE & co : le serveur ne crash plus — on remonte une
         // erreur lisible à l'UI et on considère l'hôte arrêté.
@@ -216,6 +220,7 @@ function handleCommand(msg) {
         key: msg.key,
         value: msg.value,
         newPin: msg.newPin,
+        locked: msg.locked,
       });
       break;
     }
