@@ -235,6 +235,34 @@ export default function Home() {
         }
 
         /* ══════════════════════════════════════════════
+           CLIN D'ŒIL DU LOGO — animation NON perpétuelle
+           Une seule fois à l'ouverture : fondu + montée, puis une brève
+           inclinaison avec micro-tassement (langage corporel d'un clin
+           d'œil). transform/opacity uniquement → composé par le GPU,
+           aucun coût une fois terminée.
+        ══════════════════════════════════════════════ */
+        .logo-wink {
+          transform-origin: 50% 85%;
+          animation: logo-wink 1.6s cubic-bezier(0.22, 1, 0.36, 1) 1 both;
+        }
+        @keyframes logo-wink {
+          0%   { opacity:0; transform:translateY(14px) scale(0.96); }
+          38%  { opacity:1; transform:translateY(0) scale(1); }
+          52%  { transform:rotate(0deg) scaleY(1); }
+          64%  { transform:rotate(-7deg) scaleY(0.94); }
+          78%  { transform:rotate(2deg) scaleY(1.01); }
+          100% { opacity:1; transform:rotate(0deg) scaleY(1); }
+        }
+        /* Accessibilité + petites machines : aucun mouvement si le
+           système demande la réduction des animations */
+        @media (prefers-reduced-motion: reduce) {
+          .logo-wink, .hnaya-bg::before, .hnaya-bg::after,
+          .hnaya-bg-extra::before, .hnaya-bg-extra::after {
+            animation: none !important;
+          }
+        }
+
+        /* ══════════════════════════════════════════════
            CARTE GLASS — 3 THÈMES
         ══════════════════════════════════════════════ */
         .dark .glass-card {
@@ -463,7 +491,7 @@ export default function Home() {
         className="flex flex-col items-center w-screen min-h-[88vh] pt-[15vh] pb-12 px-4"
         dir={isRTL ? "rtl" : "ltr"}
       >
-        <img src="/hnaya.png" alt="حنايا" className="h-24 mb-3 object-contain"
+        <img src="/hnaya.png" alt="حنايا" className="logo-wink h-24 mb-3 object-contain"
           style={{ filter: "drop-shadow(0 0 24px rgba(0,150,80,0.35))" }} />
 
         <p className="glass-tagline text-xs tracking-widest uppercase mb-8 font-light">{tr.tagline}</p>
