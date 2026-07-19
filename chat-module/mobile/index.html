@@ -107,7 +107,29 @@
   </section>
 </main>
 <script type="module">
-import { deriveKeyFromPin, encryptPayload, decryptPayload } from "./vendor/crypto-bundle.js";
+import { deriveKeyFromPin, encryptPayload, decryptPayload, generateIdentity, identityFromPrivate } from "./vendor/crypto-bundle.js";
+
+// ── Identité d'appareil Ed25519 (étape D) ──────────────────────────────
+// Générée à la première visite, conservée en localStorage : le pseudo est
+// libre mais chaque message est signé — l'admin du salon peut toujours
+// rattacher un message à ce téléphone (voir src/identity.js).
+// La clé privée ne quitte JAMAIS l'appareil.
+const identity = (() => {
+  try {
+    const saved = localStorage.getItem("hnaya-chat-device-key");
+    if (saved) return identityFromPrivate(saved);
+  } catch { /* clé corrompue → on régénère */ }
+  const fresh = generateIdentity();
+  localStorage.setItem("hnaya-chat-device-key", fresh.privateKeyB64);
+  return fresh;
+})();
+
+// crypto.randomUUID est réservé aux contextes sécurisés (indisponible en
+// http:// LAN) — getRandomValues reste disponible partout.
+function genMsgId() {
+  const b = crypto.getRandomValues(new Uint8Array(16));
+  return "msg_" + Array.from(b).map((x) => x.toString(16).padStart(2, "0")).join("");
+}
 
 // ── i18n ──────────────────────────────────────────────────────
 const I18N = {
@@ -212,7 +234,18 @@ async function connect() {
   };
 
   ws.onopen = () => {
-    ws.send(encryptPayload(key, { v: 1, type: "join", userId, groups: ["all"], lastSeenTs }));
+    ws.send(encryptPayload(key, {
+      v: 2,
+      type: "join",
+      userId,
+      groups: ["all"],
+      lastSeenTs,
+      device: {
+        publicKey: identity.publicKeySpki,
+        hostname: null, // pas de nom de machine exposé par un navigateur
+        platform: "mobile-web (" + ((navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || "?") + ")",
+      },
+    }));
   };
   ws.onmessage = (ev) => {
     let payload;
@@ -250,7 +283,19 @@ document.addEventListener("visibilitychange", () => {
 function sendDraft() {
   const text = draft.value.trim();
   if (!text || !ws || ws.readyState !== 1) return;
-  ws.send(encryptPayload(key, { v: 1, type: "message", text, groupId: "all", media: null }));
+  // Protocole v2 : id + horodatage générés ici puis SIGNÉS — même contrat
+  // que le client de bureau (src/client.js), vérifié par le serveur.
+  const core = { id: genMsgId(), from: userId, text, ts: Date.now() };
+  ws.send(encryptPayload(key, {
+    v: 2,
+    type: "message",
+    id: core.id,
+    text: core.text,
+    ts: core.ts,
+    groupId: "all",
+    media: null,
+    signature: identity.signMessage(core),
+  }));
   draft.value = "";
 }
 sendBtn.onclick = sendDraft;

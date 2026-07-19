@@ -21,6 +21,8 @@
 
 import { scryptAsync } from "@noble/hashes/scrypt.js";
 import { gcm } from "@noble/ciphers/aes.js";
+import { ed25519 } from "@noble/curves/ed25519.js";
+import { sha256 } from "@noble/hashes/sha2.js";
 
 const SALT = "hnaya-chat-lan-v1"; // même sel fixe que src/crypto.js
 
@@ -68,4 +70,58 @@ export function decryptPayload(key, b64) {
   sealed.set(tag, ct.length);
   const plaintext = gcm(key, iv).decrypt(sealed); // jette si PIN incorrect
   return JSON.parse(new TextDecoder().decode(plaintext));
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Identité d'appareil Ed25519 — pendant navigateur de src/identity.js
+// ═══════════════════════════════════════════════════════════════
+// ⚠️ INTEROPÉRABILITÉ OBLIGATOIRE avec Node (src/identity.js) :
+//   - contenu signé : JSON.stringify([id, from, text, ts]) — ordre FIXE
+//   - clé publique échangée au format spki DER base64 (préfixe ASN.1
+//     de 12 octets + clé brute de 32 octets)
+//   - signature : Ed25519 RFC 8032 (déterministe), 64 octets, base64
+// Vérifié par test/crypto-interop.test.mjs — à relancer après toute
+// modification, puis reconstruire le bundle (commande en tête de fichier).
+
+const SPKI_PREFIX = Uint8Array.from([0x30, 0x2a, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x03, 0x21, 0x00]);
+
+function signablePayload({ id, from, text, ts }) {
+  return new TextEncoder().encode(JSON.stringify([String(id), String(from), String(text), Number(ts)]));
+}
+
+/** Recharge une identité depuis sa clé privée (32 octets base64, stockée
+ *  en localStorage — elle ne quitte JAMAIS l'appareil). */
+export function identityFromPrivate(privateKeyB64) {
+  const priv = b64decode(privateKeyB64);
+  if (priv.length !== 32) throw new Error("Clé privée Ed25519 invalide");
+  const pub = ed25519.getPublicKey(priv);
+  const spki = new Uint8Array(SPKI_PREFIX.length + 32);
+  spki.set(SPKI_PREFIX, 0);
+  spki.set(pub, SPKI_PREFIX.length);
+  return {
+    privateKeyB64,
+    publicKeySpki: b64encode(spki),
+    // Même empreinte que côté serveur : sha256(clé brute) tronqué à 16 hex
+    fingerprint: Array.from(sha256(pub).subarray(0, 8)).map((b) => b.toString(16).padStart(2, "0")).join(""),
+    signMessage(msg) {
+      return b64encode(ed25519.sign(signablePayload(msg), priv));
+    },
+  };
+}
+
+/** Génère une identité neuve (première visite de la page sur cet appareil). */
+export function generateIdentity() {
+  const priv = crypto.getRandomValues(new Uint8Array(32));
+  return identityFromPrivate(b64encode(priv));
+}
+
+/** Vérification (symétrie avec Node — utilisée par les tests d'interop). */
+export function verifyMessage(msg, signatureB64, publicKeySpkiB64) {
+  try {
+    const spki = b64decode(publicKeySpkiB64);
+    if (spki.length !== SPKI_PREFIX.length + 32) return false;
+    return ed25519.verify(b64decode(signatureB64), signablePayload(msg), spki.subarray(SPKI_PREFIX.length));
+  } catch {
+    return false;
+  }
 }
