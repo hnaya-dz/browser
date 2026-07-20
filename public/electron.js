@@ -943,6 +943,12 @@ ipcMain.on("chat-send-invite", (event, { to, room }) => {
   chatWorker?.send({ cmd: "send-invite", to: to || null, room });
 });
 
+// D.2 : suppression définitive d'un salon (historique compris).
+// La confirmation utilisateur est demandée côté renderer AVANT l'appel.
+ipcMain.on("chat-delete-room", (event, roomId) => {
+  ensureChatWorker()?.send({ cmd: "delete-room", roomId });
+});
+
 ipcMain.on("chat-discover", (event, timeoutMs) => {
   ensureChatWorker()?.send({ cmd: "discover", timeoutMs });
 });

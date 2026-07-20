@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 // ✅ Icônes vectorielles (lucide, déjà dans les dépendances) plutôt
 // qu'emoji : les emoji sont rendus par la police du système et diffèrent
 // visuellement entre Windows 10 et 11 — incohérent d'un poste à l'autre.
-import { MessageSquare, Shield, Lock, Smartphone, KeyRound, Eye, EyeOff, Send, History, DoorOpen } from "lucide-react";
+import { MessageSquare, Shield, Lock, Smartphone, KeyRound, Eye, EyeOff, Send, History, DoorOpen, Trash2 } from "lucide-react";
 import ChatAdminPanel from "./ChatAdminPanel";
 import qrcode from "qrcode-generator";
 import { useTranslation } from "@/hooks/useTranslation";
@@ -202,6 +202,16 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
       httpPort: extra.httpPort || 4803,
       hostname: extra.address,
     });
+  };
+
+  // D.2 — suppression définitive d'un salon depuis la liste « Rouvrir » :
+  // historique, appartenances et blocages inclus. Deux gardes : le salon
+  // en cours d'hébergement n'est pas supprimable (bouton masqué) et une
+  // confirmation explicite est demandée.
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const handleDeleteRoom = (roomId: string) => {
+    getApi()?.send?.("chat-delete-room", roomId);
+    setConfirmDelete(null);
   };
 
   const handleReopenRoom = async (roomId: string, name: string) => {
@@ -558,23 +568,62 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
                 <div style={{ fontSize: 11, color: muted, marginBottom: 6, display: "flex", alignItems: "center", gap: 5 }}>
                   <History size={12} /> {t("Chat.reopenTitle")}
                 </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 150, overflowY: "auto" }}>
-                  {store.rooms.slice(0, 6).map((r) => (
-                    <button
-                      key={r.roomId}
-                      onClick={() => handleReopenRoom(r.roomId, r.name)}
-                      disabled={!nickname.trim()}
-                      style={{
-                        ...btnStyle(false, !nickname.trim()), width: "100%",
-                        display: "flex", alignItems: "center", gap: 8, textAlign: "start",
-                      }}
-                    >
-                      <DoorOpen size={13} style={{ flexShrink: 0 }} />
-                      <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</span>
-                      <span style={{ fontSize: 9.5, color: muted, flexShrink: 0 }}>
-                        {new Date(r.lastUsed).toLocaleDateString()}
-                      </span>
-                    </button>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 180, overflowY: "auto" }}>
+                  {store.rooms.slice(0, 8).map((r) => (
+                    confirmDelete === r.roomId ? (
+                      // Confirmation en place — la suppression efface aussi
+                      // tout l'historique du salon
+                      <div key={r.roomId} style={{
+                        border: "1px solid #ff525260", background: "rgba(255,82,82,0.08)",
+                        borderRadius: 4, padding: 8, display: "flex", flexDirection: "column", gap: 6,
+                      }}>
+                        <div style={{ fontSize: 10.5, lineHeight: 1.45 }}>
+                          {t("Chat.deleteConfirm")} <b>{r.name}</b>
+                        </div>
+                        <div style={{ display: "flex", gap: 6 }}>
+                          <button
+                            onClick={() => handleDeleteRoom(r.roomId)}
+                            style={{ ...btnStyle(), flex: 1, padding: "5px 8px", fontSize: 10.5, color: "#ff5252", borderColor: "#ff525260" }}
+                          >
+                            {t("Chat.deleteYes")}
+                          </button>
+                          <button
+                            onClick={() => setConfirmDelete(null)}
+                            style={{ ...btnStyle(), flex: 1, padding: "5px 8px", fontSize: 10.5 }}
+                          >
+                            {t("Chat.back")}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div key={r.roomId} style={{ display: "flex", gap: 6, alignItems: "stretch" }}>
+                        <button
+                          onClick={() => handleReopenRoom(r.roomId, r.name)}
+                          disabled={!nickname.trim()}
+                          style={{
+                            ...btnStyle(false, !nickname.trim()), flex: 1, minWidth: 0,
+                            display: "flex", alignItems: "center", gap: 8, textAlign: "start",
+                          }}
+                        >
+                          <DoorOpen size={13} style={{ flexShrink: 0 }} />
+                          <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</span>
+                          <span style={{ fontSize: 9.5, color: muted, flexShrink: 0 }}>
+                            {new Date(r.lastUsed).toLocaleDateString()}
+                          </span>
+                        </button>
+                        {/* Pas de suppression du salon actuellement hébergé
+                            (il faut le fermer d'abord) */}
+                        {store.hosting?.roomId !== r.roomId && (
+                          <button
+                            onClick={() => setConfirmDelete(r.roomId)}
+                            title={t("Chat.deleteRoom")}
+                            style={{ ...btnStyle(), padding: "0 9px", color: muted, flexShrink: 0 }}
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        )}
+                      </div>
+                    )
                   ))}
                 </div>
               </div>
@@ -830,6 +879,17 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
                 border: `1px solid ${border}`, borderRadius: 8, padding: 10,
                 display: "flex", flexDirection: "column", gap: 8, flexShrink: 0, background: inputBg,
               }}>
+                {/* Explication du principe : on invite les membres d'ICI
+                    vers un AUTRE salon (retour terrain : « je ne comprends
+                    pas avec quelle logique fonctionne ce bouton ») */}
+                <div style={{ fontSize: 10, color: muted, lineHeight: 1.5 }}>
+                  {t("Chat.invitePanelHint")}
+                </div>
+                {!store.hosting && (
+                  <div style={{ fontSize: 10, color: "#ffb300", lineHeight: 1.5 }}>
+                    {t("Chat.inviteNoHostHint")}
+                  </div>
+                )}
                 <input style={inputStyle} value={inviteRoom.name}
                   onChange={(e) => setInviteRoom((s) => ({ ...s, name: e.target.value }))}
                   placeholder={t("Chat.inviteRoomName")} />

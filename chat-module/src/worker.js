@@ -36,7 +36,7 @@
 import os from "node:os";
 import { startHost } from "./server.js";
 import { discoverSessions, joinSession } from "./client.js";
-import { initStore, listRooms } from "./store.js";
+import { initStore, listRooms, deleteRoom } from "./store.js";
 
 // IP LAN du poste — pour composer l'URL d'invitation mobile du QR code.
 // Plusieurs interfaces possibles (VirtualBox, VPN…) : on privilégie les
@@ -196,6 +196,20 @@ function handleCommand(msg) {
     case "list-rooms": {
       // Liste des salons hébergés par CE poste (écran « Rouvrir un salon »)
       initStore(DATA_DIR);
+      process.send({ event: "rooms", rooms: listRooms() });
+      break;
+    }
+
+    case "delete-room": {
+      // Suppression définitive (D.2) — refusée pour le salon en cours
+      // d'hébergement : il faut le fermer d'abord (l'UI l'empêche déjà,
+      // ceinture serveur ici)
+      if (hostHandle?.roomId === msg.roomId) {
+        process.send({ event: "error", message: "Fermez le salon avant de le supprimer." });
+        break;
+      }
+      initStore(DATA_DIR);
+      deleteRoom(msg.roomId);
       process.send({ event: "rooms", rooms: listRooms() });
       break;
     }

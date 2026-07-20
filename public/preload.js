@@ -65,6 +65,7 @@ const ALLOWED_SEND = [
   "chat-admin",
   "chat-list-rooms",
   "chat-send-invite",
+  "chat-delete-room",
   // ✅ Confidentialité — interrupteurs utilisateur
   "privacy-set-settings",
 ];

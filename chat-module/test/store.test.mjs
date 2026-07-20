@@ -10,8 +10,9 @@ import {
   initStore, closeStore, saveMessage, getMessagesSince, purgeOldMessages,
   upsertDeviceSeen, setDeviceLabel, listDevices, getDevice,
   searchMessages, getConfig, setConfig,
-  createRoom, getRoom, touchRoom, listRooms, setRoomAdminPin,
+  createRoom, getRoom, touchRoom, listRooms, setRoomAdminPin, deleteRoom,
   banDevice, unbanDevice, isBanned, listBans,
+  addRoomMember, isRoomMember, setRoomLocked,
 } from "../src/store.js";
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "hnaya-store-"));
@@ -90,6 +91,28 @@ assert.equal(listBans(rA.roomId).length, 1);
 unbanDevice(rA.roomId, "aabbccdd11223344");
 assert.equal(isBanned(rA.roomId, "aabbccdd11223344"), false, "déblocage effectif");
 
+// 7-bis) D.2 — suppression définitive d'un salon : le salon, son
+// historique, ses appartenances et ses blocages disparaissent ; les
+// AUTRES salons sont intacts (cloisonnement respecté jusqu'au bout)
+const rDel = createRoom({ name: "Salon éphémère", adminPin: "888888" });
+saveMessage({ id: "del1", roomId: rDel.roomId, groupId: "all", from: "X", text: "à effacer", ts: now });
+addRoomMember(rDel.roomId, "ffee001122334455");
+banDevice(rDel.roomId, "aabbccdd11223344");
+setRoomLocked(rDel.roomId, true);
+assert.equal(getRoom(rDel.roomId).locked, 1, "verrou posé (contrôle avant suppression)");
+assert.equal(isRoomMember(rDel.roomId, "ffee001122334455"), true);
+
+const roomsBefore = listRooms().length;
+deleteRoom(rDel.roomId);
+assert.equal(getRoom(rDel.roomId), null, "salon supprimé");
+assert.equal(listRooms().length, roomsBefore - 1, "un seul salon retiré");
+assert.equal(searchMessages({ roomId: rDel.roomId }).length, 0, "historique effacé");
+assert.equal(listBans(rDel.roomId).length, 0, "blocages effacés");
+assert.equal(isRoomMember(rDel.roomId, "ffee001122334455"), false, "appartenances effacées");
+// Les autres salons n'ont pas bougé
+assert.equal(searchMessages({ roomId: rA.roomId }).length, 1, "salon X intact après suppression de Y");
+assert.equal(getRoom(rA.roomId).adminPin, "999999", "PINs du salon X intacts");
+
 // 8) D.2 — migration : une base héritée (config seule) devient un salon
 // « default » réouvrable
 import fs2 from "node:fs";
@@ -106,4 +129,4 @@ assert.equal(migrated.adminPin, "424242");
 assert.equal(migrated.name, "Ancien salon");
 
 closeStore();
-console.log("✅ store.test.mjs : 8 groupes d'assertions PASSÉS (" + dir + ")");
+console.log("✅ store.test.mjs : 9 groupes d'assertions PASSÉS (" + dir + ")");

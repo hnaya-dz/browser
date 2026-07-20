@@ -299,6 +299,17 @@ export function setRoomPin(roomId, roomPin) {
   ensureDb().prepare("UPDATE rooms SET roomPin = ? WHERE roomId = ?").run(roomPin, String(roomId));
 }
 
+/** Suppression DÉFINITIVE d'un salon : historique, appartenances et
+ *  blocages compris. Réservée au poste qui détient la base (l'UI exige
+ *  une confirmation et refuse le salon actuellement hébergé). */
+export function deleteRoom(roomId) {
+  const d = ensureDb();
+  d.prepare("DELETE FROM messages WHERE roomId = ?").run(String(roomId));
+  d.prepare("DELETE FROM bans WHERE roomId = ?").run(String(roomId));
+  d.prepare("DELETE FROM room_members WHERE roomId = ?").run(String(roomId));
+  d.prepare("DELETE FROM rooms WHERE roomId = ?").run(String(roomId));
+}
+
 // ── Appartenance et verrou (D.2) ───────────────────────────────────────────
 // L'appartenance est enregistrée à chaque join réussi d'un client signé.
 // C'est la référence du VERROU : salon verrouillé = seuls les appareils
