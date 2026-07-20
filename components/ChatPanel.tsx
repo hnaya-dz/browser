@@ -156,11 +156,15 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
   // Pré-remplissage du formulaire d'invitation : le salon qu'on héberge
   // (cas type : je viens de créer « Service Y », j'invite depuis « X »),
   // sinon le dernier hébergé connu
+  const [inviteRoomId, setInviteRoomId] = useState<string>("");
   const openInvitePanel = () => {
+    // Rafraîchir la liste des salons de ce poste pour le sélecteur
+    getApi()?.send?.("chat-list-rooms");
     let src: any = store.hosting;
     if (!src) {
       try { src = JSON.parse(localStorage.getItem("hnaya-chat-last-hosted") || "null"); } catch {}
     }
+    setInviteRoomId(store.hosting?.roomId || "");
     setInviteRoom({
       name: src?.name || "",
       address: src?.lanIp ? `${src.lanIp}${src.wsPort && src.wsPort !== 4802 ? ":" + src.wsPort : ""}` : "",
@@ -169,6 +173,24 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
     setInviteTarget("");
     patchStore({ inviteFeedback: null });
     setShowInvitePanel(true);
+  };
+
+  // Sélection d'un salon de ce poste → remplissage automatique. Le PIN
+  // n'est connu que du salon ACTUELLEMENT hébergé (les autres dorment) :
+  // pour eux, on remplit nom + adresse et on prévient qu'il faut l'ouvrir.
+  const pickInviteRoom = (roomId: string) => {
+    setInviteRoomId(roomId);
+    if (!roomId) return;
+    const room = store.rooms.find((r) => r.roomId === roomId);
+    if (!room) return;
+    const isHosted = store.hosting?.roomId === roomId;
+    const ip = store.hosting?.lanIp || store.roomsLanIp || "";
+    const port = isHosted && store.hosting ? store.hosting.wsPort : 4802;
+    setInviteRoom({
+      name: room.name,
+      address: ip ? `${ip}${port !== 4802 ? ":" + port : ""}` : "",
+      pin: isHosted && store.hosting ? store.hosting.pin : "",
+    });
   };
 
   const sendInvitation = () => {
@@ -568,62 +590,72 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
                 <div style={{ fontSize: 11, color: muted, marginBottom: 6, display: "flex", alignItems: "center", gap: 5 }}>
                   <History size={12} /> {t("Chat.reopenTitle")}
                 </div>
+                {/* ⚠️ La confirmation vit HORS de la liste déroulante :
+                    à l'intérieur, ses boutons pouvaient tomber sous la zone
+                    visible et devenaient inatteignables (retour terrain :
+                    « pas moyen de confirmer »). */}
+                {confirmDelete && (
+                  <div style={{
+                    border: "1px solid #ff525260", background: "rgba(255,82,82,0.08)",
+                    borderRadius: 4, padding: 8, marginBottom: 8,
+                    display: "flex", flexDirection: "column", gap: 6,
+                  }}>
+                    <div style={{ fontSize: 10.5, lineHeight: 1.45 }}>
+                      {t("Chat.deleteConfirm")}{" "}
+                      <b>{store.rooms.find((r) => r.roomId === confirmDelete)?.name}</b>
+                    </div>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <button
+                        onClick={() => handleDeleteRoom(confirmDelete)}
+                        style={{ ...btnStyle(), flex: 1, padding: "6px 8px", fontSize: 10.5, color: "#ff5252", borderColor: "#ff525260" }}
+                      >
+                        {t("Chat.deleteYes")}
+                      </button>
+                      <button
+                        onClick={() => setConfirmDelete(null)}
+                        style={{ ...btnStyle(), flex: 1, padding: "6px 8px", fontSize: 10.5 }}
+                      >
+                        {t("Chat.cancel")}
+                      </button>
+                    </div>
+                  </div>
+                )}
                 <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 180, overflowY: "auto" }}>
                   {store.rooms.slice(0, 8).map((r) => (
-                    confirmDelete === r.roomId ? (
-                      // Confirmation en place — la suppression efface aussi
-                      // tout l'historique du salon
-                      <div key={r.roomId} style={{
-                        border: "1px solid #ff525260", background: "rgba(255,82,82,0.08)",
-                        borderRadius: 4, padding: 8, display: "flex", flexDirection: "column", gap: 6,
-                      }}>
-                        <div style={{ fontSize: 10.5, lineHeight: 1.45 }}>
-                          {t("Chat.deleteConfirm")} <b>{r.name}</b>
-                        </div>
-                        <div style={{ display: "flex", gap: 6 }}>
-                          <button
-                            onClick={() => handleDeleteRoom(r.roomId)}
-                            style={{ ...btnStyle(), flex: 1, padding: "5px 8px", fontSize: 10.5, color: "#ff5252", borderColor: "#ff525260" }}
-                          >
-                            {t("Chat.deleteYes")}
-                          </button>
-                          <button
-                            onClick={() => setConfirmDelete(null)}
-                            style={{ ...btnStyle(), flex: 1, padding: "5px 8px", fontSize: 10.5 }}
-                          >
-                            {t("Chat.back")}
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div key={r.roomId} style={{ display: "flex", gap: 6, alignItems: "stretch" }}>
+                    <div key={r.roomId} style={{
+                      display: "flex", gap: 6, alignItems: "stretch",
+                      opacity: confirmDelete && confirmDelete !== r.roomId ? 0.45 : 1,
+                    }}>
+                      <button
+                        onClick={() => handleReopenRoom(r.roomId, r.name)}
+                        disabled={!nickname.trim() || !!confirmDelete}
+                        style={{
+                          ...btnStyle(false, !nickname.trim() || !!confirmDelete), flex: 1, minWidth: 0,
+                          display: "flex", alignItems: "center", gap: 8, textAlign: "start",
+                        }}
+                      >
+                        <DoorOpen size={13} style={{ flexShrink: 0 }} />
+                        <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</span>
+                        <span style={{ fontSize: 9.5, color: muted, flexShrink: 0 }}>
+                          {new Date(r.lastUsed).toLocaleDateString()}
+                        </span>
+                      </button>
+                      {/* Pas de suppression du salon actuellement hébergé
+                          (il faut le fermer d'abord) */}
+                      {store.hosting?.roomId !== r.roomId && (
                         <button
-                          onClick={() => handleReopenRoom(r.roomId, r.name)}
-                          disabled={!nickname.trim()}
+                          onClick={() => setConfirmDelete(r.roomId)}
+                          title={t("Chat.deleteRoom")}
                           style={{
-                            ...btnStyle(false, !nickname.trim()), flex: 1, minWidth: 0,
-                            display: "flex", alignItems: "center", gap: 8, textAlign: "start",
+                            ...btnStyle(), padding: "0 9px", flexShrink: 0,
+                            color: confirmDelete === r.roomId ? "#ff5252" : muted,
+                            borderColor: confirmDelete === r.roomId ? "#ff525260" : border,
                           }}
                         >
-                          <DoorOpen size={13} style={{ flexShrink: 0 }} />
-                          <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</span>
-                          <span style={{ fontSize: 9.5, color: muted, flexShrink: 0 }}>
-                            {new Date(r.lastUsed).toLocaleDateString()}
-                          </span>
+                          <Trash2 size={13} />
                         </button>
-                        {/* Pas de suppression du salon actuellement hébergé
-                            (il faut le fermer d'abord) */}
-                        {store.hosting?.roomId !== r.roomId && (
-                          <button
-                            onClick={() => setConfirmDelete(r.roomId)}
-                            title={t("Chat.deleteRoom")}
-                            style={{ ...btnStyle(), padding: "0 9px", color: muted, flexShrink: 0 }}
-                          >
-                            <Trash2 size={13} />
-                          </button>
-                        )}
-                      </div>
-                    )
+                      )}
+                    </div>
                   ))}
                 </div>
               </div>
@@ -885,7 +917,30 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
                 <div style={{ fontSize: 10, color: muted, lineHeight: 1.5 }}>
                   {t("Chat.invitePanelHint")}
                 </div>
-                {!store.hosting && (
+                {/* Sélecteur des salons de ce poste — remplit nom, adresse
+                    et PIN automatiquement (retour terrain) */}
+                {store.rooms.length > 0 && (
+                  <select
+                    value={inviteRoomId}
+                    onChange={(e) => pickInviteRoom(e.target.value)}
+                    style={{ ...inputStyle, cursor: "pointer" }}
+                  >
+                    <option value="">{t("Chat.inviteRoomPick")}</option>
+                    {store.rooms.map((r) => (
+                      <option key={r.roomId} value={r.roomId}>
+                        {r.name}{store.hosting?.roomId === r.roomId ? " ● " + t("Chat.inviteRoomOpen") : ""}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                {/* Salon choisi mais pas ouvert → il faut l'ouvrir pour que
+                    l'invitation soit utilisable */}
+                {inviteRoomId && store.hosting?.roomId !== inviteRoomId && (
+                  <div style={{ fontSize: 10, color: "#ffb300", lineHeight: 1.5 }}>
+                    {t("Chat.inviteRoomClosedHint")}
+                  </div>
+                )}
+                {!store.hosting && !inviteRoomId && (
                   <div style={{ fontSize: 10, color: "#ffb300", lineHeight: 1.5 }}>
                     {t("Chat.inviteNoHostHint")}
                   </div>
@@ -904,7 +959,11 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
                   onChange={(e) => setInviteTarget(e.target.value)}
                   style={{ ...inputStyle, cursor: "pointer" }}
                 >
-                  <option value="">{t("Chat.inviteAll")}</option>
+                  {/* « À tous » + un choix par membre connecté (le compteur
+                      lève le doute quand on est seul dans le salon) */}
+                  <option value="">
+                    {t("Chat.inviteAll")} — {store.online.length} {t("Chat.online")}
+                  </option>
                   {store.online.filter((u) => u !== store.userId).map((u) => (
                     <option key={u} value={u}>{u}</option>
                   ))}
@@ -977,6 +1036,18 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
                   // D.2 — carte d'invitation : cliquable, rejoint le salon
                   // invité avec le PIN prérempli s'il a été transmis
                   if (m.type === "invite" && m.extra) {
+                    // L'expéditeur ne se voit PAS proposer de rejoindre son
+                    // propre salon (retour terrain) — simple accusé discret
+                    if (isMine) {
+                      return (
+                        <div key={m.id} style={{
+                          alignSelf: "center", fontSize: 9.5, color: muted,
+                          textAlign: "center", padding: "2px 0",
+                        }}>
+                          {t("Chat.inviteSentTo")} <b>{m.extra.name}</b>
+                        </div>
+                      );
+                    }
                     return (
                       <div key={m.id} style={{
                         alignSelf: "center", width: "95%",

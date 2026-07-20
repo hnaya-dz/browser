@@ -204,7 +204,17 @@
     "adminLockHint": "Verrouillé : les membres connus entrent et sortent librement, aucun nouvel appareil n'est accepté — même avec le bon PIN.",
     "adminChangePin": "Changer le PIN administrateur",
     "adminPinChangedOk": "✓ PIN administrateur modifié — utilisez le nouveau code dès la prochaine ouverture.",
-    "inviteHint": "Scannez avec l'appareil photo du mobile (même wifi), puis saisissez le PIN du salon. Gardez la page ouverte pour recevoir les messages."
+    "inviteHint": "Scannez avec l'appareil photo du mobile (même wifi), puis saisissez le PIN du salon. Gardez la page ouverte pour recevoir les messages.",
+    "cancel": "Annuler",
+    "inviteSentTo": "Invitation envoyée au salon",
+    "inviteRoomPick": "— Choisir un salon de ce poste —",
+    "inviteRoomOpen": "ouvert",
+    "inviteRoomClosedHint": "Ce salon n'est pas ouvert : les invités ne pourront pas le rejoindre tant qu'il n'est pas rouvert depuis l'accueil.",
+    "adminVaultUse": "Utiliser le code enregistré",
+    "adminVaultSave": "Enregistrer ce code dans mes mots de passe",
+    "adminVaultUpdate": "Mettre à jour le code enregistré",
+    "adminVaultSaved": "✓ Code enregistré dans le coffre chiffré de Hnaya.",
+    "adminVaultHint": "Plus besoin de mémoriser ce code : enregistrez-le dans vos mots de passe (chiffrés sur cet appareil) et il sera proposé automatiquement à la prochaine ouverture."
   },
   "Privacy": {
     "title": "Confidentialité",

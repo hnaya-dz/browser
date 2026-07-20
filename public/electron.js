@@ -6,7 +6,7 @@ import { existsSync, createReadStream, statSync, readFileSync, writeFileSync } f
 import http from "http";
 // ✅ PATCH 1 — import depuis shared/ (supprime la duplication avec urlbar.tsx)
 import { isDownloadableUrl } from "./shared/supportedHosts.js";
-import { registerVaultIpc } from "./vault-ipc.js";
+import { registerVaultIpc, readChatAdminPin } from "./vault-ipc.js";
 import { registerFavoritesIpc } from "./favorites-ipc.js";
 import { checkForUpdate } from "./update-check.js";
 
@@ -971,7 +971,20 @@ ipcMain.on("chat-leave", () => { chatWorker?.send({ cmd: "leave" }); });
 // historique, rétention). Le PIN admin transite vers le worker puis au
 // salon via le canal chiffré — jamais stocké ici.
 ipcMain.on("chat-admin", (event, params) => {
-  chatWorker?.send({ cmd: "admin", ...params });
+  // ✅ D.3 — « code enregistré » : le renderer envoie vaultRoomKey au lieu
+  // du PIN. Le code est lu ICI, dans le process principal, et injecté dans
+  // la commande — il ne transite JAMAIS par la page (invariant vault-ipc).
+  const { vaultRoomKey, ...rest } = params || {};
+  const adminPin = vaultRoomKey ? readChatAdminPin(vaultRoomKey) : params?.adminPin;
+  if (vaultRoomKey && !adminPin) {
+    // Aucun code enregistré pour ce salon — répondre comme un PIN refusé
+    mainWindow?.webContents.send("chat-event", {
+      event: "admin-result",
+      result: { ok: false, error: "admin-pin", action: params?.action, reqId: params?.reqId || null },
+    });
+    return;
+  }
+  chatWorker?.send({ cmd: "admin", ...rest, adminPin });
 });
 
 // Export admin (JSON/CSV) : le renderer fournit le contenu, l'utilisateur

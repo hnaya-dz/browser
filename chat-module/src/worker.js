@@ -194,9 +194,11 @@ function handleCommand(msg) {
     }
 
     case "list-rooms": {
-      // Liste des salons hébergés par CE poste (écran « Rouvrir un salon »)
+      // Liste des salons hébergés par CE poste (écran « Rouvrir un salon »
+      // et sélecteur du panneau d'invitation). lanIp accompagne la liste :
+      // il permet de composer l'adresse d'invitation sans héberger.
       initStore(DATA_DIR);
-      process.send({ event: "rooms", rooms: listRooms() });
+      process.send({ event: "rooms", rooms: listRooms(), lanIp: getLanAddress() });
       break;
     }
 

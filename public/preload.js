@@ -14,6 +14,8 @@ const ALLOWED_INVOKE = [
   "vault-inject",
   "vault-save-from-page",
   "vault-export",
+  "vault-chat-pin-save",
+  "vault-chat-pin-has",
   "get-active-tab-url",
   "favorites-list",
   "favorites-is-saved",

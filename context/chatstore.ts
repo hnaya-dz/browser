@@ -113,6 +113,8 @@ export interface ChatStore {
   joinedRoomIsHosted: boolean;
   // Salons connus de ce poste (écran « Rouvrir un salon »)
   rooms: KnownRoom[];
+  // IP LAN de ce poste — compose l'adresse d'invitation même sans héberger
+  roomsLanIp: string | null;
   // Retour de la dernière invitation ciblée (null | "delivered" | "offline")
   inviteFeedback: string | null;
   // Confirmation visuelle du changement de PIN admin (retour terrain :
@@ -159,6 +161,7 @@ export const store: ChatStore = {
   hosting: null,
   joinedRoomIsHosted: false,
   rooms: [],
+  roomsLanIp: null,
   inviteFeedback: null,
   adminPinChanged: false,
 };
@@ -166,7 +169,11 @@ export const store: ChatStore = {
 /** Envoie une commande admin au salon (réponse via l'événement
  *  "admin-result"). Le PIN est fourni à chaque appel — jamais persisté. */
 export function sendAdminCommand(params: {
-  adminPin: string;
+  // Soit le PIN saisi, soit vaultRoomKey : dans ce cas le PIN est lu et
+  // injecté par le PROCESS PRINCIPAL depuis le coffre chiffré — il ne
+  // transite jamais par cette page (voir public/vault-ipc.js).
+  adminPin?: string;
+  vaultRoomKey?: string;
   action: "devices" | "label" | "search" | "config-get" | "config-set"
     | "ban" | "unban" | "bans" | "set-locked" | "room-info" | "set-admin-pin";
   reqId?: string;
@@ -286,7 +293,7 @@ export function ensureListening() {
         patchStore({ isHost: false, adminPin: null, hosting: null, joinedRoomIsHosted: false });
         break;
       case "rooms":
-        patchStore({ rooms: evt.rooms || [] });
+        patchStore({ rooms: evt.rooms || [], roomsLanIp: evt.lanIp ?? store.roomsLanIp });
         break;
       case "invite-sent":
         patchStore({ inviteFeedback: evt.delivered ? "delivered" : "offline" });

@@ -10,9 +10,9 @@
 // Le serveur du salon reste l'unique autorité : chaque action repart par
 // le canal chiffré (voir chat-module/src/server.js, type "admin").
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "@/hooks/useTranslation";
-import { Laptop, Smartphone as PhoneIcon, BadgeCheck, BadgeX, Download, Lock, LockOpen, Ban, Undo2 } from "lucide-react";
+import { Laptop, Smartphone as PhoneIcon, BadgeCheck, BadgeX, Download, Lock, LockOpen, Ban, Undo2, KeySquare } from "lucide-react";
 import { store, patchStore, sendAdminCommand, resetAdminState, getApi, type AdminDevice } from "@/context/chatstore";
 
 interface Props {
@@ -29,6 +29,43 @@ export default function ChatAdminPanel({ accent, muted, border, inputBg, inputSt
   // Le PIN vit UNIQUEMENT dans cet état local — jamais en localStorage.
   // Pré-rempli pour l'hôte (il vient de lui être affiché par host-started).
   const [adminPin, setAdminPin] = useState(store.isHost ? (store.adminPin || "") : "");
+
+  // ── Coffre chiffré (D.3) ──────────────────────────────────────────
+  // Clé d'identification du salon : son identifiant si on l'héberge,
+  // sinon son adresse réseau. Le PIN lui-même n'est jamais lu ici : on
+  // demande seulement s'il EXISTE, et l'authentification passe par
+  // vaultRoomKey (le process principal injecte le code).
+  const roomKey = store.joinedRoomIsHosted && store.hosting
+    ? store.hosting.roomId
+    : store.selectedSession
+      ? `${store.selectedSession.address}:${store.selectedSession.wsPort}`
+      : null;
+  const [vaultHasPin, setVaultHasPin] = useState(false);
+  const [usingVault, setUsingVault] = useState(false);
+  const [vaultSaved, setVaultSaved] = useState(false);
+
+  useEffect(() => {
+    if (!roomKey) return;
+    getApi()?.invoke?.("vault-chat-pin-has", roomKey)
+      .then((has: boolean) => setVaultHasPin(!!has))
+      .catch(() => setVaultHasPin(false));
+  }, [roomKey]);
+
+  // Toute commande admin part avec le PIN saisi OU la clé de coffre
+  const admin = (params: Record<string, unknown>) =>
+    sendAdminCommand(usingVault && roomKey
+      ? ({ vaultRoomKey: roomKey, ...params } as any)
+      : ({ adminPin, ...params } as any));
+
+  const saveToVault = async () => {
+    if (!roomKey || !/^\d{6}$/.test(adminPin)) return;
+    const res = await getApi()?.invoke?.("vault-chat-pin-save", {
+      roomKey,
+      roomName: store.sessionName || "Salon",
+      adminPin,
+    });
+    if (res?.ok) { setVaultHasPin(true); setVaultSaved(true); }
+  };
   const [tab, setTab] = useState<"devices" | "history" | "settings">("devices");
   const [labelDrafts, setLabelDrafts] = useState<Record<string, string>>({});
   const [q, setQ] = useState("");
@@ -38,16 +75,27 @@ export default function ChatAdminPanel({ accent, muted, border, inputBg, inputSt
 
   const authenticate = () => {
     if (!/^\d{6}$/.test(adminPin)) return;
+    setUsingVault(false);
     sendAdminCommand({ adminPin, action: "devices" });
-    sendAdminCommand({ adminPin, action: "room-info" }); // verrou + rétention
+    sendAdminCommand({ adminPin, action: "room-info" });
     sendAdminCommand({ adminPin, action: "bans" });
+  };
+
+  // Authentification par le code enregistré dans le coffre : aucune
+  // saisie, et le PIN ne passe pas par cette page
+  const authenticateFromVault = () => {
+    if (!roomKey) return;
+    setUsingVault(true);
+    sendAdminCommand({ vaultRoomKey: roomKey, action: "devices" });
+    sendAdminCommand({ vaultRoomKey: roomKey, action: "room-info" });
+    sendAdminCommand({ vaultRoomKey: roomKey, action: "bans" });
   };
 
   const runSearch = () => {
     const filters: Record<string, unknown> = { limit: 200 };
     if (q.trim()) filters.q = q.trim();
     if (author.trim()) filters.from = author.trim();
-    sendAdminCommand({ adminPin, action: "search", filters });
+    admin({ action: "search", filters });
   };
 
   const deviceName = (fp: string | null) => {
@@ -119,6 +167,17 @@ export default function ChatAdminPanel({ accent, muted, border, inputBg, inputSt
         <button onClick={authenticate} disabled={!/^\d{6}$/.test(adminPin)} style={btnStyle(true, !/^\d{6}$/.test(adminPin))}>
           {t("Chat.adminAccess")}
         </button>
+        {/* D.3 — code enregistré dans le coffre chiffré : aucune saisie,
+            et le code ne transite pas par cette page (il est lu et injecté
+            par le process principal) */}
+        {vaultHasPin && (
+          <button
+            onClick={authenticateFromVault}
+            style={{ ...btnStyle(), display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
+          >
+            <KeySquare size={13} /> {t("Chat.adminVaultUse")}
+          </button>
+        )}
       </div>
     );
   }
@@ -165,7 +224,7 @@ export default function ChatAdminPanel({ accent, muted, border, inputBg, inputSt
                   onChange={(e) => setLabelDrafts((s) => ({ ...s, [d.fingerprint]: e.target.value }))}
                 />
                 <button
-                  onClick={() => sendAdminCommand({ adminPin, action: "label", fingerprint: d.fingerprint, label: (labelDrafts[d.fingerprint] ?? d.label ?? "").trim() || null })}
+                  onClick={() => admin({ action: "label", fingerprint: d.fingerprint, label: (labelDrafts[d.fingerprint] ?? d.label ?? "").trim() || null })}
                   style={{ ...btnStyle(true), padding: "5px 10px", fontSize: 10.5 }}
                 >
                   {t("Chat.adminSave")}
@@ -174,7 +233,7 @@ export default function ChatAdminPanel({ accent, muted, border, inputBg, inputSt
                     outil d'exception (le verrou gère le quotidien) */}
                 {store.adminBans.includes(d.fingerprint) ? (
                   <button
-                    onClick={() => sendAdminCommand({ adminPin, action: "unban", fingerprint: d.fingerprint })}
+                    onClick={() => admin({ action: "unban", fingerprint: d.fingerprint })}
                     style={{ ...btnStyle(), padding: "5px 8px", fontSize: 10.5, display: "flex", alignItems: "center", gap: 3 }}
                     title={t("Chat.adminUnban")}
                   >
@@ -182,7 +241,7 @@ export default function ChatAdminPanel({ accent, muted, border, inputBg, inputSt
                   </button>
                 ) : (
                   <button
-                    onClick={() => sendAdminCommand({ adminPin, action: "ban", fingerprint: d.fingerprint })}
+                    onClick={() => admin({ action: "ban", fingerprint: d.fingerprint })}
                     style={{ ...btnStyle(), padding: "5px 8px", fontSize: 10.5, color: "#ff5252", borderColor: "#ff525260", display: "flex", alignItems: "center", gap: 3 }}
                     title={t("Chat.adminBan")}
                   >
@@ -260,7 +319,7 @@ export default function ChatAdminPanel({ accent, muted, border, inputBg, inputSt
                 <div style={{ fontSize: 9.5, color: muted, lineHeight: 1.45 }}>{t("Chat.adminLockHint")}</div>
               </div>
               <button
-                onClick={() => sendAdminCommand({ adminPin, action: "set-locked", locked: !store.adminLocked })}
+                onClick={() => admin({ action: "set-locked", locked: !store.adminLocked })}
                 style={{ ...btnStyle(!store.adminLocked), padding: "5px 10px", fontSize: 10.5, flexShrink: 0 }}
               >
                 {store.adminLocked ? t("Chat.adminUnlock") : t("Chat.adminLock")}
@@ -277,7 +336,7 @@ export default function ChatAdminPanel({ accent, muted, border, inputBg, inputSt
                 onChange={(e) => setRetentionDraft(e.target.value)}
               />
               <button
-                onClick={() => { sendAdminCommand({ adminPin, action: "config-set", key: "retention_days", value: Number(retentionDraft ?? store.adminRetention ?? 90) }); setRetentionDraft(null); }}
+                onClick={() => { admin({ action: "config-set", key: "retention_days", value: Number(retentionDraft ?? store.adminRetention ?? 90) }); setRetentionDraft(null); }}
                 style={btnStyle(true)}
               >
                 {t("Chat.adminSave")}
@@ -296,7 +355,7 @@ export default function ChatAdminPanel({ accent, muted, border, inputBg, inputSt
               <button
                 onClick={() => {
                   if (!/^\d{6}$/.test(newAdminPin)) return;
-                  sendAdminCommand({ adminPin, action: "set-admin-pin", newPin: newAdminPin });
+                  admin({ action: "set-admin-pin", newPin: newAdminPin });
                   setAdminPin(newAdminPin); // les prochaines actions utilisent le nouveau
                   // Synchroniser aussi le pré-remplissage de l'hôte (bloc
                   // PINs + prochaine ouverture du panneau) — sinon
@@ -319,6 +378,28 @@ export default function ChatAdminPanel({ accent, muted, border, inputBg, inputSt
                 (retour terrain) */}
             {store.adminPinChanged && (
               <div style={{ fontSize: 11, color: "#00c853" }}>{t("Chat.adminPinChangedOk")}</div>
+            )}
+
+            {/* D.3 — enregistrer le code dans le coffre chiffré de Hnaya :
+                plus besoin de le mémoriser, il se saisit tout seul à la
+                prochaine ouverture (proposé seulement si le code est connu
+                de cet écran, c'est-à-dire saisi ou affiché à l'hôte) */}
+            {roomKey && /^\d{6}$/.test(adminPin) && (
+              <div style={{ marginTop: 8, borderTop: `1px solid ${border}`, paddingTop: 8 }}>
+                <div style={{ fontSize: 9.5, color: muted, lineHeight: 1.5, marginBottom: 6 }}>
+                  {t("Chat.adminVaultHint")}
+                </div>
+                <button
+                  onClick={saveToVault}
+                  style={{ ...btnStyle(), width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
+                >
+                  <KeySquare size={13} />
+                  {vaultHasPin ? t("Chat.adminVaultUpdate") : t("Chat.adminVaultSave")}
+                </button>
+                {vaultSaved && (
+                  <div style={{ fontSize: 10.5, color: "#00c853", marginTop: 5 }}>{t("Chat.adminVaultSaved")}</div>
+                )}
+              </div>
             )}
           </>
         )}

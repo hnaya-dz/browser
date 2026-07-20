@@ -204,7 +204,17 @@
     "adminLockHint": "Locked: known members come and go freely; no new device is accepted — even with the right PIN.",
     "adminChangePin": "Change the administrator PIN",
     "adminPinChangedOk": "✓ Administrator PIN changed — use the new code from the next opening.",
-    "inviteHint": "Scan with the smartphone's camera (same wifi), then enter the room PIN. Keep the page open to receive messages."
+    "inviteHint": "Scan with the smartphone's camera (same wifi), then enter the room PIN. Keep the page open to receive messages.",
+    "cancel": "Cancel",
+    "inviteSentTo": "Invitation sent for the room",
+    "inviteRoomPick": "— Pick a room from this computer —",
+    "inviteRoomOpen": "open",
+    "inviteRoomClosedHint": "This room is not open: guests will not be able to join until you reopen it from the home screen.",
+    "adminVaultUse": "Use the saved code",
+    "adminVaultSave": "Save this code to my passwords",
+    "adminVaultUpdate": "Update the saved code",
+    "adminVaultSaved": "✓ Code saved to Hnaya's encrypted vault.",
+    "adminVaultHint": "No need to memorise this code: save it to your passwords (encrypted on this device) and it will be offered automatically next time."
   },
   "Privacy": {
     "title": "Privacy",

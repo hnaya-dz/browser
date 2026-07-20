@@ -15,6 +15,26 @@ import {
   vaultFindByDomain, vaultIsAvailable
 } from "./vault.js";
 
+// Préfixe des entrées « PIN admin de salon » — ces codes sont générés par
+// l'application (pas des identifiants de site) et rangés dans le même
+// coffre chiffré. Le préfixe garantit qu'aucune lecture de PIN ne peut
+// atteindre un mot de passe de site web.
+const CHAT_PIN_SCHEME = "hnaya-chat://room/";
+
+/**
+ * Lit le PIN administrateur d'un salon depuis le coffre.
+ * ⚠️ RÉSERVÉ AU PROCESS PRINCIPAL — n'exposez JAMAIS le retour de cette
+ * fonction sur un canal IPC : elle sert à injecter le PIN dans la commande
+ * admin (electron.js) pour qu'il ne transite jamais par la page.
+ * Le filtre sur CHAT_PIN_SCHEME empêche de lire un identifiant de site.
+ */
+export function readChatAdminPin(roomKey) {
+  if (!roomKey) return null;
+  const url = CHAT_PIN_SCHEME + roomKey;
+  const entry = vaultRead().find((e) => e.url === url);
+  return entry?.password || null;
+}
+
 export function registerVaultIpc(getMainWindow, getBrowserViews, getActiveTabId) {
 
   // Vérifier si le chiffrement est disponible sur cette machine
@@ -27,6 +47,36 @@ export function registerVaultIpc(getMainWindow, getBrowserViews, getActiveTabId)
     const entries = vaultRead();
     // Masquer les mots de passe pour l'affichage dans l'UI
     return entries.map(e => ({ ...e, password: "••••••••" }));
+  });
+
+  // ══════════════════════════════════════════════════════════════
+  // PIN administrateur de la Messagerie locale (étape D.3)
+  // ══════════════════════════════════════════════════════════════
+  // Ces codes sont générés par l'application elle-même (pas des
+  // identifiants de site) et sont rangés dans le même coffre chiffré.
+  // ⚠️ L'INVARIANT DU FICHIER EST PRÉSERVÉ : aucun mot de passe ne
+  // repart en clair vers la page. « vault-chat-pin-has » ne renvoie
+  // qu'un booléen ; la lecture du code se fait UNIQUEMENT dans le
+  // process principal (voir chat-admin dans electron.js, qui injecte
+  // le PIN dans la commande sans jamais le transmettre au renderer).
+  ipcMain.handle("vault-chat-pin-save", async (event, { roomKey, roomName, adminPin }) => {
+    if (!roomKey || !/^\d{6}$/.test(String(adminPin || ""))) {
+      return { ok: false, error: "Données incomplètes" };
+    }
+    const url = CHAT_PIN_SCHEME + roomKey;
+    const existing = vaultRead().find((e) => e.url === url);
+    const ok = vaultUpsert({
+      ...(existing || {}),
+      site: "Hnaya — Messagerie locale",
+      url,
+      login: String(roomName || "Salon"),
+      password: String(adminPin),
+    });
+    return { ok };
+  });
+
+  ipcMain.handle("vault-chat-pin-has", async (event, roomKey) => {
+    return !!readChatAdminPin(roomKey); // booléen uniquement
   });
 
   // Ajouter ou mettre à jour une entrée
