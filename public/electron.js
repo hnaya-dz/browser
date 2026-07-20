@@ -7,6 +7,10 @@ import http from "http";
 // ✅ PATCH 1 — import depuis shared/ (supprime la duplication avec urlbar.tsx)
 import { isDownloadableUrl } from "./shared/supportedHosts.js";
 import { registerVaultIpc } from "./vault-ipc.js";
+import {
+  getChatSession, saveChatSession, forgetChatSession,
+  listChatSessions, clearChatSessions,
+} from "./chat-session.js";
 import { registerFavoritesIpc } from "./favorites-ipc.js";
 import { checkForUpdate } from "./update-check.js";
 
@@ -948,6 +952,17 @@ ipcMain.on("chat-send-invite", (event, { to, room }) => {
 ipcMain.on("chat-delete-room", (event, roomId) => {
   ensureChatWorker()?.send({ cmd: "delete-room", roomId });
 });
+
+// ── Sessions « rester connecté sur ce PC » (voir chat-session.js) ──────
+// Volontairement SÉPARÉ du gestionnaire de mots de passe : un code de
+// salon est un secret partagé, pas un identifiant personnel.
+ipcMain.handle("chat-session-get", async (event, roomKey) => getChatSession(roomKey));
+ipcMain.handle("chat-session-save", async (event, { roomKey, ...rest }) => ({
+  ok: saveChatSession(roomKey, rest),
+}));
+ipcMain.handle("chat-session-forget", async (event, roomKey) => ({ ok: forgetChatSession(roomKey) }));
+ipcMain.handle("chat-session-list", async () => listChatSessions());
+ipcMain.handle("chat-session-clear", async () => ({ ok: clearChatSessions() }));
 
 ipcMain.on("chat-discover", (event, timeoutMs) => {
   ensureChatWorker()?.send({ cmd: "discover", timeoutMs });

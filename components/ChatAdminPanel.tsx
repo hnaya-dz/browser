@@ -49,8 +49,9 @@ export default function ChatAdminPanel({ accent, muted, border, inputBg, inputSt
   // remplace jamais un code déjà présent (celui de l'hôte).
   useEffect(() => {
     if (!roomKey) return;
-    getApi()?.invoke?.("vault-chat-pin-get", { kind: "admin", roomKey })
-      .then((pin: string | null) => {
+    getApi()?.invoke?.("chat-session-get", roomKey)
+      .then((sess: { adminPin?: string } | null) => {
+        const pin = sess?.adminPin;
         if (pin && /^\d{6}$/.test(pin)) {
           setVaultHasPin(true);
           setAdminPin((cur) => (cur ? cur : pin));
@@ -66,11 +67,10 @@ export default function ChatAdminPanel({ accent, muted, border, inputBg, inputSt
 
   const saveToVault = async () => {
     if (!roomKey || !/^\d{6}$/.test(adminPin)) return;
-    const res = await getApi()?.invoke?.("vault-chat-pin-save", {
-      kind: "admin",
+    const res = await getApi()?.invoke?.("chat-session-save", {
       roomKey,
       roomName: store.sessionName || "Salon",
-      pin: adminPin,
+      adminPin,
     });
     if (res?.ok) { setVaultHasPin(true); setVaultSaved(true); }
   };

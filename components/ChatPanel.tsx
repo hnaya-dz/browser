@@ -247,39 +247,17 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
     const key = roomKeyOf(store.selectedSession);
     if (store.status !== "entering-pin" || !key) return;
     setPinFromVault(false);
-    getApi()?.invoke?.("vault-chat-pin-get", { kind: "access", roomKey: key })
-      .then((pin: string | null) => {
+    getApi()?.invoke?.("chat-session-get", key)
+      .then((sess: { accessPin?: string } | null) => {
+        const pin = sess?.accessPin;
         if (pin && /^\d{6}$/.test(pin)) {
           setPinInput(pin);
           setPinFromVault(true);
-          setRememberPin(true); // déjà retenu → la case reste cochée
+          setRememberPin(true); // session active → la case reste cochée
         }
       })
-      .catch(() => { /* coffre indisponible — saisie manuelle */ });
+      .catch(() => { /* stockage indisponible — saisie manuelle */ });
   }, [store.status, store.selectedSession?.address, store.selectedSession?.wsPort]);
-
-  // Enregistrement des DEUX codes par l'hôte, depuis le bloc des PINs :
-  // il ne voit jamais l'écran de saisie, donc c'est son seul point d'accès
-  // naturel au coffre. La clé du code d'accès est celle qu'utilisera un
-  // participant (adresse LAN du poste), pour que le remplissage
-  // automatique fonctionne aussi... sur les AUTRES postes n'aurait pas de
-  // sens : on enregistre donc sous la clé locale de l'hôte.
-  const [hostPinsSaved, setHostPinsSaved] = useState(false);
-  useEffect(() => { setHostPinsSaved(false); }, [store.hosting?.roomId]);
-  const saveHostPinsToVault = async () => {
-    const api = getApi();
-    if (!api?.invoke || !store.hosting) return;
-    const name = store.hosting.name || store.sessionName || "Salon";
-    const results = await Promise.all([
-      api.invoke("vault-chat-pin-save", {
-        kind: "access", roomKey: `127.0.0.1:${store.hosting.wsPort}`, roomName: name, pin: store.hosting.pin,
-      }),
-      api.invoke("vault-chat-pin-save", {
-        kind: "admin", roomKey: store.hosting.roomId, roomName: name, pin: store.hosting.adminPin,
-      }),
-    ]);
-    if (results.every((r: any) => r?.ok)) setHostPinsSaved(true);
-  };
 
   // Enregistrement APRÈS connexion réussie uniquement
   const pendingPinSave = useRef<{ key: string; pin: string; name: string } | null>(null);
@@ -287,7 +265,7 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
     if (store.status !== "joined" || !pendingPinSave.current) return;
     const { key, pin, name } = pendingPinSave.current;
     pendingPinSave.current = null;
-    getApi()?.invoke?.("vault-chat-pin-save", { kind: "access", roomKey: key, roomName: name, pin });
+    getApi()?.invoke?.("chat-session-save", { roomKey: key, roomName: name, accessPin: pin });
   }, [store.status]);
   const handleDeleteRoom = (roomId: string) => {
     getApi()?.send?.("chat-delete-room", roomId);
@@ -844,7 +822,7 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
                   <button
                     onClick={() => {
                       const key = roomKeyOf(store.selectedSession);
-                      if (key) getApi()?.invoke?.("vault-chat-pin-forget", { kind: "access", roomKey: key });
+                      if (key) getApi()?.invoke?.("chat-session-forget", key);
                       setPinInput(""); setPinFromVault(false); setRememberPin(false);
                     }}
                     style={{ background: "none", border: "none", color: muted, cursor: "pointer", fontSize: 10, textDecoration: "underline", padding: 0 }}
@@ -853,15 +831,22 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
                   </button>
                 </div>
               ) : (
-                <label style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6, fontSize: 10.5, color: muted, cursor: "pointer" }}>
-                  <input
-                    type="checkbox"
-                    checked={rememberPin}
-                    onChange={(e) => setRememberPin(e.target.checked)}
-                    style={{ cursor: "pointer" }}
-                  />
-                  <KeySquare size={11} /> {t("Chat.pinRemember")}
-                </label>
+                <>
+                  <label style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6, fontSize: 10.5, color: muted, cursor: "pointer" }}>
+                    <input
+                      type="checkbox"
+                      checked={rememberPin}
+                      onChange={(e) => setRememberPin(e.target.checked)}
+                      style={{ cursor: "pointer" }}
+                    />
+                    <KeySquare size={11} /> {t("Chat.pinRemember")}
+                  </label>
+                  {rememberPin && (
+                    <div style={{ fontSize: 9.5, color: muted, marginTop: 4, lineHeight: 1.45 }}>
+                      {t("Chat.pinRememberHint")}
+                    </div>
+                  )}
+                </>
               )}
             </div>
             {store.error && (
@@ -943,22 +928,6 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
                   <PinRow label={t("Chat.adminPinYours")} pin={store.adminPin} accent={accent} muted={muted} />
                 )}
                 <div style={{ fontSize: 9, color: muted, textAlign: "center" }}>{t("Chat.pinHint")}</div>
-                {/* ✅ Le créateur d'un salon ne passe JAMAIS par l'écran de
-                    saisie du PIN : sans ce bouton ici, l'enregistrement dans
-                    le coffre lui restait invisible (retour terrain). */}
-                <button
-                  onClick={saveHostPinsToVault}
-                  disabled={hostPinsSaved}
-                  style={{
-                    ...btnStyle(false, hostPinsSaved), padding: "5px 8px", fontSize: 10,
-                    display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
-                    color: hostPinsSaved ? "#00c853" : undefined,
-                    borderColor: hostPinsSaved ? "#00c85360" : undefined,
-                  }}
-                >
-                  <KeySquare size={11} />
-                  {hostPinsSaved ? t("Chat.pinsSavedOk") : t("Chat.pinsSaveBoth")}
-                </button>
               </div>
             )}
 
