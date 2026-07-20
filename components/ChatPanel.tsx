@@ -183,13 +183,13 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
     if (!roomId) return;
     const room = store.rooms.find((r) => r.roomId === roomId);
     if (!room) return;
-    const isHosted = store.hosting?.roomId === roomId;
-    const ip = store.hosting?.lanIp || store.roomsLanIp || "";
-    const port = isHosted && store.hosting ? store.hosting.wsPort : 4802;
+    const open = store.hostings.find((h) => h.roomId === roomId);
+    const ip = open?.lanIp || store.hosting?.lanIp || store.roomsLanIp || "";
+    const port = open ? open.wsPort : 4802;
     setInviteRoom({
       name: room.name,
       address: ip ? `${ip}${port !== 4802 ? ":" + port : ""}` : "",
-      pin: isHosted && store.hosting ? store.hosting.pin : "",
+      pin: open ? open.pin : "",
     });
   };
 
@@ -481,6 +481,23 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
     setMessageInput("");
   };
 
+  /** Quitte la CONVERSATION en laissant le salon ouvert pour les autres. */
+  const handleBackToMenu = () => {
+    const api = getApi();
+    clearConnectTimer();
+    api?.send("chat-leave"); // ferme MA connexion, pas le salon
+    resetAdminState();
+    setShowAdmin(false);
+    setShowInvitePanel(false);
+    patchStore({
+      status: "idle", isHost: false, pin: null, adminPin: null,
+      joinedRoomIsHosted: false, hosting: null,
+      messages: [], online: [], discovered: new Map(),
+      selectedSession: null, error: null, inviteUrl: null,
+    });
+    setPinInput("");
+  };
+
   const handleLeave = () => {
     const api = getApi();
     clearConnectTimer();
@@ -489,7 +506,7 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
     // héberge — quitter « X » en hébergeant « Y » laisse Y ouvert (c'est
     // le mécanisme des invitations vers un sous-salon). Le bandeau de
     // l'accueil rappelle le salon resté ouvert.
-    if (store.joinedRoomIsHosted) api?.send("chat-stop-host");
+    if (store.joinedRoomIsHosted) api?.send("chat-stop-host", store.hosting?.roomId || null);
     resetAdminState();
     setShowAdmin(false);
     setShowInvitePanel(false);
@@ -534,6 +551,18 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
             <div style={{ fontSize: 10, color: muted, lineHeight: 1.3, marginTop: 1 }}>{t("Chat.subtitle")}</div>
           )}
         </div>
+        {/* D.4 — revenir au menu SANS fermer le salon qu'on héberge :
+            indispensable pour en ouvrir un second et inviter de l'un vers
+            l'autre (le salon resté ouvert apparaît en bandeau à l'accueil). */}
+        {store.status === "joined" && store.joinedRoomIsHosted && (
+          <button
+            onClick={handleBackToMenu}
+            title={t("Chat.backToMenuHint")}
+            style={{ ...btnStyle(), padding: "5px 10px", fontSize: 11 }}
+          >
+            {t("Chat.backToMenu")}
+          </button>
+        )}
         {store.status === "joined" && (
           <button onClick={handleLeave} style={{ ...btnStyle(), padding: "5px 10px", fontSize: 11 }}>
             {/* Sur le salon qu'on HÉBERGE, « Quitter » le FERME pour tout
@@ -561,29 +590,32 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
           <>
             {/* D.2 — un salon hébergé par ce poste tourne encore (on l'a
                 quitté sans le fermer, ex. pour aller inviter ailleurs) */}
-            {store.hosting && (
-              <div style={{
+            {/* D.4 — TOUS les salons que ce poste héberge (plusieurs
+                possibles) : c'est ce qui permet d'inviter d'un salon vers
+                un autre resté ouvert. */}
+            {store.hostings.map((h) => (
+              <div key={h.roomId} style={{
                 border: `1px solid ${accent}40`, background: `${accent}12`,
                 borderRadius: 6, padding: 8, display: "flex", alignItems: "center", gap: 8,
               }}>
                 <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#00c853", flexShrink: 0 }} />
-                <span style={{ fontSize: 11, flex: 1 }}>
-                  {t("Chat.hostingBanner")} <b>{store.hosting.name}</b>
+                <span style={{ fontSize: 11, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {t("Chat.hostingBanner")} <b>{h.name}</b>
                 </span>
                 <button
-                  onClick={() => handleReopenRoom(store.hosting!.roomId, store.hosting!.name)}
-                  style={{ ...btnStyle(true), padding: "4px 9px", fontSize: 10.5 }}
+                  onClick={() => handleReopenRoom(h.roomId, h.name)}
+                  style={{ ...btnStyle(true), padding: "4px 9px", fontSize: 10.5, flexShrink: 0 }}
                 >
                   {t("Chat.hostingRejoin")}
                 </button>
                 <button
-                  onClick={() => getApi()?.send?.("chat-stop-host")}
-                  style={{ ...btnStyle(), padding: "4px 9px", fontSize: 10.5 }}
+                  onClick={() => getApi()?.send?.("chat-stop-host", h.roomId)}
+                  style={{ ...btnStyle(), padding: "4px 9px", fontSize: 10.5, flexShrink: 0 }}
                 >
                   {t("Chat.closeRoom")}
                 </button>
               </div>
-            )}
+            ))}
             <div>
               <div style={{ fontSize: 11, color: muted, marginBottom: 4 }}>
                 {t("Chat.nickname")} <span style={{ color: accent }}>*</span>
@@ -689,7 +721,7 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
                       </button>
                       {/* Pas de suppression du salon actuellement hébergé
                           (il faut le fermer d'abord) */}
-                      {store.hosting?.roomId !== r.roomId && (
+                      {!store.hostings.some((h) => h.roomId === r.roomId) && (
                         <button
                           onClick={() => setConfirmDelete(r.roomId)}
                           title={t("Chat.deleteRoom")}
@@ -1009,19 +1041,19 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
                     <option value="">{t("Chat.inviteRoomPick")}</option>
                     {store.rooms.map((r) => (
                       <option key={r.roomId} value={r.roomId}>
-                        {r.name}{store.hosting?.roomId === r.roomId ? " ● " + t("Chat.inviteRoomOpen") : ""}
+                        {r.name}{store.hostings.some((h) => h.roomId === r.roomId) ? " ● " + t("Chat.inviteRoomOpen") : ""}
                       </option>
                     ))}
                   </select>
                 )}
                 {/* Salon choisi mais pas ouvert → il faut l'ouvrir pour que
                     l'invitation soit utilisable */}
-                {inviteRoomId && store.hosting?.roomId !== inviteRoomId && (
+                {inviteRoomId && !store.hostings.some((h) => h.roomId === inviteRoomId) && (
                   <div style={{ fontSize: 10, color: "#ffb300", lineHeight: 1.5 }}>
                     {t("Chat.inviteRoomClosedHint")}
                   </div>
                 )}
-                {!store.hosting && !inviteRoomId && (
+                {store.hostings.length === 0 && !inviteRoomId && (
                   <div style={{ fontSize: 10, color: "#ffb300", lineHeight: 1.5 }}>
                     {t("Chat.inviteNoHostHint")}
                   </div>

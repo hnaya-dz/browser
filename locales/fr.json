@@ -217,7 +217,9 @@
     "pinFromVault": "Connecté sur ce PC — code rempli automatiquement",
     "pinForget": "se déconnecter",
     "pinRemember": "Rester connecté à ce salon sur ce PC",
-    "pinRememberHint": "Le code sera conservé chiffré sur cet appareil — à réserver à un poste dont vous êtes le seul utilisateur."
+    "pinRememberHint": "Le code sera conservé chiffré sur cet appareil — à réserver à un poste dont vous êtes le seul utilisateur.",
+    "backToMenu": "Menu",
+    "backToMenuHint": "Revenir au menu en laissant ce salon ouvert (pour en ouvrir un autre ou inviter vers un autre salon)"
   },
   "Privacy": {
     "title": "Confidentialité",

@@ -935,7 +935,10 @@ ipcMain.handle("chat-start-host", async (event, params) => {
   return { ok: true };
 });
 
-ipcMain.on("chat-stop-host", () => { chatWorker?.send({ cmd: "stop-host" }); });
+// roomId précise QUEL salon fermer (plusieurs peuvent être ouverts)
+ipcMain.on("chat-stop-host", (event, roomId) => {
+  chatWorker?.send({ cmd: "stop-host", roomId: roomId || null });
+});
 
 // D.2 : liste des salons hébergés par ce poste (écran « Rouvrir »)
 ipcMain.on("chat-list-rooms", () => {
@@ -1023,15 +1026,19 @@ ipcMain.handle("chat-admin-export", async (event, { filename, content }) => {
 // limitée au sous-réseau local (-RemoteAddress LocalSubnet) et tous
 // profils (-Profile Any) — fonctionne donc aussi sur un point d'accès
 // mobile classé « Public ».
-const FIREWALL_RULE_TCP = "Hnaya Messagerie locale (TCP 4802)";
+const FIREWALL_RULE_TCP = "Hnaya Messagerie locale (TCP 4802-4809)";
 const FIREWALL_RULE_UDP = "Hnaya Messagerie locale (UDP 41234)";
-// Accès mobile (C-bis) : page web servie aux téléphones sur le port 4803
-const FIREWALL_RULE_HTTP = "Hnaya Messagerie locale (TCP 4803 mobile)";
+// Anciennes règles à port unique (v1/v2) : la plage 4802-4809 les couvre
+// désormais toutes. On les SUPPRIME à la mise à niveau, sinon elles
+// resteraient en doublon dans le pare-feu de l'utilisateur.
+const LEGACY_RULE_TCP = "Hnaya Messagerie locale (TCP 4802)";
+const LEGACY_RULE_HTTP = "Hnaya Messagerie locale (TCP 4803 mobile)";
 // Version du dispositif : incrémentée quand une NOUVELLE règle devient
-// nécessaire (v2 = ajout du port mobile 4803). Un drapeau d'une version
+// nécessaire (v2 = port mobile 4803 ; v3 = plage 4802-4809 pour héberger
+// plusieurs salons à la fois). Un drapeau d'une version
 // antérieure ne vaut plus « configuré » — l'utilisateur verra une nouvelle
 // demande d'autorisation, une seule fois.
-const NETWORK_SETUP_VERSION = 2;
+const NETWORK_SETUP_VERSION = 3;
 
 function runPowerShell(args) {
   return new Promise((resolve) => {
@@ -1055,8 +1062,7 @@ async function checkFirewallRules() {
     "$null = Get-NetFirewallRule -ErrorAction Stop | Select-Object -First 1; " +
     "$t = Get-NetFirewallRule -DisplayName '" + FIREWALL_RULE_TCP + "' -ErrorAction SilentlyContinue; " +
     "$u = Get-NetFirewallRule -DisplayName '" + FIREWALL_RULE_UDP + "' -ErrorAction SilentlyContinue; " +
-    "$m = Get-NetFirewallRule -DisplayName '" + FIREWALL_RULE_HTTP + "' -ErrorAction SilentlyContinue; " +
-    "Write-Output ('READ|' + [string]([bool]$t -and [bool]$u -and [bool]$m)) " +
+    "Write-Output ('READ|' + [string]([bool]$t -and [bool]$u)) " +
     "} catch { Write-Output 'DENIED|False' }",
   ]);
   const [access, ok] = (out || "DENIED|False").split("|");
@@ -1131,18 +1137,18 @@ ipcMain.handle("chat-network-setup", async () => {
     "$exe = '" + exe + "'",
     "Remove-NetFirewallRule -DisplayName '" + FIREWALL_RULE_TCP + "' -ErrorAction SilentlyContinue",
     "Remove-NetFirewallRule -DisplayName '" + FIREWALL_RULE_UDP + "' -ErrorAction SilentlyContinue",
+    "Remove-NetFirewallRule -DisplayName '" + LEGACY_RULE_TCP + "' -ErrorAction SilentlyContinue",
+    "Remove-NetFirewallRule -DisplayName '" + LEGACY_RULE_HTTP + "' -ErrorAction SilentlyContinue",
     "Get-NetFirewallRule -Direction Inbound -Action Block -Enabled True -ErrorAction SilentlyContinue | Where-Object { $dn = $_.DisplayName; ($dn -like '*hnaya*') -or ($dn -like '*electron*') -or ($dn -like '*node*') } | Where-Object { ($_ | Get-NetFirewallApplicationFilter -ErrorAction SilentlyContinue).Program -ieq $exe } | Remove-NetFirewallRule -ErrorAction SilentlyContinue",
     // « Créer seulement si absent » plutôt que supprimer-puis-créer :
     // Kaspersky (observé sur poste de test) peut bloquer la SUPPRESSION
     // de règles même en élévation tout en autorisant la création — le
     // remove+create y produit des règles en double à chaque exécution.
-    "if (-not (Get-NetFirewallRule -DisplayName '" + FIREWALL_RULE_TCP + "' -ErrorAction SilentlyContinue)) { New-NetFirewallRule -DisplayName '" + FIREWALL_RULE_TCP + "' -Direction Inbound -Action Allow -Protocol TCP -LocalPort 4802 -Program $exe -RemoteAddress LocalSubnet -Profile Any | Out-Null }",
+    "if (-not (Get-NetFirewallRule -DisplayName '" + FIREWALL_RULE_TCP + "' -ErrorAction SilentlyContinue)) { New-NetFirewallRule -DisplayName '" + FIREWALL_RULE_TCP + "' -Direction Inbound -Action Allow -Protocol TCP -LocalPort 4802-4809 -Program $exe -RemoteAddress LocalSubnet -Profile Any | Out-Null }",
     "if (-not (Get-NetFirewallRule -DisplayName '" + FIREWALL_RULE_UDP + "' -ErrorAction SilentlyContinue)) { New-NetFirewallRule -DisplayName '" + FIREWALL_RULE_UDP + "' -Direction Inbound -Action Allow -Protocol UDP -LocalPort 41234 -Program $exe -RemoteAddress LocalSubnet -Profile Any | Out-Null }",
-    "if (-not (Get-NetFirewallRule -DisplayName '" + FIREWALL_RULE_HTTP + "' -ErrorAction SilentlyContinue)) { New-NetFirewallRule -DisplayName '" + FIREWALL_RULE_HTTP + "' -Direction Inbound -Action Allow -Protocol TCP -LocalPort 4803 -Program $exe -RemoteAddress LocalSubnet -Profile Any | Out-Null }",
     "$t = Get-NetFirewallRule -DisplayName '" + FIREWALL_RULE_TCP + "' -ErrorAction SilentlyContinue",
     "$u = Get-NetFirewallRule -DisplayName '" + FIREWALL_RULE_UDP + "' -ErrorAction SilentlyContinue",
-    "$m = Get-NetFirewallRule -DisplayName '" + FIREWALL_RULE_HTTP + "' -ErrorAction SilentlyContinue",
-    "if ($t -and $u -and $m) { Set-Content -LiteralPath '" + resultEsc + "' -Value 'OK' } else { Set-Content -LiteralPath '" + resultEsc + "' -Value 'FAIL' }",
+    "if ($t -and $u) { Set-Content -LiteralPath '" + resultEsc + "' -Value 'OK' } else { Set-Content -LiteralPath '" + resultEsc + "' -Value 'FAIL' }",
     "exit 0",
   ].join("\r\n");
   writeFileSync(ps1, script, "utf8");

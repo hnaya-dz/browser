@@ -105,9 +105,12 @@ export interface ChatStore {
   adminBans: string[];
   // Verrou du salon courant (null = pas encore lu)
   adminLocked: boolean | null;
-  // Salon hébergé par ce poste (bandeau + invitations) — survit au fait
-  // de rejoindre un AUTRE salon ; null si on n'héberge rien
+  // Salon hébergé correspondant à celui qu'on a REJOINT (null sinon)
   hosting: HostingInfo | null;
+  // TOUS les salons ouverts par ce poste (D.4 : plusieurs à la fois, un
+  // par paire de ports). C'est ce qui permet d'inviter les membres d'un
+  // salon vers un autre salon RESTÉ OUVERT.
+  hostings: HostingInfo[];
   // Le salon actuellement REJOINT est-il celui qu'on héberge ?
   // (pilote l'affichage du bloc PINs et le bouton Fermer vs Quitter)
   joinedRoomIsHosted: boolean;
@@ -159,6 +162,7 @@ export const store: ChatStore = {
   adminBans: [],
   adminLocked: null,
   hosting: null,
+  hostings: [],
   joinedRoomIsHosted: false,
   rooms: [],
   roomsLanIp: null,
@@ -274,9 +278,11 @@ export function ensureListening() {
         // Mémoire des coordonnées du dernier salon hébergé — pré-remplit
         // le formulaire d'invitation depuis un AUTRE salon
         try { localStorage.setItem("hnaya-chat-last-hosted", JSON.stringify(hosting)); } catch {}
+        // D.4 : la liste des salons ouverts s'enrichit (plusieurs à la fois)
+        const hostings = [...store.hostings.filter((h) => h.roomId !== hosting.roomId), hosting];
         patchStore({
           pin: evt.pin, adminPin: evt.adminPin || null, isHost: true,
-          inviteUrl: evt.inviteUrl || null, hosting, joinedRoomIsHosted: true,
+          inviteUrl: evt.inviteUrl || null, hosting, hostings, joinedRoomIsHosted: true,
         });
         startConnecting();
         api.send("chat-join", {
@@ -289,9 +295,20 @@ export function ensureListening() {
         });
         break;
       }
-      case "host-stopped":
-        patchStore({ isHost: false, adminPin: null, hosting: null, joinedRoomIsHosted: false });
+      case "host-stopped": {
+        // Retire le salon fermé de la liste ; les autres restent ouverts
+        const remaining = evt.roomId
+          ? store.hostings.filter((h) => h.roomId !== evt.roomId)
+          : [];
+        const closedCurrent = !evt.roomId || store.hosting?.roomId === evt.roomId;
+        patchStore({
+          hostings: remaining,
+          ...(closedCurrent
+            ? { isHost: false, adminPin: null, hosting: null, joinedRoomIsHosted: false }
+            : {}),
+        });
         break;
+      }
       case "rooms":
         patchStore({ rooms: evt.rooms || [], roomsLanIp: evt.lanIp ?? store.roomsLanIp });
         break;

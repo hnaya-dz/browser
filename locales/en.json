@@ -217,7 +217,9 @@
     "pinFromVault": "Connected on this PC — code filled automatically",
     "pinForget": "sign out",
     "pinRemember": "Stay connected to this room on this PC",
-    "pinRememberHint": "The code will be kept encrypted on this device — only do this on a computer you alone use."
+    "pinRememberHint": "The code will be kept encrypted on this device — only do this on a computer you alone use.",
+    "backToMenu": "Menu",
+    "backToMenuHint": "Back to the menu, leaving this room open (to open another one or invite to another room)"
   },
   "Privacy": {
     "title": "Privacy",

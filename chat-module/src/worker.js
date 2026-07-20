@@ -61,7 +61,38 @@ function getLanAddress() {
 // (userData/chat-data) ; en lancement autonome, défaut du module.
 const DATA_DIR = process.env.HNAYA_CHAT_DATA || undefined;
 
-let hostHandle = null;      // { pin, stop } si on héberge un salon
+// ══════════════════════════════════════════════════════════════════
+// PLUSIEURS salons hébergés simultanément (D.4)
+// ══════════════════════════════════════════════════════════════════
+// Un poste n'hébergeait qu'un salon à la fois : impossible d'inviter les
+// membres du salon A vers le salon B, puisque B était forcément fermé
+// (retour terrain). Chaque salon prend donc sa propre paire de ports,
+// dans la plage autorisée par le pare-feu (4802-4809 → 4 salons).
+const PORT_BASE = 4802;
+const MAX_ROOMS = 4; // paires (4802/4803) … (4808/4809)
+
+const hostHandles = new Map(); // roomId -> handle renvoyé par startHost()
+
+/** Première paire de ports libre : ni utilisée par nos salons, ni par un
+ *  autre processus (un serveur permanent tourne peut-être déjà ici). */
+async function findFreePortPair() {
+  const net = await import("node:net");
+  const used = new Set([...hostHandles.values()].map((h) => h.wsPort));
+  const canBind = (port) => new Promise((resolve) => {
+    const probe = net.createServer();
+    probe.once("error", () => resolve(false));
+    probe.once("listening", () => probe.close(() => resolve(true)));
+    probe.listen(port, "0.0.0.0");
+  });
+  for (let i = 0; i < MAX_ROOMS; i++) {
+    const ws = PORT_BASE + i * 2;
+    if (used.has(ws)) continue;
+    if (await canBind(ws) && await canBind(ws + 1)) return { wsPort: ws, httpPort: ws + 1 };
+  }
+  return null;
+}
+
+let hostHandle = null;      // dernier salon ouvert (compat interne)
 let clientHandle = null;    // { send, markRead, close } si on a rejoint un salon
 let stopDiscovery = null;   // fonction pour arrêter une découverte en cours
 
@@ -73,51 +104,85 @@ process.on("message", (msg) => {
   }
 });
 
+/** Ouverture d'un salon : l'allocation de ports est asynchrone (sondage),
+ *  d'où cette fonction séparée du switch synchrone. */
+async function startHostAsync(msg) {
+  // Ports imposés par l'environnement (dev/tests) sinon première paire libre
+  const forcedWs = Number(process.env.HNAYA_CHAT_WS_PORT) || 0;
+  const ports = forcedWs
+    ? { wsPort: forcedWs, httpPort: Number(process.env.HNAYA_CHAT_HTTP_PORT) || forcedWs + 1 }
+    : await findFreePortPair();
+  if (!ports) {
+    process.send?.({ event: "error", message: `Limite atteinte : ${MAX_ROOMS} salons ouverts simultanément sur ce poste.` });
+    return;
+  }
+  const handle = startHost({
+    // Nom transmis seulement s'il est fourni : une réouverture sans
+    // nom (roomId seul) conserve le nom existant du salon
+    sessionName: msg.sessionName || undefined,
+    // D.2 : roomId → réouverture d'un salon existant ; adminPin →
+    // PIN admin choisi par l'utilisateur à la création (optionnel)
+    roomId: msg.roomId || undefined,
+    adminPin: msg.adminPin || undefined,
+    wsPort: ports.wsPort,
+    httpPort: ports.httpPort,
+    dataDir: DATA_DIR,
+    // EADDRINUSE & co : le serveur ne crash plus — on remonte une
+    // erreur lisible à l'UI et on retire le salon de la liste.
+    onError: (friendly) => {
+      if (handle?.roomId) hostHandles.delete(handle.roomId);
+      if (hostHandle?.roomId === handle?.roomId) hostHandle = null;
+      process.send?.({ event: "error", message: friendly });
+    },
+  });
+  hostHandles.set(handle.roomId, handle);
+  hostHandle = handle;
+  // inviteUrl : ce que le QR du dock encode — null si aucune IP LAN
+  // (poste hors réseau : salon local possible, accès mobile non)
+  const lanIp = getLanAddress();
+  process.send({
+    event: "host-started",
+    pin: handle.pin,
+    adminPin: handle.adminPin,
+    roomId: handle.roomId,
+    sessionName: msg.sessionName || undefined,
+    wsPort: handle.wsPort,
+    httpPort: handle.httpPort,
+    lanIp,
+    inviteUrl: lanIp ? `http://${lanIp}:${handle.httpPort}` : null,
+  });
+}
+
 function handleCommand(msg) {
   switch (msg.cmd) {
     case "start-host": {
-      if (hostHandle) hostHandle.stop(); // évite deux hôtes simultanés sur ce poste
-      hostHandle = startHost({
-        // Nom transmis seulement s'il est fourni : une réouverture sans
-        // nom (roomId seul) conserve le nom existant du salon
-        sessionName: msg.sessionName || undefined,
-        // D.2 : roomId → réouverture d'un salon existant ; adminPin →
-        // PIN admin choisi par l'utilisateur à la création (optionnel)
-        roomId: msg.roomId || undefined,
-        adminPin: msg.adminPin || undefined,
-        // Ports surchargés par l'environnement (tests/dev : cohabiter
-        // avec une app installée qui occupe 4802/4803) — vides en prod
-        wsPort: Number(process.env.HNAYA_CHAT_WS_PORT) || undefined,
-        httpPort: Number(process.env.HNAYA_CHAT_HTTP_PORT) || undefined,
-        dataDir: DATA_DIR,
-        // EADDRINUSE & co : le serveur ne crash plus — on remonte une
-        // erreur lisible à l'UI et on considère l'hôte arrêté.
-        onError: (friendly) => {
-          hostHandle = null;
-          process.send?.({ event: "error", message: friendly });
-        },
-      });
-      // inviteUrl : ce que le QR du dock encode — null si aucune IP LAN
-      // (poste hors réseau : salon local possible, accès mobile non)
-      const lanIp = getLanAddress();
-      process.send({
-        event: "host-started",
-        pin: hostHandle.pin,
-        adminPin: hostHandle.adminPin,
-        roomId: hostHandle.roomId,
-        sessionName: msg.sessionName || "Hnaya Chat",
-        wsPort: hostHandle.wsPort,
-        httpPort: hostHandle.httpPort,
-        lanIp,
-        inviteUrl: lanIp ? `http://${lanIp}:${hostHandle.httpPort}` : null,
-      });
+      // Salon déjà ouvert ? On le renvoie tel quel plutôt que d'en ouvrir
+      // un second exemplaire (clic sur « Revenir » ou double-clic).
+      const already = msg.roomId && hostHandles.get(msg.roomId);
+      if (already) {
+        const lanIp = getLanAddress();
+        process.send({
+          event: "host-started", pin: already.pin, adminPin: already.adminPin,
+          roomId: already.roomId, sessionName: msg.sessionName || undefined,
+          wsPort: already.wsPort, httpPort: already.httpPort, lanIp,
+          inviteUrl: lanIp ? `http://${lanIp}:${already.httpPort}` : null,
+        });
+        break;
+      }
+      startHostAsync(msg);
       break;
     }
 
     case "stop-host": {
-      hostHandle?.stop();
-      hostHandle = null;
-      process.send({ event: "host-stopped" });
+      // roomId absent → on ferme le dernier salon ouvert (compat)
+      const target = msg.roomId
+        ? hostHandles.get(msg.roomId)
+        : [...hostHandles.values()].pop();
+      if (!target) { process.send({ event: "host-stopped", roomId: msg.roomId || null }); break; }
+      try { target.stop(); } catch { /* déjà arrêté */ }
+      hostHandles.delete(target.roomId);
+      if (hostHandle?.roomId === target.roomId) hostHandle = null;
+      process.send({ event: "host-stopped", roomId: target.roomId });
       break;
     }
 
@@ -206,7 +271,7 @@ function handleCommand(msg) {
       // Suppression définitive (D.2) — refusée pour le salon en cours
       // d'hébergement : il faut le fermer d'abord (l'UI l'empêche déjà,
       // ceinture serveur ici)
-      if (hostHandle?.roomId === msg.roomId) {
+      if (hostHandles.has(msg.roomId)) {
         process.send({ event: "error", message: "Fermez le salon avant de le supprimer." });
         break;
       }
@@ -256,7 +321,7 @@ function handleCommand(msg) {
 // évite un salon "fantôme" qui continuerait de tourner et de répondre
 // au beacon réseau après la fermeture du navigateur.
 process.on("disconnect", () => {
-  try { hostHandle?.stop(); } catch { /* déjà arrêté */ }
+  for (const h of hostHandles.values()) { try { h.stop(); } catch { /* déjà arrêté */ } }
   try { clientHandle?.close(); } catch { /* déjà fermée */ }
   try { stopDiscovery?.(); } catch { /* déjà arrêtée */ }
   process.exit(0);
