@@ -227,18 +227,19 @@ export default function TabBar() {
         <ArrowBtn dir="left" onClick={scrollLeft} show={canScrollLeft} />
 
         {/* ✅ Zone scrollable — min-width:0 force le débordement dans un flex */}
+        {/* ⚠️ hide-scrollbar (styles/globals.css) et NON une balise <style>
+            avec le sélecteur universel : celle qui vivait ici masquait les
+            barres de défilement de TOUTE l'application — le dock de la
+            messagerie devenait impossible à faire défiler (retour terrain). */}
         <div
           ref={scrollRef}
-          className="flex items-end gap-1 overflow-x-auto overflow-y-hidden"
+          className="hide-scrollbar flex items-end gap-1 overflow-x-auto overflow-y-hidden"
           style={{
             flex: "1 1 0",        // flex-grow + flex-shrink + flex-basis:0
             minWidth: 0,          // ✅ clé : sans ça, flexbox étire et scrollWidth === clientWidth
-            scrollbarWidth: "none",
-            msOverflowStyle: "none",
           }}
           onScroll={updateScrollState}
         >
-          <style>{`*::-webkit-scrollbar{display:none}`}</style>
           {tabs.map((tab, i) => renderTab(tab, i))}
         </div>
 

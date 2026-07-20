@@ -217,7 +217,9 @@
     "adminVaultHint": "Plus besoin de mémoriser ce code : enregistrez-le dans vos mots de passe (chiffrés sur cet appareil) et il sera proposé automatiquement à la prochaine ouverture.",
     "pinFromVault": "Code rempli depuis vos mots de passe enregistrés",
     "pinForget": "oublier",
-    "pinRemember": "Retenir ce code (mots de passe enregistrés)"
+    "pinRemember": "Retenir ce code (mots de passe enregistrés)",
+    "pinsSaveBoth": "Retenir ces codes dans mes mots de passe",
+    "pinsSavedOk": "Codes enregistrés ✓"
   },
   "Privacy": {
     "title": "Confidentialité",

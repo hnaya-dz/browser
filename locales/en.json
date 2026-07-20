@@ -217,7 +217,9 @@
     "adminVaultHint": "No need to memorise this code: save it to your passwords (encrypted on this device) and it will be offered automatically next time.",
     "pinFromVault": "Code filled from your saved passwords",
     "pinForget": "forget",
-    "pinRemember": "Remember this code (saved passwords)"
+    "pinRemember": "Remember this code (saved passwords)",
+    "pinsSaveBoth": "Save these codes to my passwords",
+    "pinsSavedOk": "Codes saved ✓"
   },
   "Privacy": {
     "title": "Privacy",
