@@ -32,37 +32,45 @@ export default function ChatAdminPanel({ accent, muted, border, inputBg, inputSt
 
   // ── Coffre chiffré (D.3) ──────────────────────────────────────────
   // Clé d'identification du salon : son identifiant si on l'héberge,
-  // sinon son adresse réseau. Le PIN lui-même n'est jamais lu ici : on
-  // demande seulement s'il EXISTE, et l'authentification passe par
-  // vaultRoomKey (le process principal injecte le code).
+  // sinon son adresse réseau. Le code enregistré est repris du coffre et
+  // rempli dans le champ, comme le ferait un gestionnaire de mots de
+  // passe (voir la note d'exception dans public/vault-ipc.js).
   const roomKey = store.joinedRoomIsHosted && store.hosting
     ? store.hosting.roomId
     : store.selectedSession
       ? `${store.selectedSession.address}:${store.selectedSession.wsPort}`
       : null;
   const [vaultHasPin, setVaultHasPin] = useState(false);
-  const [usingVault, setUsingVault] = useState(false);
   const [vaultSaved, setVaultSaved] = useState(false);
+  const [pinFilledFromVault, setPinFilledFromVault] = useState(false);
 
+  // Remplissage automatique : si un code est enregistré pour ce salon, il
+  // est saisi tout seul (comme un gestionnaire de mots de passe). Ne
+  // remplace jamais un code déjà présent (celui de l'hôte).
   useEffect(() => {
     if (!roomKey) return;
-    getApi()?.invoke?.("vault-chat-pin-has", roomKey)
-      .then((has: boolean) => setVaultHasPin(!!has))
+    getApi()?.invoke?.("vault-chat-pin-get", { kind: "admin", roomKey })
+      .then((pin: string | null) => {
+        if (pin && /^\d{6}$/.test(pin)) {
+          setVaultHasPin(true);
+          setAdminPin((cur) => (cur ? cur : pin));
+          setPinFilledFromVault((prev) => prev || !store.adminPin);
+        }
+      })
       .catch(() => setVaultHasPin(false));
   }, [roomKey]);
 
   // Toute commande admin part avec le PIN saisi OU la clé de coffre
   const admin = (params: Record<string, unknown>) =>
-    sendAdminCommand(usingVault && roomKey
-      ? ({ vaultRoomKey: roomKey, ...params } as any)
-      : ({ adminPin, ...params } as any));
+    sendAdminCommand({ adminPin, ...params } as any);
 
   const saveToVault = async () => {
     if (!roomKey || !/^\d{6}$/.test(adminPin)) return;
     const res = await getApi()?.invoke?.("vault-chat-pin-save", {
+      kind: "admin",
       roomKey,
       roomName: store.sessionName || "Salon",
-      adminPin,
+      pin: adminPin,
     });
     if (res?.ok) { setVaultHasPin(true); setVaultSaved(true); }
   };
@@ -75,21 +83,11 @@ export default function ChatAdminPanel({ accent, muted, border, inputBg, inputSt
 
   const authenticate = () => {
     if (!/^\d{6}$/.test(adminPin)) return;
-    setUsingVault(false);
     sendAdminCommand({ adminPin, action: "devices" });
     sendAdminCommand({ adminPin, action: "room-info" });
     sendAdminCommand({ adminPin, action: "bans" });
   };
 
-  // Authentification par le code enregistré dans le coffre : aucune
-  // saisie, et le PIN ne passe pas par cette page
-  const authenticateFromVault = () => {
-    if (!roomKey) return;
-    setUsingVault(true);
-    sendAdminCommand({ vaultRoomKey: roomKey, action: "devices" });
-    sendAdminCommand({ vaultRoomKey: roomKey, action: "room-info" });
-    sendAdminCommand({ vaultRoomKey: roomKey, action: "bans" });
-  };
 
   const runSearch = () => {
     const filters: Record<string, unknown> = { limit: 200 };
@@ -167,16 +165,12 @@ export default function ChatAdminPanel({ accent, muted, border, inputBg, inputSt
         <button onClick={authenticate} disabled={!/^\d{6}$/.test(adminPin)} style={btnStyle(true, !/^\d{6}$/.test(adminPin))}>
           {t("Chat.adminAccess")}
         </button>
-        {/* D.3 — code enregistré dans le coffre chiffré : aucune saisie,
-            et le code ne transite pas par cette page (il est lu et injecté
-            par le process principal) */}
-        {vaultHasPin && (
-          <button
-            onClick={authenticateFromVault}
-            style={{ ...btnStyle(), display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
-          >
-            <KeySquare size={13} /> {t("Chat.adminVaultUse")}
-          </button>
+        {/* D.3 — code repris du coffre chiffré : rempli automatiquement
+            ci-dessus, il suffit de valider */}
+        {pinFilledFromVault && (
+          <div style={{ fontSize: 10, color: "#00c853", display: "flex", alignItems: "center", gap: 5 }}>
+            <KeySquare size={11} /> {t("Chat.pinFromVault")}
+          </div>
         )}
       </div>
     );

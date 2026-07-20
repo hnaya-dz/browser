@@ -214,7 +214,10 @@
     "adminVaultSave": "Enregistrer ce code dans mes mots de passe",
     "adminVaultUpdate": "Mettre à jour le code enregistré",
     "adminVaultSaved": "✓ Code enregistré dans le coffre chiffré de Hnaya.",
-    "adminVaultHint": "Plus besoin de mémoriser ce code : enregistrez-le dans vos mots de passe (chiffrés sur cet appareil) et il sera proposé automatiquement à la prochaine ouverture."
+    "adminVaultHint": "Plus besoin de mémoriser ce code : enregistrez-le dans vos mots de passe (chiffrés sur cet appareil) et il sera proposé automatiquement à la prochaine ouverture.",
+    "pinFromVault": "Code rempli depuis vos mots de passe enregistrés",
+    "pinForget": "oublier",
+    "pinRemember": "Retenir ce code (mots de passe enregistrés)"
   },
   "Privacy": {
     "title": "Confidentialité",

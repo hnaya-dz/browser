@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 // ✅ Icônes vectorielles (lucide, déjà dans les dépendances) plutôt
 // qu'emoji : les emoji sont rendus par la police du système et diffèrent
 // visuellement entre Windows 10 et 11 — incohérent d'un poste à l'autre.
-import { MessageSquare, Shield, Lock, Smartphone, KeyRound, Eye, EyeOff, Send, History, DoorOpen, Trash2 } from "lucide-react";
+import { MessageSquare, Shield, Lock, Smartphone, KeyRound, Eye, EyeOff, Send, History, DoorOpen, Trash2, KeySquare } from "lucide-react";
 import ChatAdminPanel from "./ChatAdminPanel";
 import qrcode from "qrcode-generator";
 import { useTranslation } from "@/hooks/useTranslation";
@@ -231,6 +231,41 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
   // en cours d'hébergement n'est pas supprimable (bouton masqué) et une
   // confirmation explicite est demandée.
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+
+  // ══════════════════════════════════════════════════════════════
+  // Coffre chiffré — code d'ACCÈS du salon (D.3)
+  // ══════════════════════════════════════════════════════════════
+  // Le code se remplit tout seul si l'utilisateur l'a fait retenir, et
+  // une case propose de le retenir après une connexion RÉUSSIE (jamais
+  // avant : on n'enregistre pas un code erroné).
+  const roomKeyOf = (s: DiscoveredSession | null) =>
+    s ? `${s.address}:${s.wsPort}` : null;
+  const [pinFromVault, setPinFromVault] = useState(false);
+  const [rememberPin, setRememberPin] = useState(false);
+
+  useEffect(() => {
+    const key = roomKeyOf(store.selectedSession);
+    if (store.status !== "entering-pin" || !key) return;
+    setPinFromVault(false);
+    getApi()?.invoke?.("vault-chat-pin-get", { kind: "access", roomKey: key })
+      .then((pin: string | null) => {
+        if (pin && /^\d{6}$/.test(pin)) {
+          setPinInput(pin);
+          setPinFromVault(true);
+          setRememberPin(true); // déjà retenu → la case reste cochée
+        }
+      })
+      .catch(() => { /* coffre indisponible — saisie manuelle */ });
+  }, [store.status, store.selectedSession?.address, store.selectedSession?.wsPort]);
+
+  // Enregistrement APRÈS connexion réussie uniquement
+  const pendingPinSave = useRef<{ key: string; pin: string; name: string } | null>(null);
+  useEffect(() => {
+    if (store.status !== "joined" || !pendingPinSave.current) return;
+    const { key, pin, name } = pendingPinSave.current;
+    pendingPinSave.current = null;
+    getApi()?.invoke?.("vault-chat-pin-save", { kind: "access", roomKey: key, roomName: name, pin });
+  }, [store.status]);
   const handleDeleteRoom = (roomId: string) => {
     getApi()?.send?.("chat-delete-room", roomId);
     setConfirmDelete(null);
@@ -410,6 +445,12 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
     if (!api?.send || !store.selectedSession || pinInput.length !== 6 || !nickname.trim()) return;
     store.userId = nickname.trim();
     if (typeof window !== "undefined") localStorage.setItem("hnaya-chat-user-id", nickname.trim());
+    // Coffre : mémoriser la demande, l'enregistrement n'aura lieu qu'une
+    // fois la connexion acceptée (voir l'effet sur status === "joined")
+    const vaultKey = roomKeyOf(store.selectedSession);
+    pendingPinSave.current = rememberPin && vaultKey
+      ? { key: vaultKey, pin: pinInput, name: store.selectedSession.sessionName || vaultKey }
+      : null;
     // Même remise à zéro qu'à la création — le backlog fait foi.
     // ✅ Retenir aussi le nom du salon rejoint : affiché dans l'en-tête
     // du dock une fois connecté (on doit savoir OÙ on discute).
@@ -764,9 +805,36 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
                 value={pinInput}
                 maxLength={6}
                 inputMode="numeric"
-                onChange={(e) => setPinInput(e.target.value.replace(/\D/g, ""))}
+                onChange={(e) => { setPinInput(e.target.value.replace(/\D/g, "")); setPinFromVault(false); }}
                 placeholder={t("Chat.pinPlaceholder")}
               />
+              {/* Coffre chiffré : code rempli automatiquement, ou case à
+                  cocher pour le faire retenir après une connexion réussie */}
+              {pinFromVault ? (
+                <div style={{ fontSize: 10, color: "#00c853", marginTop: 5, display: "flex", alignItems: "center", gap: 5 }}>
+                  <KeySquare size={11} /> {t("Chat.pinFromVault")}
+                  <button
+                    onClick={() => {
+                      const key = roomKeyOf(store.selectedSession);
+                      if (key) getApi()?.invoke?.("vault-chat-pin-forget", { kind: "access", roomKey: key });
+                      setPinInput(""); setPinFromVault(false); setRememberPin(false);
+                    }}
+                    style={{ background: "none", border: "none", color: muted, cursor: "pointer", fontSize: 10, textDecoration: "underline", padding: 0 }}
+                  >
+                    {t("Chat.pinForget")}
+                  </button>
+                </div>
+              ) : (
+                <label style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6, fontSize: 10.5, color: muted, cursor: "pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={rememberPin}
+                    onChange={(e) => setRememberPin(e.target.checked)}
+                    style={{ cursor: "pointer" }}
+                  />
+                  <KeySquare size={11} /> {t("Chat.pinRemember")}
+                </label>
+              )}
             </div>
             {store.error && (
               <div style={{ color: "#ff6060", fontSize: 12, textAlign: "center" }}>

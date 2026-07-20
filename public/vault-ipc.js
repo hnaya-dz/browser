@@ -15,25 +15,36 @@ import {
   vaultFindByDomain, vaultIsAvailable
 } from "./vault.js";
 
-// Préfixe des entrées « PIN admin de salon » — ces codes sont générés par
-// l'application (pas des identifiants de site) et rangés dans le même
-// coffre chiffré. Le préfixe garantit qu'aucune lecture de PIN ne peut
-// atteindre un mot de passe de site web.
-const CHAT_PIN_SCHEME = "hnaya-chat://room/";
+// ══════════════════════════════════════════════════════════════════
+// Codes de la Messagerie locale (PIN d'accès et PIN admin)
+// ══════════════════════════════════════════════════════════════════
+// EXCEPTION ASSUMÉE À L'INVARIANT CI-DESSUS, limitée à ces codes :
+// l'invariant protège les identifiants de SITES WEB, qui sont injectés
+// dans des pages distantes (WebContentsView) — un contexte hostile.
+// Ces codes-ci sont générés par l'application elle-même, pour sa propre
+// interface (le dock, servi depuis 127.0.0.1), et y sont DÉJÀ affichés
+// à l'hôte. Les remplir automatiquement n'ouvre donc aucune surface
+// nouvelle, alors que l'inverse obligeait l'utilisateur à mémoriser un
+// code que le coffre est justement fait pour retenir.
+// ⚠️ GARDE-FOU : la lecture est strictement limitée au schéma
+// hnaya-chat:// — aucun identifiant de site ne peut être lu par ces
+// canaux, quelle que soit la clé demandée.
+const CHAT_SCHEME = "hnaya-chat://";
+const CHAT_KINDS = new Set(["admin", "access"]);
 
-/**
- * Lit le PIN administrateur d'un salon depuis le coffre.
- * ⚠️ RÉSERVÉ AU PROCESS PRINCIPAL — n'exposez JAMAIS le retour de cette
- * fonction sur un canal IPC : elle sert à injecter le PIN dans la commande
- * admin (electron.js) pour qu'il ne transite jamais par la page.
- * Le filtre sur CHAT_PIN_SCHEME empêche de lire un identifiant de site.
- */
-export function readChatAdminPin(roomKey) {
-  if (!roomKey) return null;
-  const url = CHAT_PIN_SCHEME + roomKey;
+function chatPinUrl(kind, roomKey) {
+  if (!CHAT_KINDS.has(kind) || !roomKey) return null;
+  return `${CHAT_SCHEME}${kind}/${roomKey}`;
+}
+
+/** Lit un code de salon (usage process principal ET canal IPC dédié). */
+export function readChatPin(kind, roomKey) {
+  const url = chatPinUrl(kind, roomKey);
+  if (!url) return null;
   const entry = vaultRead().find((e) => e.url === url);
   return entry?.password || null;
 }
+
 
 export function registerVaultIpc(getMainWindow, getBrowserViews, getActiveTabId) {
 
@@ -59,24 +70,42 @@ export function registerVaultIpc(getMainWindow, getBrowserViews, getActiveTabId)
   // qu'un booléen ; la lecture du code se fait UNIQUEMENT dans le
   // process principal (voir chat-admin dans electron.js, qui injecte
   // le PIN dans la commande sans jamais le transmettre au renderer).
-  ipcMain.handle("vault-chat-pin-save", async (event, { roomKey, roomName, adminPin }) => {
-    if (!roomKey || !/^\d{6}$/.test(String(adminPin || ""))) {
-      return { ok: false, error: "Données incomplètes" };
-    }
-    const url = CHAT_PIN_SCHEME + roomKey;
+  // Enregistrer un code de salon (kind: "access" = code d'accès partagé,
+  // "admin" = code d'administration)
+  ipcMain.handle("vault-chat-pin-save", async (event, { kind = "admin", roomKey, roomName, pin, adminPin }) => {
+    const code = String(pin ?? adminPin ?? "");
+    const url = chatPinUrl(kind, roomKey);
+    if (!url || !/^\d{6}$/.test(code)) return { ok: false, error: "Données incomplètes" };
     const existing = vaultRead().find((e) => e.url === url);
     const ok = vaultUpsert({
       ...(existing || {}),
       site: "Hnaya — Messagerie locale",
       url,
-      login: String(roomName || "Salon"),
-      password: String(adminPin),
+      login: `${roomName || "Salon"} — ${kind === "admin" ? "administration" : "accès"}`,
+      password: code,
     });
     return { ok };
   });
 
-  ipcMain.handle("vault-chat-pin-has", async (event, roomKey) => {
-    return !!readChatAdminPin(roomKey); // booléen uniquement
+  // Existence d'un code enregistré (booléen)
+  ipcMain.handle("vault-chat-pin-has", async (event, arg) => {
+    const { kind = "admin", roomKey } = typeof arg === "string" ? { roomKey: arg } : (arg || {});
+    return !!readChatPin(kind, roomKey);
+  });
+
+  // Remplissage automatique — limité au schéma hnaya-chat:// (voir la note
+  // ci-dessus) : ce canal ne peut PAS servir à lire un mot de passe de site.
+  ipcMain.handle("vault-chat-pin-get", async (event, { kind = "admin", roomKey } = {}) => {
+    return readChatPin(kind, roomKey);
+  });
+
+  // Oublier un code enregistré
+  ipcMain.handle("vault-chat-pin-forget", async (event, { kind = "admin", roomKey } = {}) => {
+    const url = chatPinUrl(kind, roomKey);
+    if (!url) return { ok: false };
+    const entry = vaultRead().find((e) => e.url === url);
+    if (!entry) return { ok: true };
+    return { ok: vaultDelete(entry.id) };
   });
 
   // Ajouter ou mettre à jour une entrée

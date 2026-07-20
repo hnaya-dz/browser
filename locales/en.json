@@ -214,7 +214,10 @@
     "adminVaultSave": "Save this code to my passwords",
     "adminVaultUpdate": "Update the saved code",
     "adminVaultSaved": "✓ Code saved to Hnaya's encrypted vault.",
-    "adminVaultHint": "No need to memorise this code: save it to your passwords (encrypted on this device) and it will be offered automatically next time."
+    "adminVaultHint": "No need to memorise this code: save it to your passwords (encrypted on this device) and it will be offered automatically next time.",
+    "pinFromVault": "Code filled from your saved passwords",
+    "pinForget": "forget",
+    "pinRemember": "Remember this code (saved passwords)"
   },
   "Privacy": {
     "title": "Privacy",

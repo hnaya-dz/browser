@@ -16,6 +16,8 @@ const ALLOWED_INVOKE = [
   "vault-export",
   "vault-chat-pin-save",
   "vault-chat-pin-has",
+  "vault-chat-pin-get",
+  "vault-chat-pin-forget",
   "get-active-tab-url",
   "favorites-list",
   "favorites-is-saved",
