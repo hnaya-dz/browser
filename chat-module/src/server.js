@@ -287,11 +287,11 @@ export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, 
         try {
           switch (payload.action) {
             case "devices":
-              reply({ ok: true, data: listDevices() });
+              reply({ ok: true, data: listDevices(activeRoomId) });
               break;
             case "label":
               setDeviceLabel(String(payload.fingerprint || ""), payload.label ?? null);
-              reply({ ok: true, data: listDevices() });
+              reply({ ok: true, data: listDevices(activeRoomId) });
               break;
             case "search":
               // roomId imposé côté serveur : l'admin de CE salon ne peut
@@ -311,12 +311,12 @@ export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, 
                 }
               }
               broadcastPresence();
-              reply({ ok: true, data: { devices: listDevices(), bans: listBans(activeRoomId) } });
+              reply({ ok: true, data: { devices: listDevices(activeRoomId), bans: listBans(activeRoomId) } });
               break;
             }
             case "unban":
               unbanDevice(activeRoomId, String(payload.fingerprint || ""));
-              reply({ ok: true, data: { devices: listDevices(), bans: listBans(activeRoomId) } });
+              reply({ ok: true, data: { devices: listDevices(activeRoomId), bans: listBans(activeRoomId) } });
               break;
             case "bans":
               reply({ ok: true, data: listBans(activeRoomId) });

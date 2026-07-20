@@ -55,6 +55,9 @@ assert.equal(dev.hostname, "PC-RH-03", "hostname conservé si absent au join sui
 assert.equal(dev.lastIp, "192.168.1.21", "dernière IP connue");
 assert.equal(listDevices().length, 1);
 
+// 3-bis) D.2 — registre CLOISONNÉ par salon : sans roomId on voit tout
+// (usage interne), avec roomId seulement les membres de ce salon
+
 // 4) Recherche admin cumulable
 assert.equal(searchMessages({ q: "hnaya" }).length, 1, "recherche mot-clé");
 assert.equal(searchMessages({ from: "Karim" }).length, 2, "recherche par auteur");
@@ -101,6 +104,11 @@ banDevice(rDel.roomId, "aabbccdd11223344");
 setRoomLocked(rDel.roomId, true);
 assert.equal(getRoom(rDel.roomId).locked, 1, "verrou posé (contrôle avant suppression)");
 assert.equal(isRoomMember(rDel.roomId, "ffee001122334455"), true);
+
+// Registre cloisonné : l'appareil membre de rDel n'apparaît que là
+addRoomMember(rA.roomId, 'aabbccdd11223344');
+assert.equal(listDevices(rA.roomId).length, 1, 'salon X : son membre');
+assert.equal(listDevices(rB.roomId).length, 0, 'salon Y : aucun membre → registre vide');
 
 const roomsBefore = listRooms().length;
 deleteRoom(rDel.roomId);

@@ -229,9 +229,18 @@ export function setDeviceLabel(fingerprint, label) {
     .run(label || null, fingerprint);
 }
 
-export function listDevices() {
-  return ensureDb().prepare("SELECT * FROM devices ORDER BY lastSeen DESC").all()
-    .map((r) => ({ ...r, nicknames: safeJson(r.nicknames, []) }));
+/** Registre des appareils. Avec roomId : UNIQUEMENT ceux qui ont rejoint
+ *  CE salon — l'admin d'une direction ne découvre pas les appareils des
+ *  autres salons hébergés sur la même machine (le cloisonnement doit
+ *  valoir aussi pour le registre, pas seulement pour l'historique). */
+export function listDevices(roomId) {
+  const d = ensureDb();
+  const rows = roomId
+    ? d.prepare(`SELECT dev.* FROM devices dev
+                 JOIN room_members m ON m.fingerprint = dev.fingerprint
+                 WHERE m.roomId = ? ORDER BY dev.lastSeen DESC`).all(String(roomId))
+    : d.prepare("SELECT * FROM devices ORDER BY lastSeen DESC").all();
+  return rows.map((r) => ({ ...r, nicknames: safeJson(r.nicknames, []) }));
 }
 
 export function getDevice(fingerprint) {
