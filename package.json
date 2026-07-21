@@ -33,6 +33,7 @@
       "public/shared/**/*",
       "public/vault.js",
       "public/vault-ipc.js",
+      "public/chat-session.js",
       "public/favorites.js",
       "public/favorites-ipc.js",
       "public/update-check.js"
