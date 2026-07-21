@@ -1,21 +1,36 @@
-MIT License
+Copyright (c) 2026 Hnaya DZ. Tous droits réservés.
+All rights reserved.
 
-Copyright (c) 2023 Next UI
+Ce logiciel et les fichiers de code source associés (le « Logiciel »)
+sont la propriété exclusive de Hnaya DZ.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+Toute reproduction, distribution, modification, ingénierie inverse,
+sous-licence ou exploitation commerciale du Logiciel, en tout ou en
+partie, est interdite sans l'autorisation écrite préalable de
+Hnaya DZ.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+La consultation du code source à des fins d'audit, d'apprentissage ou
+d'évaluation est permise. Cette consultation n'accorde aucun droit
+d'usage, de copie, de modification ou de redistribution.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+LE LOGICIEL EST FOURNI « EN L'ÉTAT », SANS GARANTIE D'AUCUNE SORTE,
+EXPRESSE OU IMPLICITE. EN AUCUN CAS HNAYA DZ NE POURRA ÊTRE TENU
+RESPONSABLE DE TOUT DOMMAGE DÉCOULANT DE L'UTILISATION DU LOGICIEL.
+
+---
+
+This software and associated source code files (the "Software") are
+the exclusive property of Hnaya DZ.
+
+Any reproduction, distribution, modification, reverse engineering,
+sublicensing, or commercial exploitation of the Software, in whole or
+in part, is prohibited without prior written authorization from
+Hnaya DZ.
+
+Viewing the source code for auditing, learning, or evaluation purposes
+is permitted. Such viewing grants no right to use, copy, modify, or
+redistribute the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+OR IMPLIED. IN NO EVENT SHALL HNAYA DZ BE LIABLE FOR ANY DAMAGES ARISING
+FROM THE USE OF THE SOFTWARE.
