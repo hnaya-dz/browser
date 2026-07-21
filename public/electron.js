@@ -302,12 +302,16 @@ const createWindow = () => {
         // ✅ F12 remplacé par Ctrl+Shift+I — évite conflit avec touche HP
         { role: "toggleDevTools", accelerator: "CmdOrCtrl+Shift+I" },
         { type: "separator" },
-        { role: "resetZoom",      accelerator: "CmdOrCtrl+0" },
-        // ✅ Zoom interface — QWERTY: Ctrl+= / AZERTY: Ctrl+Shift+= (même touche physique)
-        { role: "zoomIn",         accelerator: "CmdOrCtrl+Equal" },
-        { role: "zoomIn",         accelerator: "CmdOrCtrl+numadd" },
-        { role: "zoomOut",        accelerator: "CmdOrCtrl+Minus" },
-        { role: "zoomOut",        accelerator: "CmdOrCtrl+numsub" },
+        // ✅ Zoom INTERFACE (fenêtre principale) — handlers explicites plutôt
+        // que les rôles zoomIn/zoomOut : après un zoom d'interface, la
+        // colonne du dock/sidebar (px CSS) change de taille en DIP, il FAUT
+        // recalculer les bounds de la vue web, sinon elle déborde sous le
+        // dock (retour terrain). uiZoom(delta) applique puis resynchronise.
+        { label: "Zoom interface 100%", accelerator: "CmdOrCtrl+0", click: () => uiZoom(0, true) },
+        { label: "Zoom interface +",    accelerator: "CmdOrCtrl+Equal",  click: () => uiZoom(+0.5) },
+        { label: "Zoom interface + (pavé)", accelerator: "CmdOrCtrl+numadd", click: () => uiZoom(+0.5) },
+        { label: "Zoom interface -",    accelerator: "CmdOrCtrl+Minus",  click: () => uiZoom(-0.5) },
+        { label: "Zoom interface - (pavé)", accelerator: "CmdOrCtrl+numsub", click: () => uiZoom(-0.5) },
         // ✅ Zoom page web — fonctionne sur QWERTY et AZERTY
         { label: "Zoom page +",   accelerator: "CmdOrCtrl+Shift+Equal", click: () => {
           if (activeTabId && browserViews.has(activeTabId)) {
@@ -545,6 +549,9 @@ app.on("ready", async () => {
     win.on("enter-full-screen", () => setTimeout(updateBrowserViewSize, 100));
     win.on("leave-full-screen",  () => setTimeout(updateBrowserViewSize, 100));
     win.on("resize",             () => setTimeout(updateBrowserViewSize, 50));
+    // Zoom d'interface à la molette (Ctrl+molette) : recalculer les bounds
+    // pour que la vue web reste alignée avec le dock/la sidebar
+    win.webContents.on("zoom-changed", () => setTimeout(updateBrowserViewSize, 30));
   });
   // ✅ Téléchargement images avec dialogue de sauvegarde
   // ⚠️ Verrou anti-doublon : "will-download" peut être émis deux fois pour la
@@ -661,10 +668,20 @@ const updateBrowserViewSize = () => {
   const view = browserViews.get(activeTabId);
   if (!view) return;
   const { width, height } = mainWindow.getContentBounds();
+  // ⚠️ getContentBounds() est en DIP ; la barre latérale (tabSideWidth) et
+  // le dock (chatDockWidth) sont réservés en PIXELS CSS du renderer. Quand
+  // l'interface est zoomée (Ctrl+= « Zoom interface »), 1 px CSS ≠ 1 DIP :
+  // il faut convertir par le facteur de zoom de la FENÊTRE PRINCIPALE,
+  // sinon la vue web déborde sous le dock et laisse voir l'accueil derrière
+  // (retour terrain). La marge haute (12vh) est proportionnelle : elle
+  // reste correcte sans conversion.
+  const zoomFactor = mainWindow.webContents.getZoomFactor() || 1;
+  const sideDip = Math.round(tabSideWidth * zoomFactor);
+  const dockDip = Math.round(chatDockWidth * zoomFactor);
   if (tabSideWidth > 0) {
     // Mode sidebar — la vue prend toute la hauteur à gauche de la sidebar
     // (et du dock messagerie s'il est ouvert)
-    view.setBounds({ x: 0, y: 0, width: width - tabSideWidth - chatDockWidth, height });
+    view.setBounds({ x: 0, y: 0, width: width - sideDip - dockDip, height });
   } else {
     // Mode top — tabbar (6vh) + navbar (6vh) = 12vh de hauteur fixe
     // On utilise des pixels calculés depuis la vraie hauteur de la fenêtre
@@ -675,11 +692,22 @@ const updateBrowserViewSize = () => {
     view.setBounds({
       x: 0,
       y: marginTop,
-      width: width - chatDockWidth,
+      width: width - dockDip,
       height: height - marginTop
     });
   }
 };
+
+// Zoom de l'INTERFACE (fenêtre principale) puis resynchronisation des
+// bounds de la vue web. delta en niveaux de zoom (0,5) ; reset=true remet
+// à 100 %. Bornes ±2 niveaux pour éviter une UI inutilisable.
+function uiZoom(delta, reset = false) {
+  if (!mainWindow) return;
+  const wc = mainWindow.webContents;
+  const level = reset ? 0 : Math.max(-2, Math.min(2, wc.getZoomLevel() + delta));
+  wc.setZoomLevel(level);
+  updateBrowserViewSize();
+}
 
 // ✅ Recalculer la taille au redimensionnement et au plein écran
 const scheduleResize = () => setTimeout(updateBrowserViewSize, 50);
