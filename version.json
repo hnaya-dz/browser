@@ -1,9 +1,9 @@
 {
-  "version": "0.4.0",
+  "version": "0.5.0",
   "url": "https://github.com/hnaya-dz/browser/releases/latest",
   "notes": {
-    "ar": "المراسلة المحلية للمؤسسات: توقيع الرسائل، سجل موقّع قابل للتدقيق، لوحة إدارة، خادم دائم — وهوية بصرية جديدة",
-    "fr": "Messagerie locale pour organisations : messages signés, historique auditable, panneau d'administration, serveur permanent — et une nouvelle identité visuelle",
-    "en": "Local Messaging for organizations: signed messages, auditable history, admin panel, permanent server — and a refreshed visual identity"
+    "ar": "غرف متعددة في آن واحد ودعوات بينها، قفل الغرفة وحظر الأجهزة، حذف الغرف، وجلسات « البقاء متصلاً على هذا الجهاز » — مع إصلاحات عرض عند التكبير وملء الشاشة",
+    "fr": "Plusieurs salons à la fois et invitations entre eux, verrou de salon et blocage d'appareils, suppression de salons, et sessions « rester connecté sur ce PC » — avec des correctifs d'affichage au zoom et en plein écran",
+    "en": "Several rooms at once with cross-room invitations, room lock and device blocking, room deletion, and “stay connected on this PC” sessions — plus display fixes for zoom and fullscreen"
   }
 }
