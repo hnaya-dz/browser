@@ -544,15 +544,23 @@ app.on("ready", async () => {
     staticServerUrl = await startStaticServer();
   }
   createWindow();
-  // ✅ Recalculer les vues au plein écran / sortie plein écran
-  app.on("browser-window-created", (_, win) => {
-    win.on("enter-full-screen", () => setTimeout(updateBrowserViewSize, 100));
-    win.on("leave-full-screen",  () => setTimeout(updateBrowserViewSize, 100));
-    win.on("resize",             () => setTimeout(updateBrowserViewSize, 50));
-    // Zoom d'interface à la molette (Ctrl+molette) : recalculer les bounds
-    // pour que la vue web reste alignée avec le dock/la sidebar
-    win.webContents.on("zoom-changed", () => setTimeout(updateBrowserViewSize, 30));
-  });
+  // ✅ Recalculer la vue web à CHAQUE changement de taille de la fenêtre.
+  // ⚠️ Attaché DIRECTEMENT à mainWindow, PAS via app.on("browser-window-
+  // created") : ce dernier était enregistré APRÈS createWindow(), donc il
+  // ne se déclenchait jamais pour la fenêtre principale — le plein écran
+  // ne redimensionnait pas la page web (retour terrain). enter/leave-full-
+  // screen couvrent le vrai plein écran ; maximize/unmaximize le bouton
+  // Agrandir de Windows ; resize le glissement de bordure.
+  if (mainWindow) {
+    const relayout = (delay) => () => setTimeout(updateBrowserViewSize, delay);
+    mainWindow.on("enter-full-screen", relayout(100));
+    mainWindow.on("leave-full-screen", relayout(100));
+    mainWindow.on("maximize",          relayout(80));
+    mainWindow.on("unmaximize",        relayout(80));
+    mainWindow.on("resize",            relayout(50));
+    // Zoom d'interface à la molette (Ctrl+molette) : réaligner la vue web
+    mainWindow.webContents.on("zoom-changed", relayout(30));
+  }
   // ✅ Téléchargement images avec dialogue de sauvegarde
   // ⚠️ Verrou anti-doublon : "will-download" peut être émis deux fois pour la
   // même image lors d'un clic sur "Enregistrer l'image" (comportement Chromium
