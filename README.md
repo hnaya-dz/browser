@@ -75,6 +75,10 @@ yarn dist:linux   # Linux (AppImage)
 
 ## Licence
 
-MIT — © 2026 Nacib Hamida.
-
-*Hnaya DZ Browser — Navigateur algérien souverain.*
+License
+Copyright (c) 2026 Hnaya DZ. Tous droits réservés.
+All rights reserved.
+Ce logiciel et les fichiers de code source associés (le « Logiciel ») sont la propriété exclusive de Hnaya DZ.
+Toute reproduction, distribution, modification, ingénierie inverse, sous-licence ou exploitation commerciale du Logiciel, en tout ou en partie, est interdite sans l'autorisation écrite préalable de Hnaya DZ.
+La consultation du code source à des fins d'audit, d'apprentissage ou d'évaluation est permise. Cette consultation n'accorde aucun droit d'usage, de copie, de modification ou de redistribution.
+LE LOGICIEL EST FOURNI « EN L'ÉTAT », SANS GARANTIE D'AUCUNE SORTE, EXPRESSE OU IMPLICITE. EN AUCUN CAS HNAYA DZ NE POURRA ÊTRE TENU RESPONSABLE DE TOUT DOMMAGE DÉCOULANT DE L'UTILISATION DU LOGICIEL.
