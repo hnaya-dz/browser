@@ -21,7 +21,8 @@
     "vaultTitle": "Passwords",
     "vaultTitleFound": "Saved login for this site",
     "hintVault": "Manage your passwords",
-    "hintVaultFound": "Login available — click to autofill"
+    "hintVaultFound": "Login available — click to autofill",
+    "externalAuthNotice": "Google sign-in opens in your usual browser: Google refuses authentication from inside an application. Come back here once signed in."
   },
   "Download": {
     "analyzing": "Analyzing video…",

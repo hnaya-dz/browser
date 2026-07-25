@@ -21,7 +21,8 @@
     "vaultTitle": "Mots de passe",
     "vaultTitleFound": "Identifiant enregistré pour ce site",
     "hintVault": "Gérer vos mots de passe",
-    "hintVaultFound": "Identifiant disponible — cliquez pour remplir"
+    "hintVaultFound": "Identifiant disponible — cliquez pour remplir",
+    "externalAuthNotice": "La connexion Google s'ouvre dans votre navigateur habituel : Google refuse l'authentification depuis une application. Revenez ici une fois connecté."
   },
   "Download": {
     "analyzing": "Analyse de la vidéo…",

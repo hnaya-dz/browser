@@ -14,6 +14,7 @@ import URLBar from "@/components/urlbar";
 import HtmlWrapper from "@/components/html-wrapper";
 import UpdateBannerClient from "@/components/UpdateBannerClient";
 import ChatDockMount from "@/components/ChatDockMount";
+import ExternalOpenNotice from "@/components/ExternalOpenNotice";
 
 export const metadata: Metadata = {
   title: {
@@ -52,6 +53,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                         <UpdateBannerClient />
                         {/* ✅ Dock Messagerie locale — point de montage unique, piloté par le store global */}
                         <ChatDockMount />
+                        {/* ✅ Bandeau « ouvert dans le navigateur système » (connexion Google).
+                            Monté ICI et non dans la barre d'adresse : celle-ci se remonte au
+                            changement d'onglet, ce qui effaçait le bandeau avant affichage. */}
+                        <ExternalOpenNotice />
                       </TabProvider>
                     </LoadingProvider>
                   </main>

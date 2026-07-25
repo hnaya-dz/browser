@@ -23,6 +23,18 @@ function isGoogleAuthUrl(url) {
   } catch { return false; }
 }
 
+// ✅ Ouverture dans le navigateur SYSTÈME + information de l'utilisateur.
+// Google refuse l'authentification depuis un navigateur Electron
+// (« this browser may not be secure ») : la connexion Google est donc
+// déléguée au navigateur par défaut du poste. Sans message, l'utilisateur
+// voit une fenêtre surgir sans comprendre (retour terrain : « un onglet
+// s'était détaché dans une autre fenêtre » lors d'une connexion LinkedIn
+// via Google). On prévient donc explicitement.
+function openExternallyWithNotice(url) {
+  shell.openExternal(url);
+  try { mainWindow?.webContents.send("external-open-notice", url); } catch {}
+}
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
@@ -659,7 +671,7 @@ app.on('web-contents-created', (event, contents) => {
   contents.setWindowOpenHandler((details) => {
     // ✅ Google OAuth → navigateur système (Electron est bloqué par Google)
     if (isGoogleAuthUrl(details.url)) {
-      shell.openExternal(details.url);
+      openExternallyWithNotice(details.url);
       return { action: 'deny' };
     }
     if (mainWindow) mainWindow.webContents.send('new-tab-url', details.url);
@@ -1254,17 +1266,39 @@ ipcMain.on("open-tab", (event, newTab) => {
 
     // ✅ PATCH 6 — updateTabInfo simplifié : envoyer le titre sans double filtre
     // Le filtre "title !== domain" bloquait les vrais titres de page
+    // ⚠️ Anti-clignotement (retour terrain : un onglet ouedkniss.com
+    // clignotait de façon irrégulière). Le titre était envoyé par DEUX
+    // sources — l'événement page-title-updated ET updateTabInfo, lui-même
+    // branché sur 5 événements de navigation. Sur un site à publicités et
+    // rafraîchissements fréquents, ces cycles se répètent et le libellé
+    // de l'onglet oscillait entre le titre réel et une valeur transitoire.
+    // Solution : mémoriser la dernière valeur envoyée et n'émettre QUE
+    // sur un vrai changement (le renderer ne reçoit plus de doublons).
+    let lastSentUrl = null;
+    let lastSentTitle = null;
+    let lastSentFavicon = null;
+
+    const sendTabUrl = (url) => {
+      // Ne jamais propager une URL Google Auth au renderer — pollue
+      // realViewUrl côté React (urlbar.tsx) et casse isDownloadable
+      if (isGoogleAuthUrl(url) || !url || url === lastSentUrl) return;
+      lastSentUrl = url;
+      mainWindow.webContents.send("update-url", id, url);
+    };
+
+    const sendTabTitle = (title) => {
+      if (!title || title === lastSentTitle) return;
+      lastSentTitle = title;
+      mainWindow.webContents.send("update-tab-title", { id, title });
+    };
+
     const updateTabInfo = () => {
       const currentUrl = view.webContents.getURL();
       const title = view.webContents.getTitle();
-      // ✅ Ne jamais propager une URL Google Auth au renderer — pollue
-      // realViewUrl côté React (urlbar.tsx) et casse isDownloadable/téléchargement
-      if (!isGoogleAuthUrl(currentUrl)) {
-        mainWindow.webContents.send("update-url", id, currentUrl);
-      }
-      if (title && title !== currentUrl) {
-        mainWindow.webContents.send("update-tab-title", { id, title });
-      }
+      sendTabUrl(currentUrl);
+      // Pendant un chargement, getTitle() renvoie parfois l'URL elle-même :
+      // on ignore ce cas transitoire plutôt que d'afficher une URL brute
+      if (title !== currentUrl) sendTabTitle(title);
     };
 
     view.webContents.on("page-title-updated", (event, title) => {
@@ -1277,7 +1311,9 @@ ipcMain.on("open-tab", (event, newTab) => {
         }, 150);
         return;
       }
-      mainWindow.webContents.send("update-tab-title", { id, title });
+      // Même filtre anti-doublon que updateTabInfo — sans lui, les deux
+      // sources se relançaient mutuellement et l'onglet clignotait
+      sendTabTitle(title);
     });
 
     // ✅ Menu contextuel clic droit dans les onglets de navigation
@@ -1342,7 +1378,7 @@ ipcMain.on("open-tab", (event, newTab) => {
     view.webContents.setWindowOpenHandler((details) => {
       // ✅ Google OAuth → navigateur système
       if (isGoogleAuthUrl(details.url)) {
-        shell.openExternal(details.url);
+        openExternallyWithNotice(details.url);
         return { action: "deny" };
       }
       mainWindow.webContents.send("new-tab-url", details.url);
@@ -1355,7 +1391,7 @@ ipcMain.on("open-tab", (event, newTab) => {
   // ✅ Google OAuth en navigation directe (pas une popup) → navigateur système
   if (isGoogleAuthUrl(navUrl)) {
     event.preventDefault();
-    shell.openExternal(navUrl);
+    openExternallyWithNotice(navUrl);
     return;
   }
   if (navUrl.startsWith("hnaya-dl://")) {
@@ -1386,7 +1422,7 @@ view.webContents.on("did-navigate", (event, navUrl) => {
   // ✅ Filet de sécurité — Google peut rediriger en cascade et échapper à will-navigate
   // (cas observé : accounts.google.com/v3/signin/rejected via gsi/select popup)
   if (isGoogleAuthUrl(navUrl)) {
-    shell.openExternal(navUrl);
+    openExternallyWithNotice(navUrl);
     if (view.webContents.navigationHistory?.canGoBack()) {
       view.webContents.navigationHistory.goBack();
     } else {
@@ -1412,7 +1448,7 @@ view.webContents.on("did-navigate", (event, navUrl) => {
       .forEach(ev => view.webContents.on(ev, updateTabInfo));
 
     view.webContents.on("did-fail-load", (event, errorCode, errorDescription, validatedURL) => {
-      mainWindow.webContents.send("update-url", id, validatedURL);
+      sendTabUrl(validatedURL);
       updateTabInfo();
     });
 view.webContents.on("did-finish-load", () => {
@@ -1421,6 +1457,10 @@ view.webContents.on("did-finish-load", () => {
         const favicon = document.querySelector('link[rel="icon"], link[rel="shortcut icon"]');
         favicon ? favicon.href : null;
       `).then(faviconUrl => {
+        // Même dédoublonnage : une icône réémise à l'identique faisait
+        // re-télécharger l'image et clignoter l'onglet
+        if (faviconUrl === lastSentFavicon) return;
+        lastSentFavicon = faviconUrl;
         mainWindow.webContents.send("update-tab-favicon", { id, faviconUrl });
       }).catch(console.error);
 
