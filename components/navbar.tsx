@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { usePathname } from "next/navigation";
 import dynamic from "next/dynamic";
-import { MessageSquare, Shield } from "lucide-react";
+import { MessageSquare, Shield, BookOpen } from "lucide-react";
 import { ThemeSwitch } from "@/components/theme-switch";
 import LangSwitch from "./lang-switch";
 import { useTabContext } from "@/context/tabcontext";
@@ -10,6 +10,7 @@ import { useTabPosition } from "@/context/tabpositioncontext";
 import { useLanguage } from "@/context/langcontext";
 import { useTranslation } from "@/hooks/useTranslation";
 import { setPanelOpen, useChatSnapshot } from "@/context/chatstore";
+import { setTutorialActive, useTutorialSnapshot } from "@/context/tutorialStore";
 
 const PrivacyPanel = dynamic(() => import("./PrivacyPanel"), { ssr: false });
 
@@ -30,6 +31,7 @@ export const Navbar = () => {
   // État global de la messagerie : couleur d'icône (vert = connecté) et
   // badge non-lus, tenus à jour même quand le dock est fermé
   const chat = useChatSnapshot();
+  const tutorial = useTutorialSnapshot();
   const [showPrivacy, setShowPrivacy] = useState(false);
 
   if (pathname === "/browser") return null;
@@ -60,10 +62,19 @@ export const Navbar = () => {
       </div>
       <div className="flex items-center gap-2 flex-shrink-0">
         <button
+          onClick={() => setTutorialActive(!tutorial.isActive)}
+          className="px-2 text-white/70 hover:text-white transition-all duration-150"
+          title={t("Tutorial.title") || "Guide"}
+          data-tutorial="tutorial-btn"
+        >
+          <BookOpen size={16} />
+        </button>
+        <button
           onClick={() => setPanelOpen(!chat.panelOpen)}
           className="px-2 text-white/70 hover:text-white transition-all duration-150"
           title={t("Chat.title")}
           style={{ position: "relative" }}
+          data-tutorial="chat-btn"
         >
           {/* Icône vectorielle : rendu identique sur Windows 10 et 11,
               contrairement aux emoji (police système) */}
@@ -82,11 +93,16 @@ export const Navbar = () => {
           onClick={() => setShowPrivacy(true)}
           className="px-2 text-white/70 hover:text-white transition-all duration-150"
           title={t("Privacy.title")}
+          data-tutorial="privacy-btn"
         >
           <Shield size={16} />
         </button>
-        <LangSwitch />
-        <ThemeSwitch />
+        <div data-tutorial="theme-btn">
+          <LangSwitch />
+        </div>
+        <div data-tutorial="theme-btn">
+          <ThemeSwitch />
+        </div>
       </div>
       {showPrivacy && <PrivacyPanel onClose={() => setShowPrivacy(false)} />}
     </nav>

@@ -286,9 +286,9 @@ export default function URLBar() {
 
         {/* ✅ Infobulles et placeholder traduits (clés Navbar existantes) —
             elles étaient codées en dur en français même en interface arabe */}
-        <button className="urlbar-btn" onClick={() => (window as any)?.electronAPI?.send("go-back")} title={t("Navbar.back")}><IconBack /></button>
-        <button className="urlbar-btn" onClick={() => (window as any)?.electronAPI?.send("go-forward")} title={t("Navbar.forward")}><IconForward /></button>
-        <button className="urlbar-btn" onClick={() => (window as any)?.electronAPI?.send("refresh")} title={t("Navbar.reload")}><IconRefresh /></button>
+        <button className="urlbar-btn" onClick={() => (window as any)?.electronAPI?.send("go-back")} title={t("Navbar.back")} data-tutorial="nav-buttons"><IconBack /></button>
+        <button className="urlbar-btn" onClick={() => (window as any)?.electronAPI?.send("go-forward")} title={t("Navbar.forward")} data-tutorial="nav-buttons"><IconForward /></button>
+        <button className="urlbar-btn" onClick={() => (window as any)?.electronAPI?.send("refresh")} title={t("Navbar.reload")} data-tutorial="nav-buttons"><IconRefresh /></button>
 
         <input
           className="urlbar-input"
@@ -296,13 +296,14 @@ export default function URLBar() {
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleNavigation()}
+          data-tutorial="urlbar"
         />
 
-        <button className="urlbar-btn" onClick={handleNavigation} title={t("Navbar.search")}><IconSearch /></button>
+        <button className="urlbar-btn" onClick={handleNavigation} title={t("Navbar.search")} data-tutorial="search-scope"><IconSearch /></button>
 
         {/* Bouton téléchargement */}
         {canDownload && (
-          <div style={{ position: "relative", flexShrink: 0 }}>
+          <div style={{ position: "relative", flexShrink: 0 }} data-tutorial="download-btn">
             {showDlHint && (
               <div className="urlbar-hint">{t("URLBar.hintDownload")}</div>
             )}
@@ -337,7 +338,7 @@ export default function URLBar() {
         </button>
 
         {/* Bouton vault */}
-        <div style={{ position: "relative", flexShrink: 0 }}>
+        <div style={{ position: "relative", flexShrink: 0 }} data-tutorial="vault-btn">
           {showVaultHint && (
             <div className="urlbar-hint">
               {hasCredentials ? t("URLBar.hintVaultFound") : t("URLBar.hintVault")}
@@ -360,6 +361,7 @@ export default function URLBar() {
           onClick={() => setPanelOpen(!chat.panelOpen)}
           className="urlbar-btn"
           title={t("Chat.title")}
+          data-tutorial="chat-btn"
         >
           <MessageSquare size={17} style={chat.status === "joined" ? { color: "#00c853" } : undefined} />
           {chat.unreadCount > 0 && <span className="chat-unread-dot" />}
@@ -371,6 +373,7 @@ export default function URLBar() {
           onClick={handlePrivacyClick}
           className="urlbar-btn"
           title={t("Privacy.title")}
+          data-tutorial="privacy-btn"
         >
           <Shield size={17} />
         </button>

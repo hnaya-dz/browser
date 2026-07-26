@@ -15,6 +15,8 @@ import HtmlWrapper from "@/components/html-wrapper";
 import UpdateBannerClient from "@/components/UpdateBannerClient";
 import ChatDockMount from "@/components/ChatDockMount";
 import ExternalOpenNotice from "@/components/ExternalOpenNotice";
+import { TutorialOverlay } from "@/components/TutorialOverlay";
+import TutorialBootstrap from "@/components/TutorialBootstrap";
 
 export const metadata: Metadata = {
   title: {
@@ -57,6 +59,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                             Monté ICI et non dans la barre d'adresse : celle-ci se remonte au
                             changement d'onglet, ce qui effaçait le bandeau avant affichage. */}
                         <ExternalOpenNotice />
+                        {/* ✅ Mode tutoriel interactif (trilingue, peut s'activer via l'icône Livre) */}
+                        <TutorialOverlay />
+                        {/* ✅ Bootstrap du tutoriel au premier lancement (localStorage) */}
+                        <TutorialBootstrap />
                       </TabProvider>
                     </LoadingProvider>
                   </main>

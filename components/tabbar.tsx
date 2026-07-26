@@ -136,6 +136,7 @@ export default function TabBar() {
       <div
         key={tab.id}
         data-active={isActive}
+        data-tutorial={index === 0 ? "tabbar" : undefined}
         draggable
         onDragStart={onDragStart(index)}
         onDragOver={onDragOver(index)}

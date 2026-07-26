@@ -249,5 +249,13 @@
     "cleanLinks": "Link cleaning",
     "cleanLinksDesc": "Removes tracking parameters from visited addresses (utm_, fbclid, gclid…).",
     "troubleshoot": "If a website misbehaves (Facebook login, missing content…), temporarily disable these protections and reload the page. Changes apply immediately."
+  },
+  "Tutorial": {
+    "title": "Tutorial",
+    "icon": "Guide",
+    "next": "Next",
+    "skip": "Skip",
+    "done": "Done",
+    "finish": "Finish"
   }
 }

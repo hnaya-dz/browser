@@ -249,5 +249,13 @@
     "cleanLinks": "Nettoyage des liens",
     "cleanLinksDesc": "Retire les paramètres de suivi des adresses visitées (utm_, fbclid, gclid…).",
     "troubleshoot": "Si un site ne fonctionne pas correctement (connexion via Facebook, contenu manquant…), désactivez temporairement ces protections puis rechargez la page. Les changements s'appliquent immédiatement."
+  },
+  "Tutorial": {
+    "title": "Tutoriel",
+    "icon": "Guide",
+    "next": "Suivant",
+    "skip": "Passer",
+    "done": "Terminé",
+    "finish": "Terminer"
   }
 }
