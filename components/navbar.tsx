@@ -97,10 +97,8 @@ export const Navbar = () => {
         >
           <Shield size={16} />
         </button>
-        <div data-tutorial="theme-btn">
+        <div className="flex items-center gap-2" data-tutorial="theme-btn">
           <LangSwitch />
-        </div>
-        <div data-tutorial="theme-btn">
           <ThemeSwitch />
         </div>
       </div>

@@ -1,401 +1,521 @@
 "use client";
-import { useTutorialSnapshot, nextTutorialStep, prevTutorialStep, completeTutorial, skipTutorial } from "@/context/tutorialStore";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from "react";
+import { X, ChevronLeft, ChevronRight } from "lucide-react";
 import { useLanguage } from "@/context/langcontext";
-import { useTranslation } from "@/hooks/useTranslation";
-import { ChevronRight, ChevronLeft, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import {
+  useTutorialSnapshot,
+  nextTutorialStep,
+  prevTutorialStep,
+  closeTutorial,
+} from "@/context/tutorialStore";
 
-// Tutorial steps: each step has a target selector and content
-const TUTORIAL_STEPS = [
-  {
-    id: "welcome",
-    targetSelector: null, // No highlight for welcome
-    position: "center" as const,
-  },
-  {
-    id: "urlbar",
-    targetSelector: "[data-tutorial='urlbar']",
-    position: "bottom" as const,
-  },
-  {
-    id: "navigation",
-    targetSelector: "[data-tutorial='nav-buttons']",
-    position: "bottom" as const,
-  },
-  {
-    id: "search",
-    targetSelector: "[data-tutorial='search-scope']",
-    position: "bottom" as const,
-  },
-  {
-    id: "tabs",
-    targetSelector: "[data-tutorial='tabbar']",
-    position: "bottom" as const,
-  },
-  {
-    id: "download",
-    targetSelector: "[data-tutorial='download-btn']",
-    position: "bottom" as const,
-  },
-  {
-    id: "vault",
-    targetSelector: "[data-tutorial='vault-btn']",
-    position: "bottom" as const,
-  },
-  {
-    id: "chat-intro",
-    targetSelector: "[data-tutorial='chat-btn']",
-    position: "bottom" as const,
-  },
-  {
-    id: "chat-features",
-    targetSelector: "[data-tutorial='chat-btn']",
-    position: "bottom" as const,
-  },
-  {
-    id: "privacy",
-    targetSelector: "[data-tutorial='privacy-btn']",
-    position: "bottom" as const,
-  },
-  {
-    id: "theme",
-    targetSelector: "[data-tutorial='theme-btn']",
-    position: "bottom" as const,
-  },
-  {
-    id: "outro",
-    targetSelector: null,
-    position: "center" as const,
-  },
-];
+type Lang = "ar" | "fr" | "en";
 
-interface StepContent {
-  title: string;
-  description: string;
-}
+// ── Étapes ────────────────────────────────────────────────────────
+// targetSelector null = carte centrée sans projecteur (accueil / fin).
+// Les étapes dont la cible est absente du DOM sont retirées au
+// démarrage : la barre d'adresse (téléchargement, coffre-fort…)
+// n'existe que lorsqu'un site est ouvert.
+const ALL_STEPS = [
+  { id: "language", target: null },
+  { id: "welcome", target: null },
+  { id: "urlbar", target: "[data-tutorial='urlbar']" },
+  { id: "navigation", target: "[data-tutorial='nav-buttons']" },
+  { id: "search", target: "[data-tutorial='search-scope']" },
+  { id: "tabs", target: "[data-tutorial='tabbar']" },
+  { id: "download", target: "[data-tutorial='download-btn']" },
+  { id: "vault", target: "[data-tutorial='vault-btn']" },
+  { id: "chat-intro", target: "[data-tutorial='chat-btn']" },
+  { id: "chat-features", target: "[data-tutorial='chat-btn']" },
+  { id: "privacy", target: "[data-tutorial='privacy-btn']" },
+  { id: "theme", target: "[data-tutorial='theme-btn']" },
+  { id: "outro", target: null },
+] as const;
 
-const getStepContent = (stepId: string, language: string): StepContent => {
-  const contents: Record<string, Record<string, StepContent>> = {
-    fr: {
-      welcome: {
-        title: "Bienvenue dans Hnaya",
-        description: "Votre navigateur, votre réseau, vos données. Ce guide rapide vous montre les fonctionnalités essentielles. Cliquez sur les flèches ou « Passer » pour explorer.",
-      },
-      urlbar: {
-        title: "Barre d'adresse",
-        description: "Saisissez une adresse Web ou une recherche ici. Appuyez sur Entrée pour naviguer.",
-      },
-      navigation: {
-        title: "Navigation",
-        description: "Retour, avance et actualiser. Comme dans tout navigateur.",
-      },
-      search: {
-        title: "Recherche Algérie & Monde",
-        description: "Choisissez votre portée : Algérie pour les contenus locaux, Monde pour le web global.",
-      },
-      tabs: {
-        title: "Gestion des onglets",
-        description: "Plusieurs onglets ouverts à la fois. Cliquez sur l'onglet pour le voir, bouton × pour fermer.",
-      },
-      download: {
-        title: "Téléchargement vidéo",
-        description: "Téléchargez la vidéo depuis cette page. Supporte 30+ plateformes : YouTube, TikTok, Instagram, etc.",
-      },
-      vault: {
-        title: "Coffre-fort de mots de passe",
-        description: "Sauvegardez vos identifiants en toute sécurité (AES-256). Le navigateur les remplira automatiquement.",
-      },
-      "chat-intro": {
-        title: "Messagerie locale — Essentiel",
-        description: "Communiquez en sécurité sur votre réseau interne. Pas de cloud, pas d'intermédiaire : les données restent chez vous.",
-      },
-      "chat-features": {
-        title: "Messagerie — Créer ou rejoindre",
-        description: "Créez un salon pour vos collègues (ils rejoignent via code PIN). Historique conservé, signature cryptographique pour l'audit. Administrateur pour les paramètres.",
-      },
-      privacy: {
-        title: "Sécurité & confidentialité",
-        description: "DNS sécurisé, blocage des traqueurs, nettoyage des URL. Tous les détails ici, avec options pour désactiver si un site plante.",
-      },
-      theme: {
-        title: "Thème & langue",
-        description: "Clair ou sombre, français/anglais/arabe. Réglages sauvegardés.",
-      },
-      outro: {
-        title: "C'est parti !",
-        description: "Vous maîtrisez les bases. Explorez à votre rythme. Révisez ce guide avec l'icône Livre (en haut) à tout moment.",
-      },
+const CONTENT: Record<Lang, Record<string, { title: string; body: string }>> = {
+  fr: {
+    welcome: {
+      title: "Bienvenue dans Hnaya",
+      body: "Votre navigateur, votre réseau, vos données. Ce guide vous présente les fonctions principales en quelques écrans. Vous pourrez le relancer à tout moment avec l'icône Livre.",
     },
-    en: {
-      welcome: {
-        title: "Welcome to Hnaya",
-        description: "Your browser, your network, your data. This quick guide shows you the essential features. Click the arrows or \"Skip\" to explore.",
-      },
-      urlbar: {
-        title: "Address bar",
-        description: "Type a web address or search here. Press Enter to go.",
-      },
-      navigation: {
-        title: "Navigation",
-        description: "Back, forward, and refresh. Like in any browser.",
-      },
-      search: {
-        title: "Search Algeria & World",
-        description: "Choose your scope: Algeria for local content, World for the global web.",
-      },
-      tabs: {
-        title: "Tab management",
-        description: "Multiple tabs open at once. Click a tab to view it, × button to close it.",
-      },
-      download: {
-        title: "Video download",
-        description: "Download video from this page. Supports 30+ platforms: YouTube, TikTok, Instagram, etc.",
-      },
-      vault: {
-        title: "Password vault",
-        description: "Save your logins securely (AES-256). The browser fills them automatically.",
-      },
-      "chat-intro": {
-        title: "Local Messaging — Essential",
-        description: "Communicate securely on your internal network. No cloud, no intermediary: your data stays with you.",
-      },
-      "chat-features": {
-        title: "Messaging — Create or join",
-        description: "Create a room for your team (they join via PIN code). History kept, cryptographic signature for audit. Admin panel for settings.",
-      },
-      privacy: {
-        title: "Security & privacy",
-        description: "Secure DNS, tracker blocking, URL cleanup. Full details here, with options to disable if a site breaks.",
-      },
-      theme: {
-        title: "Theme & language",
-        description: "Light or dark, French/English/Arabic. Settings saved.",
-      },
-      outro: {
-        title: "You're all set!",
-        description: "You've got the basics. Explore at your own pace. Revisit this guide using the Book icon (top) anytime.",
-      },
+    urlbar: {
+      title: "Barre d'adresse",
+      body: "Saisissez une adresse de site ou des mots à rechercher, puis appuyez sur Entrée.",
     },
-    ar: {
-      welcome: {
-        title: "أهلاً بك في حنايا",
-        description: "متصفحك، شبكتك، بياناتك. هذا الدليل السريع يعرض المزايا الأساسية. انقر الأسهم أو \"تخطّ\" للاستكشاف.",
-      },
-      urlbar: {
-        title: "شريط العنوان",
-        description: "اكتب عنوان موقع أو ابحث هنا. اضغط Enter للانتقال.",
-      },
-      navigation: {
-        title: "الملاحة",
-        description: "الخلف والأمام والتحديث. كما في أي متصفح.",
-      },
-      search: {
-        title: "البحث عن الجزائر والعالم",
-        description: "اختر نطاقك: الجزائر للمحتوى المحلي، العالم للويب العالمي.",
-      },
-      tabs: {
-        title: "إدارة الألسنة",
-        description: "عدة ألسنة مفتوحة في نفس الوقت. انقر اللسان لعرضه، الزر × لإغلاقه.",
-      },
-      download: {
-        title: "تحميل الفيديو",
-        description: "حمّل الفيديو من هذه الصفحة. يدعم 30+ منصة: YouTube و TikTok و Instagram وغيرها.",
-      },
-      vault: {
-        title: "الخزنة الآمنة",
-        description: "احفظ بيانات دخولك بأمان (AES-256). يملأ المتصفح بيانات دخولك تلقائياً.",
-      },
-      "chat-intro": {
-        title: "المراسلة المحلية — أساسي",
-        description: "تواصل آمن على شبكتك الداخلية. لا سحابة، لا وسيط: بياناتك معك.",
-      },
-      "chat-features": {
-        title: "المراسلة — إنشاء أو الانضمام",
-        description: "أنشئ غرفة لفريقك (يندمجون برمز PIN). محفوظ السجل، توقيع تشفيري للتدقيق. لوحة مسؤول للإعدادات.",
-      },
-      privacy: {
-        title: "الأمان والخصوصية",
-        description: "DNS آمن، حجب المتتبعات، تنظيف الروابط. التفاصيل هنا، مع خيارات لتعطيل إن تعطّل موقع.",
-      },
-      theme: {
-        title: "المظهر واللغة",
-        description: "فاتح أو غامق، عربي/فرنسي/إنجليزي. الإعدادات محفوظة.",
-      },
-      outro: {
-        title: "استعد تماماً!",
-        description: "ستتقن الأساسيات. استكشف بوتيرتك. أعد الاطلاع على هذا الدليل بأيقونة الكتاب (في الأعلى) في أي وقت.",
-      },
+    navigation: {
+      title: "Naviguer entre les pages",
+      body: "Revenir à la page précédente, avancer, et actualiser la page affichée.",
     },
-  };
-
-  return (
-    contents[language]?.[stepId] || {
-      title: "Tutorial",
-      description: "No content available",
-    }
-  );
+    search: {
+      title: "Recherche Algérie ou Monde",
+      body: "« Algérie » privilégie les sites algériens, « Monde » interroge le web entier. Choisissez selon ce que vous cherchez.",
+    },
+    tabs: {
+      title: "Vos onglets",
+      body: "Chaque site ouvert occupe un onglet. Cliquez dessus pour l'afficher, faites-le glisser pour le déplacer, la croix le ferme.",
+    },
+    download: {
+      title: "Enregistrer une vidéo",
+      body: "Ce bouton apparaît sur les sites de vidéo (plus de 30 plateformes reconnues) et enregistre la vidéo affichée dans le dossier de votre choix.",
+    },
+    vault: {
+      title: "Vos mots de passe",
+      body: "Enregistrez vos identifiants de sites, chiffrés sur ce poste. Un point vert signale qu'un identifiant existe pour la page ouverte.",
+    },
+    "chat-intro": {
+      title: "Messagerie locale",
+      body: "Échangez avec vos collègues sur le réseau interne, sans passer par Internet ni par un service extérieur : les messages ne quittent jamais vos locaux.",
+    },
+    "chat-features": {
+      title: "Messagerie : créer ou rejoindre",
+      body: "Créez un salon et communiquez son code d'accès, ou rejoignez celui d'un collègue. L'historique est conservé, chaque message est signé, et un espace administrateur permet de gérer les appareils autorisés.",
+    },
+    privacy: {
+      title: "Confidentialité",
+      body: "Le détail des protections actives et leurs interrupteurs se trouvent dans ce panneau.",
+    },
+    theme: {
+      title: "Langue et apparence",
+      body: "Basculez entre arabe, français et anglais, et changez de thème. Vos choix sont conservés.",
+    },
+    outro: {
+      title: "Vous êtes prêt",
+      body: "D'autres boutons apparaîtront dans la barre d'adresse une fois un site ouvert : téléchargement de vidéo, favoris, mots de passe. Relancez ce guide quand vous voulez avec l'icône Livre.",
+    },
+  },
+  en: {
+    welcome: {
+      title: "Welcome to Hnaya",
+      body: "Your browser, your network, your data. This guide walks through the main features in a few screens. You can replay it anytime from the Book icon.",
+    },
+    urlbar: {
+      title: "Address bar",
+      body: "Type a website address or words to search for, then press Enter.",
+    },
+    navigation: {
+      title: "Moving between pages",
+      body: "Go back to the previous page, forward again, and reload the current page.",
+    },
+    search: {
+      title: "Algeria or World search",
+      body: "“Algeria” favours Algerian websites, “World” searches the whole web. Pick whichever fits what you are looking for.",
+    },
+    tabs: {
+      title: "Your tabs",
+      body: "Each open site gets a tab. Click one to show it, drag to reorder, and use the cross to close it.",
+    },
+    download: {
+      title: "Saving a video",
+      body: "This button appears on video sites (over 30 supported platforms) and saves the video on screen to the folder of your choice.",
+    },
+    vault: {
+      title: "Your passwords",
+      body: "Store website logins, encrypted on this machine. A green dot means a login exists for the page you are on.",
+    },
+    "chat-intro": {
+      title: "Local Messaging",
+      body: "Talk to colleagues over your internal network, with no Internet and no outside service involved: messages never leave your premises.",
+    },
+    "chat-features": {
+      title: "Messaging: create or join",
+      body: "Create a room and share its access code, or join a colleague's. History is kept, every message is signed, and an admin area manages which devices are allowed.",
+    },
+    privacy: {
+      title: "Privacy",
+      body: "The full list of active protections and their switches live in this panel.",
+    },
+    theme: {
+      title: "Language and appearance",
+      body: "Switch between Arabic, French and English, and change the theme. Your choices are remembered.",
+    },
+    outro: {
+      title: "You are all set",
+      body: "More buttons appear in the address bar once a site is open: video download, bookmarks, passwords. Replay this guide anytime from the Book icon.",
+    },
+  },
+  ar: {
+    welcome: {
+      title: "أهلاً بك في حنايا",
+      body: "متصفحك، شبكتك، بياناتك. يعرّفك هذا الدليل بالوظائف الأساسية في بضع شاشات. يمكنك إعادة تشغيله في أي وقت من أيقونة الكتاب.",
+    },
+    urlbar: {
+      title: "شريط العنوان",
+      body: "اكتب عنوان موقع أو كلمات للبحث، ثم اضغط Enter.",
+    },
+    navigation: {
+      title: "التنقّل بين الصفحات",
+      body: "العودة إلى الصفحة السابقة، التقدّم، وتحديث الصفحة المعروضة.",
+    },
+    search: {
+      title: "البحث في الجزائر أو العالم",
+      body: "«الجزائر» يرجّح المواقع الجزائرية، و«العالم» يبحث في الويب كلّه. اختر حسب ما تبحث عنه.",
+    },
+    tabs: {
+      title: "ألسنتك",
+      body: "كل موقع مفتوح له لسان. انقر عليه لعرضه، اسحبه لتغيير ترتيبه، والعلامة × تغلقه.",
+    },
+    download: {
+      title: "حفظ فيديو",
+      body: "يظهر هذا الزر في مواقع الفيديو (أكثر من 30 منصة مدعومة) ويحفظ الفيديو المعروض في المجلد الذي تختاره.",
+    },
+    vault: {
+      title: "كلمات المرور",
+      body: "احفظ بيانات دخولك إلى المواقع، مشفّرة على هذا الجهاز. النقطة الخضراء تعني وجود بيانات محفوظة للصفحة الحالية.",
+    },
+    "chat-intro": {
+      title: "المراسلة المحلية",
+      body: "تواصل مع زملائك عبر الشبكة الداخلية، دون إنترنت ودون أي خدمة خارجية: الرسائل لا تغادر مقرّكم أبداً.",
+    },
+    "chat-features": {
+      title: "المراسلة: إنشاء أو انضمام",
+      body: "أنشئ غرفة وشارك رمز الدخول، أو انضم إلى غرفة زميل. السجلّ محفوظ، وكل رسالة موقّعة، ومساحة المسؤول تتيح إدارة الأجهزة المسموح لها.",
+    },
+    privacy: {
+      title: "الخصوصية",
+      body: "تفاصيل الحماية المفعّلة ومفاتيحها موجودة في هذه اللوحة.",
+    },
+    theme: {
+      title: "اللغة والمظهر",
+      body: "بدّل بين العربية والفرنسية والإنجليزية، وغيّر المظهر. اختياراتك محفوظة.",
+    },
+    outro: {
+      title: "أنت جاهز",
+      body: "ستظهر أزرار أخرى في شريط العنوان بمجرد فتح موقع: تحميل الفيديو، المفضّلة، كلمات المرور. أعد تشغيل هذا الدليل متى شئت من أيقونة الكتاب.",
+    },
+  },
 };
+
+const UI: Record<Lang, { next: string; prev: string; skip: string; finish: string; close: string }> = {
+  fr: { next: "Suivant", prev: "Précédent", skip: "Passer le guide", finish: "Terminer", close: "Fermer le guide" },
+  en: { next: "Next", prev: "Back", skip: "Skip guide", finish: "Finish", close: "Close guide" },
+  ar: { next: "التالي", prev: "السابق", skip: "تخطّي الدليل", finish: "إنهاء", close: "إغلاق الدليل" },
+};
+
+const POPOVER_MAX_W = 380;
+const MARGIN = 16; // marge minimale avec les bords de l'écran
+const ARROW_GAP = 26; // espace réservé à la flèche entre carte et cible
+const HOLE_PAD = 6;
+
+interface Placement {
+  left: number;
+  top: number;
+  arrow: "up" | "down" | null;
+  arrowX: number; // position de la flèche, relative à la carte
+}
 
 export const TutorialOverlay = () => {
   const tutorial = useTutorialSnapshot();
-  const { language, isRTL } = useLanguage();
-  const { t } = useTranslation();
-  const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
-  const overlayRef = useRef<HTMLDivElement>(null);
+  const { language, isRTL, toggleLanguage } = useLanguage();
+  const lang = (language as Lang) || "fr";
+  const ui = UI[lang];
 
-  const step = TUTORIAL_STEPS[tutorial.currentStep];
-  const stepContent = getStepContent(step.id, language);
-  const totalSteps = TUTORIAL_STEPS.length;
-  const isFirst = tutorial.currentStep === 0;
-  const isLast = tutorial.currentStep === totalSteps - 1;
+  const popRef = useRef<HTMLDivElement | null>(null);
+  const popObserver = useRef<ResizeObserver | null>(null);
+  const [rect, setRect] = useState<DOMRect | null>(null);
+  const [popH, setPopH] = useState(0);
+  const [viewport, setViewport] = useState({ w: 1280, h: 720 });
+  // Étapes retenues, figées à l'ouverture (cf. commentaire sur ALL_STEPS)
+  const [stepIds, setStepIds] = useState<string[]>([]);
 
-  // Measure target element
+  // ── Sélection des étapes pertinentes à l'ouverture ──────────────
   useEffect(() => {
-    if (!step.targetSelector) {
-      setTargetRect(null);
+    if (!tutorial.isActive) return;
+    const ids = ALL_STEPS.filter((s) => {
+      if (s.id === "language") return tutorial.fromLaunch;
+      if (!s.target) return true;
+      return document.querySelector(s.target) !== null;
+    }).map((s) => s.id);
+    setStepIds(ids);
+  }, [tutorial.isActive, tutorial.fromLaunch]);
+
+  const steps = useMemo(
+    () => stepIds.map((id) => ALL_STEPS.find((s) => s.id === id)!).filter(Boolean),
+    [stepIds],
+  );
+
+  const index = Math.min(tutorial.currentStep, Math.max(0, steps.length - 1));
+  const step = steps[index];
+  const isLanguageStep = step?.id === "language";
+  const isFirst = index === 0;
+  const isLast = index === steps.length - 1;
+
+  // ── Mesure de la cible ──────────────────────────────────────────
+  const measure = useCallback(() => {
+    setViewport({ w: window.innerWidth, h: window.innerHeight });
+    if (!step?.target) {
+      setRect(null);
       return;
     }
-    const target = document.querySelector(step.targetSelector);
-    if (target) {
-      const rect = target.getBoundingClientRect();
-      setTargetRect(rect);
+    const el = document.querySelector(step.target);
+    setRect(el ? el.getBoundingClientRect() : null);
+  }, [step]);
+
+  useLayoutEffect(() => {
+    measure();
+  }, [measure, tutorial.currentStep, tutorial.isActive]);
+
+  useEffect(() => {
+    if (!tutorial.isActive) return;
+    window.addEventListener("resize", measure);
+    window.addEventListener("scroll", measure, true);
+    return () => {
+      window.removeEventListener("resize", measure);
+      window.removeEventListener("scroll", measure, true);
+    };
+  }, [measure, tutorial.isActive]);
+
+  // Hauteur réelle de la carte : indispensable pour décider de la placer
+  // au-dessus ou en dessous sans jamais sortir de l'écran.
+  // ⚠️ Mesure par ref-callback et NON par effet : la carte n'apparaît
+  // qu'au rendu suivant l'activation (les étapes sont sélectionnées dans
+  // un effet), or un effet dont les dépendances n'ont pas changé entre
+  // ces deux rendus ne se rejoue pas — la hauteur restait à 0 et la carte
+  // se plaçait de travers. La ref-callback, elle, se déclenche exactement
+  // au montage du nœud.
+  const attachPopover = useCallback((node: HTMLDivElement | null) => {
+    popRef.current = node;
+    popObserver.current?.disconnect();
+    popObserver.current = null;
+    if (!node) return;
+    setPopH(node.offsetHeight);
+    const ro = new ResizeObserver(() => setPopH(node.offsetHeight));
+    ro.observe(node);
+    popObserver.current = ro;
+  }, []);
+
+  useEffect(() => () => popObserver.current?.disconnect(), []);
+
+  if (!tutorial.isActive || !step) return null;
+
+  // Largeur adaptative : sur une fenêtre étroite, une largeur fixe
+  // ferait déborder la carte hors de l'écran.
+  const POPOVER_W = Math.min(POPOVER_MAX_W, viewport.w - MARGIN * 2);
+
+  // ── Placement de la carte ───────────────────────────────────────
+  const placement: Placement = (() => {
+    if (!rect) {
+      return {
+        left: Math.round((viewport.w - POPOVER_W) / 2),
+        top: Math.round(Math.max(MARGIN, (viewport.h - popH) / 2)),
+        arrow: null,
+        arrowX: 0,
+      };
     }
-  }, [step.targetSelector, tutorial.currentStep]);
+    const centerX = rect.left + rect.width / 2;
+    const left = Math.round(
+      Math.min(Math.max(centerX - POPOVER_W / 2, MARGIN), viewport.w - POPOVER_W - MARGIN),
+    );
 
-  if (!tutorial.isActive) return null;
+    const below = rect.bottom + ARROW_GAP;
+    const above = rect.top - ARROW_GAP - popH;
+    const fitsBelow = below + popH <= viewport.h - MARGIN;
+    const fitsAbove = above >= MARGIN;
 
-  const handleNext = () => {
-    if (isLast) {
-      completeTutorial();
+    let top: number;
+    let arrow: "up" | "down";
+    if (fitsBelow) {
+      top = Math.round(below);
+      arrow = "up"; // la flèche pointe vers le haut, vers la cible
+    } else if (fitsAbove) {
+      top = Math.round(above);
+      arrow = "down";
     } else {
-      nextTutorialStep();
+      top = Math.round(Math.min(Math.max(MARGIN, below), viewport.h - popH - MARGIN));
+      arrow = "up";
     }
+
+    return {
+      left,
+      top,
+      arrow,
+      arrowX: Math.round(Math.min(Math.max(centerX - left, 28), POPOVER_W - 28)),
+    };
+  })();
+
+  const handleNext = () => (isLast ? closeTutorial() : nextTutorialStep());
+  const handlePickLanguage = (l: Lang) => {
+    toggleLanguage(l);
+    nextTutorialStep();
   };
 
-  const handlePrev = () => {
-    if (!isFirst) {
-      prevTutorialStep();
-    }
-  };
-
-  const handleSkip = () => {
-    skipTutorial();
-  };
+  const content = CONTENT[lang][step.id];
 
   return (
     <div
-      ref={overlayRef}
-      className="fixed inset-0 z-50 pointer-events-none"
-      style={{ direction: isRTL ? "rtl" : "ltr" }}
+      className="fixed inset-0 z-[60]"
+      style={{ pointerEvents: "none" }}
+      role="dialog"
+      aria-modal="true"
     >
-      {/* Dark overlay */}
-      <div
-        className="absolute inset-0 bg-black/70 backdrop-blur-sm transition-opacity duration-300"
-        style={{ pointerEvents: "auto" }}
-        onClick={handleSkip}
-      />
+      <style>{`
+        .tuto-card{position:absolute;pointer-events:auto;
+          background:#0d1512;border:1px solid rgba(255,255,255,0.14);border-radius:6px;
+          box-shadow:0 18px 48px rgba(0,0,0,0.55);padding:20px}
+        .light .tuto-card{background:#ffffff;border-color:rgba(0,99,65,0.2);color:#12211a}
+        .tuto-title{font-size:16px;font-weight:650;letter-spacing:-0.01em;color:#fff;margin:0}
+        .light .tuto-title{color:#0c1a13}
+        .tuto-body{font-size:13.5px;line-height:1.6;color:rgba(255,255,255,0.72);margin:10px 0 0}
+        .light .tuto-body{color:rgba(12,26,19,0.75)}
+        .tuto-btn{border-radius:4px;font-size:12.5px;font-weight:600;padding:7px 14px;
+          transition:background-color .15s ease,color .15s ease,border-color .15s ease;
+          border:1px solid transparent;cursor:pointer}
+        .tuto-btn-primary{background:#00994d;color:#fff}
+        .tuto-btn-primary:hover{background:#00b35a}
+        .tuto-btn-ghost{background:transparent;color:rgba(255,255,255,0.55)}
+        .tuto-btn-ghost:hover{background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.9)}
+        .light .tuto-btn-ghost{color:rgba(12,26,19,0.55)}
+        .light .tuto-btn-ghost:hover{background:rgba(0,99,65,0.08);color:#0c1a13}
+        .tuto-btn-icon{border-radius:4px;padding:7px;background:transparent;
+          color:rgba(255,255,255,0.6);border:1px solid rgba(255,255,255,0.14);cursor:pointer;
+          display:flex;align-items:center;transition:background-color .15s ease}
+        .tuto-btn-icon:hover:not(:disabled){background:rgba(255,255,255,0.08);color:#fff}
+        .tuto-btn-icon:disabled{opacity:.3;cursor:default}
+        .light .tuto-btn-icon{color:rgba(12,26,19,0.6);border-color:rgba(0,99,65,0.2)}
+        .tuto-lang{display:flex;flex-direction:column;gap:8px;margin-top:16px}
+        .tuto-lang button{display:flex;align-items:center;justify-content:space-between;
+          width:100%;padding:11px 14px;border-radius:4px;cursor:pointer;
+          background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.14);
+          color:#fff;font-size:14px;font-weight:600;
+          transition:background-color .15s ease,border-color .15s ease}
+        .tuto-lang button:hover{background:rgba(0,153,77,0.18);border-color:rgba(0,180,100,0.55)}
+        .light .tuto-lang button{background:rgba(0,99,65,0.05);border-color:rgba(0,99,65,0.2);color:#0c1a13}
+        .tuto-lang .tag{font-size:12px;font-weight:700;opacity:.55;letter-spacing:.06em}
+        .tuto-progress{height:2px;border-radius:2px;background:rgba(255,255,255,0.12);overflow:hidden}
+        .light .tuto-progress{background:rgba(0,99,65,0.15)}
+        .tuto-progress > i{display:block;height:100%;background:#00994d;border-radius:2px;
+          transition:width .25s ease}
+        .tuto-step-count{font-size:11.5px;color:rgba(255,255,255,0.4);font-variant-numeric:tabular-nums}
+        .light .tuto-step-count{color:rgba(12,26,19,0.45)}
+      `}</style>
 
-      {/* Spotlight (if target exists) */}
-      {targetRect && (
-        <svg
-          className="absolute inset-0 w-full h-full"
-          style={{ pointerEvents: "auto" }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <defs>
-            <mask id="tutorial-mask">
-              <rect width="100%" height="100%" fill="white" />
+      {/* Voile + trou de projecteur. Un masque SVG évacue complètement la
+          zone ciblée : l'élément expliqué reste net et pleinement lisible
+          (aucun flou sur l'interface, retour utilisateur). */}
+      <svg width={viewport.w} height={viewport.h} style={{ position: "absolute", inset: 0 }}>
+        <defs>
+          <mask id="tuto-hole">
+            <rect width="100%" height="100%" fill="#fff" />
+            {rect && (
               <rect
-                x={targetRect.left - 8}
-                y={targetRect.top - 8}
-                width={targetRect.width + 16}
-                height={targetRect.height + 16}
-                rx="8"
-                fill="black"
+                x={rect.left - HOLE_PAD}
+                y={rect.top - HOLE_PAD}
+                width={rect.width + HOLE_PAD * 2}
+                height={rect.height + HOLE_PAD * 2}
+                rx="4"
+                fill="#000"
               />
-            </mask>
-          </defs>
+            )}
+          </mask>
+        </defs>
+        <rect width="100%" height="100%" fill="rgba(3,10,7,0.66)" mask="url(#tuto-hole)" />
+        {rect && (
           <rect
-            width="100%"
-            height="100%"
-            fill="rgba(0, 0, 0, 0.3)"
-            mask="url(#tutorial-mask)"
-          />
-          {/* Highlight border */}
-          <rect
-            x={targetRect.left - 8}
-            y={targetRect.top - 8}
-            width={targetRect.width + 16}
-            height={targetRect.height + 16}
-            rx="8"
+            x={rect.left - HOLE_PAD}
+            y={rect.top - HOLE_PAD}
+            width={rect.width + HOLE_PAD * 2}
+            height={rect.height + HOLE_PAD * 2}
+            rx="4"
             fill="none"
-            stroke="rgba(0, 200, 83, 0.5)"
+            stroke="#00c853"
             strokeWidth="2"
-            className="animate-pulse"
           />
-        </svg>
-      )}
+        )}
+      </svg>
 
-      {/* Popover */}
       <div
-        className="absolute pointer-events-auto max-w-sm bg-white/10 backdrop-blur-lg border border-white/20 rounded-lg p-6 shadow-2xl transition-all duration-300"
-        style={{
-          left: step.position === "center" ? "50%" : targetRect ? Math.max(20, Math.min(window.innerWidth - 400, targetRect.left + targetRect.width / 2 - 200)) : "50%",
-          top: step.position === "center" ? "50%" : targetRect ? targetRect.bottom + 20 : "50%",
-          transform: step.position === "center" ? "translate(-50%, -50%)" : isRTL ? "translateX(50%)" : "translateX(-50%)",
-        }}
+        ref={attachPopover}
+        className="tuto-card"
+        style={{ left: placement.left, top: placement.top, width: POPOVER_W }}
+        dir={isRTL ? "rtl" : "ltr"}
       >
-        <div className="text-white">
-          <div className="flex items-start justify-between gap-4 mb-3">
-            <h3 className="text-lg font-semibold">{stepContent.title}</h3>
-            <button
-              onClick={handleSkip}
-              className="text-white/50 hover:text-white transition-colors flex-shrink-0"
-              aria-label="Close tutorial"
-            >
-              <X size={20} />
-            </button>
-          </div>
-          <p className="text-white/80 text-sm leading-relaxed mb-6">
-            {stepContent.description}
-          </p>
+        {/* Flèche : repère franc entre la carte et l'élément désigné */}
+        {placement.arrow && (
+          <svg
+            width="34"
+            height="20"
+            viewBox="0 0 34 20"
+            style={{
+              position: "absolute",
+              left: placement.arrowX - 17,
+              [placement.arrow === "up" ? "top" : "bottom"]: -19,
+              transform: placement.arrow === "down" ? "rotate(180deg)" : undefined,
+            }}
+            aria-hidden="true"
+          >
+            <path d="M17 0 L34 20 L0 20 Z" fill="#00c853" />
+          </svg>
+        )}
 
-          {/* Progress bar */}
-          <div className="w-full bg-white/10 rounded-full h-1 mb-4">
-            <div
-              className="bg-gradient-to-r from-green-400 to-green-500 h-1 rounded-full transition-all duration-300"
-              style={{ width: `${((tutorial.currentStep + 1) / totalSteps) * 100}%` }}
-            />
-          </div>
-
-          {/* Controls */}
-          <div className="flex items-center justify-between gap-3">
-            <div className="text-xs text-white/50">
-              {tutorial.currentStep + 1} / {totalSteps}
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={handleSkip}
-                className="px-3 py-2 text-xs font-medium text-white/60 hover:text-white/80 transition-colors rounded hover:bg-white/5"
-              >
-                {isLast ? t("Tutorial.done") || "Terminé" : t("Tutorial.skip") || "Passer"}
+        {isLanguageStep ? (
+          <div dir="ltr">
+            {/* Écran d'ouverture au premier lancement : les trois langues
+                sont proposées ensemble, l'utilisateur n'a pas à subir la
+                langue du système s'il ne la maîtrise pas. */}
+            <p className="tuto-title" style={{ textAlign: "center" }}>
+              أهلاً بك في حنايا
+            </p>
+            <p className="tuto-title" style={{ textAlign: "center", marginTop: 2 }}>
+              Bienvenue dans Hnaya · Welcome to Hnaya
+            </p>
+            <p className="tuto-body" style={{ textAlign: "center" }}>
+              اختر لغتك · Choisissez votre langue · Choose your language
+            </p>
+            <div className="tuto-lang">
+              <button onClick={() => handlePickLanguage("ar")} dir="rtl">
+                <span>العربية</span>
+                <span className="tag">ع</span>
               </button>
-              <button
-                onClick={handlePrev}
-                disabled={isFirst}
-                className="px-2 py-2 rounded hover:bg-white/10 transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-white"
-              >
-                <ChevronLeft size={18} />
+              <button onClick={() => handlePickLanguage("fr")}>
+                <span>Français</span>
+                <span className="tag">FR</span>
               </button>
-              <button
-                onClick={handleNext}
-                className="px-4 py-2 bg-gradient-to-r from-green-500 to-green-600 text-white rounded font-medium text-sm hover:from-green-600 hover:to-green-700 transition-all duration-200"
-              >
-                {isLast ? t("Tutorial.finish") || "Terminer" : t("Tutorial.next") || "Suivant"}
+              <button onClick={() => handlePickLanguage("en")}>
+                <span>English</span>
+                <span className="tag">EN</span>
               </button>
             </div>
           </div>
-        </div>
+        ) : (
+          <>
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+              <p className="tuto-title" style={{ flex: 1 }}>{content?.title}</p>
+              <button className="tuto-btn-icon" onClick={closeTutorial} title={ui.close} aria-label={ui.close}>
+                <X size={15} />
+              </button>
+            </div>
+            <p className="tuto-body">{content?.body}</p>
+
+            <div style={{ marginTop: 18 }}>
+              <div className="tuto-progress">
+                <i style={{ width: `${((index + 1) / steps.length) * 100}%` }} />
+              </div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 12, gap: 8 }}>
+                <span className="tuto-step-count">
+                  {index + 1} / {steps.length}
+                </span>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  {!isLast && (
+                    <button className="tuto-btn tuto-btn-ghost" onClick={closeTutorial}>
+                      {ui.skip}
+                    </button>
+                  )}
+                  <button
+                    className="tuto-btn-icon"
+                    onClick={prevTutorialStep}
+                    disabled={isFirst}
+                    title={ui.prev}
+                    aria-label={ui.prev}
+                  >
+                    {isRTL ? <ChevronRight size={15} /> : <ChevronLeft size={15} />}
+                  </button>
+                  <button className="tuto-btn tuto-btn-primary" onClick={handleNext}>
+                    {isLast ? ui.finish : ui.next}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

@@ -501,7 +501,7 @@ export default function Home() {
         <div className="glass-card rounded-lg w-full max-w-3xl overflow-hidden">
           <div className={`flex items-center gap-3 px-5 pt-4 pb-3 glass-divider border-b ${isRTL ? "flex-row-reverse" : ""}`}>
             <span className="glass-title text-xs font-semibold tracking-wider uppercase">{tr.title}</span>
-            <div className="scope-wrap flex rounded-md p-1 gap-1">
+            <div className="scope-wrap flex rounded-md p-1 gap-1" data-tutorial="search-scope">
               <button onClick={() => setScope("algerie")} className={`scope-btn px-4 py-1 rounded text-[13px] font-bold ${scope === "algerie" ? "active-algerie" : ""}`}>{tr.algerie}</button>
               <button onClick={() => setScope("monde")} className={`scope-btn px-4 py-1 rounded text-[13px] font-bold ${scope === "monde" ? "active-monde" : ""}`}>{tr.monde}</button>
             </div>

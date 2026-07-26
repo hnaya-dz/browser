@@ -299,7 +299,7 @@ export default function URLBar() {
           data-tutorial="urlbar"
         />
 
-        <button className="urlbar-btn" onClick={handleNavigation} title={t("Navbar.search")} data-tutorial="search-scope"><IconSearch /></button>
+        <button className="urlbar-btn" onClick={handleNavigation} title={t("Navbar.search")}><IconSearch /></button>
 
         {/* Bouton téléchargement */}
         {canDownload && (

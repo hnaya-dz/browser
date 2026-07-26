@@ -439,8 +439,21 @@ mainWindow = new BrowserWindow({
   // ✅ Correcteur orthographique multilingue sur la session partagée
   // (fenêtre principale + vues web). AR/FR/EN ensemble : les utilisateurs
   // cibles alternent couramment entre les trois dans un même champ.
+  // ⚠️ Chromium ne fournit AUCUN dictionnaire Hunspell arabe intégré —
+  // demander "ar" fait échouer TOUT l'appel (pas seulement l'arabe), ce
+  // qui désactivait silencieusement aussi le correcteur FR/EN. On filtre
+  // donc sur les langues réellement disponibles avant d'appliquer.
   try {
-    mainWindow.webContents.session.setSpellCheckerLanguages(["ar", "fr", "en-US"]);
+    const desired = ["ar", "fr", "en-US"];
+    const available = mainWindow.webContents.session.availableSpellCheckerLanguages || [];
+    const supported = desired.filter((l) => available.includes(l));
+    if (supported.length) {
+      mainWindow.webContents.session.setSpellCheckerLanguages(supported);
+    }
+    const missing = desired.filter((l) => !supported.includes(l));
+    if (missing.length) {
+      console.warn("Dictionnaire(s) correcteur indisponible(s) dans Chromium :", missing.join(", "));
+    }
   } catch (e) {
     console.warn("Langues du correcteur non configurées :", e?.message);
   }
