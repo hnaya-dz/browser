@@ -1,9 +1,9 @@
 {
-  “version”: “0.6.0”,
-  “url”: “https://github.com/hnaya-dz/browser/releases/latest”,
-  “notes”: {
-    “ar”: “دليل تفاعلي جديد (12 خطوة مع spotlight) — اضغط أيقونة الكتاب في الأعلى لإعادة تشغيله. إصلاحات: عدم وميض ألسنة ouedkniss، إيضاح فتح Google Auth في المتصفح الخارجي، موافقة قانونية مطلوبة قبل التحميل.”,
-    “fr”: “Nouveau guide interactif (12 étapes avec spotlight) — pressez l'icône Livre en haut pour le relancer. Correctifs: pas de scintillement d'onglet ouedkniss, clarification de l'ouverture Google Auth dans un navigateur externe, consentement juridique obligatoire avant téléchargement.”,
-    “en”: “New interactive guide (12 steps with spotlight) — press the Book icon at top to replay it. Fixes: no ouedkniss tab flicker, clarification of Google Auth opening in external browser, mandatory legal consent before download.”
+  "version": "0.6.0",
+  "url": "https://github.com/hnaya-dz/browser/releases/latest",
+  "notes": {
+    "ar": "دليل تفاعلي جديد: يبدأ عند أول تشغيل باختيار اللغة (عربية/فرنسية/إنجليزية)، ويضيء كل زر مع شرح مبسّط، مع تغطية خاصة للمراسلة المحلية. أعد تشغيله متى شئت من أيقونة الكتاب. إصلاحات: توقّف وميض عناوين الألسنة، توضيح فتح تسجيل دخول Google في المتصفح النظامي، موافقة قانونية قبل التحميل، وعودة المدقّق الإملائي بالفرنسية والإنجليزية.",
+    "fr": "Nouveau guide interactif : il démarre au premier lancement par le choix de la langue (arabe, français, anglais), met en lumière chaque bouton avec une explication simple, et consacre une place à la Messagerie locale. Relancez-le quand vous voulez avec l'icône Livre. Correctifs : fin du scintillement des titres d'onglets, explication de l'ouverture de la connexion Google dans le navigateur du système, consentement légal avant téléchargement, et correcteur orthographique de nouveau actif en français et en anglais.",
+    "en": "New interactive guide: it opens on first launch with a language choice (Arabic, French, English), highlights each button with a plain-language explanation, and gives Local Messaging its own place. Replay it anytime from the Book icon. Fixes: tab titles no longer flicker, Google sign-in opening in the system browser is now explained, legal consent before downloading, and the spell checker works again in French and English."
   }
 }
