@@ -1,9 +1,9 @@
 {
-  "version": "0.5.0",
-  "url": "https://github.com/hnaya-dz/browser/releases/latest",
-  "notes": {
-    "ar": "غرف متعددة في آن واحد ودعوات بينها، قفل الغرفة وحظر الأجهزة، حذف الغرف، وجلسات « البقاء متصلاً على هذا الجهاز » — مع إصلاحات عرض عند التكبير وملء الشاشة",
-    "fr": "Plusieurs salons à la fois et invitations entre eux, verrou de salon et blocage d'appareils, suppression de salons, et sessions « rester connecté sur ce PC » — avec des correctifs d'affichage au zoom et en plein écran",
-    "en": "Several rooms at once with cross-room invitations, room lock and device blocking, room deletion, and “stay connected on this PC” sessions — plus display fixes for zoom and fullscreen"
+  “version”: “0.6.0”,
+  “url”: “https://github.com/hnaya-dz/browser/releases/latest”,
+  “notes”: {
+    “ar”: “دليل تفاعلي جديد (12 خطوة مع spotlight) — اضغط أيقونة الكتاب في الأعلى لإعادة تشغيله. إصلاحات: عدم وميض ألسنة ouedkniss، إيضاح فتح Google Auth في المتصفح الخارجي، موافقة قانونية مطلوبة قبل التحميل.”,
+    “fr”: “Nouveau guide interactif (12 étapes avec spotlight) — pressez l'icône Livre en haut pour le relancer. Correctifs: pas de scintillement d'onglet ouedkniss, clarification de l'ouverture Google Auth dans un navigateur externe, consentement juridique obligatoire avant téléchargement.”,
+    “en”: “New interactive guide (12 steps with spotlight) — press the Book icon at top to replay it. Fixes: no ouedkniss tab flicker, clarification of Google Auth opening in external browser, mandatory legal consent before download.”
   }
 }
