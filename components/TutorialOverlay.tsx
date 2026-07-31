@@ -29,7 +29,6 @@ const ALL_STEPS = [
   // désigner depuis l'accueil. Remplace l'ancienne étape « download »,
   // que cette légende explique plus complètement.
   { id: "toolbar", target: null },
-  { id: "vault", target: "[data-tutorial='vault-btn']" },
   { id: "chat-intro", target: "[data-tutorial='chat-btn']" },
   { id: "chat-features", target: "[data-tutorial='chat-btn']" },
   { id: "privacy", target: "[data-tutorial='privacy-btn']" },
@@ -64,12 +63,8 @@ const CONTENT: Record<Lang, Record<string, { title: string; body: string }>> = {
       body: "Chaque site ouvert occupe un onglet. Cliquez dessus pour l'afficher, faites-le glisser pour le déplacer, la croix le ferme.",
     },
     toolbar: {
-      title: "Favoris et téléchargement",
-      body: "Ces trois boutons se trouvent à droite de la barre d'adresse. Ils apparaissent dès qu'un site est ouvert.",
-    },
-    vault: {
-      title: "Vos mots de passe",
-      body: "Enregistrez vos identifiants de sites, chiffrés sur ce poste. Un point vert signale qu'un identifiant existe pour la page ouverte.",
+      title: "Favoris, mots de passe et téléchargement",
+      body: "Ces boutons se trouvent à droite de la barre d'adresse. Ils apparaissent dès qu'un site est ouvert.",
     },
     "chat-intro": {
       title: "Messagerie locale",
@@ -118,12 +113,8 @@ const CONTENT: Record<Lang, Record<string, { title: string; body: string }>> = {
       body: "Each open site gets a tab. Click one to show it, drag to reorder, and use the cross to close it.",
     },
     toolbar: {
-      title: "Favorites and downloads",
-      body: "These three buttons sit on the right of the address bar. They appear as soon as a site is open.",
-    },
-    vault: {
-      title: "Your passwords",
-      body: "Store website logins, encrypted on this machine. A green dot means a login exists for the page you are on.",
+      title: "Favorites, passwords and downloads",
+      body: "These buttons sit on the right of the address bar. They appear as soon as a site is open.",
     },
     "chat-intro": {
       title: "Local Messaging",
@@ -172,12 +163,8 @@ const CONTENT: Record<Lang, Record<string, { title: string; body: string }>> = {
       body: "كل موقع مفتوح له لسان. انقر عليه لعرضه، اسحبه لتغيير ترتيبه، والعلامة × تغلقه.",
     },
     toolbar: {
-      title: "المفضلة والتحميل",
-      body: "توجد هذه الأزرار الثلاثة على يمين شريط العنوان، وتظهر بمجرد فتح موقع.",
-    },
-    vault: {
-      title: "كلمات المرور",
-      body: "احفظ بيانات دخولك إلى المواقع، مشفّرة على هذا الجهاز. النقطة الخضراء تعني وجود بيانات محفوظة للصفحة الحالية.",
+      title: "المفضلة وكلمات المرور والتحميل",
+      body: "توجد هذه الأزرار على يمين شريط العنوان، وتظهر بمجرد فتح موقع.",
     },
     "chat-intro": {
       title: "المراسلة المحلية",
@@ -218,6 +205,11 @@ const LEGEND: Record<Lang, { icon: string; label: string; desc: string }[]> = {
       desc: "Vos favoris classés par dossier, et vos groupes d'onglets : enregistrez toutes les pages ouvertes d'un coup pour les rouvrir plus tard. « Sauvegarder mes favoris » les exporte dans un fichier, « Importer des favoris » les restaure sur un autre poste.",
     },
     {
+      icon: "🔐",
+      label: "Mots de passe",
+      desc: "Vos identifiants sont chiffrés sur ce poste (AES-256, clé protégée par Windows) : aucun compte, aucun serveur, rien n'est transmis. Ils restent masqués dans la liste et sont saisis directement dans la page, jamais par le presse-papier. Un point vert signale qu'un identifiant existe pour la page ouverte. « Sauvegarder mes mots de passe » en écrit une copie chiffrée.",
+    },
+    {
       icon: "⬇️",
       label: "Télécharger la vidéo",
       desc: "N'apparaît que sur les sites de vidéo (plus de 30 plateformes). Deux qualités : Rapide (MP4 720p, lisible partout) ou Haute qualité. Vous choisissez le dossier, après acceptation de l'avertissement légal.",
@@ -235,6 +227,11 @@ const LEGEND: Record<Lang, { icon: string; label: string; desc: string }[]> = {
       desc: "Your favorites sorted into folders, plus tab groups: save every open page at once and reopen them later. “Back up my favorites” exports them to a file, “Import favorites” restores them on another machine.",
     },
     {
+      icon: "🔐",
+      label: "Passwords",
+      desc: "Your logins are encrypted on this machine (AES-256, key protected by Windows): no account, no server, nothing sent anywhere. They stay hidden in the list and are typed straight into the page, never through the clipboard. A green dot means a login exists for the open page. “Back up my passwords” writes an encrypted copy.",
+    },
+    {
       icon: "⬇️",
       label: "Download the video",
       desc: "Only appears on video sites (over 30 platforms). Two qualities: Fast (MP4 720p, plays anywhere) or High quality. You pick the folder, once you have accepted the legal notice.",
@@ -250,6 +247,11 @@ const LEGEND: Record<Lang, { icon: string; label: string; desc: string }[]> = {
       icon: "📑",
       label: "قائمة المفضلة",
       desc: "مفضّلاتك مرتّبة في مجلدات، ومجموعات الألسنة: احفظ كل الصفحات المفتوحة دفعة واحدة لإعادة فتحها لاحقاً. «نسخ احتياطي للمفضلة» يصدّرها في ملف، و«استيراد المفضلة» يستعيدها على جهاز آخر.",
+    },
+    {
+      icon: "🔐",
+      label: "كلمات المرور",
+      desc: "بيانات دخولك مشفّرة على هذا الجهاز (AES-256، والمفتاح محمي بواسطة ويندوز): لا حساب، لا خادم، ولا شيء يُرسل. تبقى مخفيّة في القائمة وتُكتب مباشرة في الصفحة، لا عبر الحافظة. النقطة الخضراء تعني وجود بيانات محفوظة للصفحة الحالية. «نسخ احتياطي لكلمات المرور» يكتب نسخة مشفّرة.",
     },
     {
       icon: "⬇️",
@@ -433,7 +435,10 @@ export const TutorialOverlay = () => {
       aria-modal="true"
     >
       <style>{`
-        .tuto-card{position:absolute;pointer-events:auto;
+        /* La couleur de base est indispensable : sans elle la carte hérite
+           d'un gris très sombre, et tout glyphe monochrome (l'étoile ☆ des
+           favoris) se dessinait en noir sur noir, donc invisible. */
+        .tuto-card{position:absolute;pointer-events:auto;color:rgba(255,255,255,0.75);
           background:#0d1512;border:1px solid rgba(255,255,255,0.14);border-radius:6px;
           box-shadow:0 18px 48px rgba(0,0,0,0.55);padding:20px}
         .light .tuto-card{background:#ffffff;border-color:rgba(0,99,65,0.2);color:#12211a}
@@ -476,10 +481,14 @@ export const TutorialOverlay = () => {
         .tuto-legend{display:flex;flex-direction:column;gap:13px;margin-top:15px;
           max-height:44vh;overflow-y:auto}
         .tuto-legend-row{display:flex;align-items:flex-start;gap:11px}
+        /* Couleur explicite : l'étoile ☆ prend la couleur du texte, elle
+           doit donc contraster avec le fond de la carte dans chaque thème. */
         .tuto-ico{flex-shrink:0;width:30px;height:30px;border-radius:4px;
-          display:flex;align-items:center;justify-content:center;font-size:15px;line-height:1;
-          background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.14)}
-        .light .tuto-ico{background:rgba(0,99,65,0.05);border-color:rgba(0,99,65,0.2)}
+          display:flex;align-items:center;justify-content:center;font-size:17px;line-height:1;
+          color:#fff;background:rgba(255,255,255,0.06);
+          border:1px solid rgba(255,255,255,0.14)}
+        .light .tuto-ico{color:#0c1a13;background:rgba(0,99,65,0.05);
+          border-color:rgba(0,99,65,0.2)}
         .tuto-legend b{display:block;font-size:13px;font-weight:650;color:#fff;margin-bottom:3px}
         .light .tuto-legend b{color:#0c1a13}
         .tuto-legend-desc{display:block;font-size:12.5px;line-height:1.55;
