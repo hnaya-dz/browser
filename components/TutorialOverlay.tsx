@@ -24,7 +24,11 @@ const ALL_STEPS = [
   { id: "search", target: "[data-tutorial='search-scope']" },
   { id: "shop", target: "[data-tutorial='shop-btn']" },
   { id: "tabs", target: "[data-tutorial='tabbar']" },
-  { id: "download", target: "[data-tutorial='download-btn']" },
+  // Légende dessinée à l'intérieur de la carte : ces boutons n'existent
+  // qu'une fois un site ouvert, un projecteur ne pourrait donc pas les
+  // désigner depuis l'accueil. Remplace l'ancienne étape « download »,
+  // que cette légende explique plus complètement.
+  { id: "toolbar", target: null },
   { id: "vault", target: "[data-tutorial='vault-btn']" },
   { id: "chat-intro", target: "[data-tutorial='chat-btn']" },
   { id: "chat-features", target: "[data-tutorial='chat-btn']" },
@@ -59,9 +63,9 @@ const CONTENT: Record<Lang, Record<string, { title: string; body: string }>> = {
       title: "Vos onglets",
       body: "Chaque site ouvert occupe un onglet. Cliquez dessus pour l'afficher, faites-le glisser pour le déplacer, la croix le ferme.",
     },
-    download: {
-      title: "Enregistrer une vidéo",
-      body: "Ce bouton apparaît sur les sites de vidéo (plus de 30 plateformes reconnues) et enregistre la vidéo affichée dans le dossier de votre choix.",
+    toolbar: {
+      title: "Favoris et téléchargement",
+      body: "Ces trois boutons se trouvent à droite de la barre d'adresse. Ils apparaissent dès qu'un site est ouvert.",
     },
     vault: {
       title: "Vos mots de passe",
@@ -113,9 +117,9 @@ const CONTENT: Record<Lang, Record<string, { title: string; body: string }>> = {
       title: "Your tabs",
       body: "Each open site gets a tab. Click one to show it, drag to reorder, and use the cross to close it.",
     },
-    download: {
-      title: "Saving a video",
-      body: "This button appears on video sites (over 30 supported platforms) and saves the video on screen to the folder of your choice.",
+    toolbar: {
+      title: "Favorites and downloads",
+      body: "These three buttons sit on the right of the address bar. They appear as soon as a site is open.",
     },
     vault: {
       title: "Your passwords",
@@ -167,9 +171,9 @@ const CONTENT: Record<Lang, Record<string, { title: string; body: string }>> = {
       title: "ألسنتك",
       body: "كل موقع مفتوح له لسان. انقر عليه لعرضه، اسحبه لتغيير ترتيبه، والعلامة × تغلقه.",
     },
-    download: {
-      title: "حفظ فيديو",
-      body: "يظهر هذا الزر في مواقع الفيديو (أكثر من 30 منصة مدعومة) ويحفظ الفيديو المعروض في المجلد الذي تختاره.",
+    toolbar: {
+      title: "المفضلة والتحميل",
+      body: "توجد هذه الأزرار الثلاثة على يمين شريط العنوان، وتظهر بمجرد فتح موقع.",
     },
     vault: {
       title: "كلمات المرور",
@@ -196,6 +200,63 @@ const CONTENT: Record<Lang, Record<string, { title: string; body: string }>> = {
       body: "ستظهر أزرار أخرى في شريط العنوان بمجرد فتح موقع: تحميل الفيديو، المفضّلة، كلمات المرور. أعد تشغيل هذا الدليل متى شئت من أيقونة الكتاب.",
     },
   },
+};
+
+// Légende de l'étape « toolbar » : chaque ligne reproduit l'icône telle
+// qu'elle apparaît réellement dans la barre d'adresse, pour que le lecteur
+// la reconnaisse même si le bouton n'est pas affiché au moment du guide.
+const LEGEND: Record<Lang, { icon: string; label: string; desc: string }[]> = {
+  fr: [
+    {
+      icon: "☆",
+      label: "Ajouter aux favoris",
+      desc: "Enregistre la page ouverte. L'étoile devient dorée ; cliquez à nouveau pour la retirer.",
+    },
+    {
+      icon: "📑",
+      label: "Liste des favoris",
+      desc: "Vos favoris classés par dossier, et vos groupes d'onglets : enregistrez toutes les pages ouvertes d'un coup pour les rouvrir plus tard. « Sauvegarder mes favoris » les exporte dans un fichier, « Importer des favoris » les restaure sur un autre poste.",
+    },
+    {
+      icon: "⬇️",
+      label: "Télécharger la vidéo",
+      desc: "N'apparaît que sur les sites de vidéo (plus de 30 plateformes). Deux qualités : Rapide (MP4 720p, lisible partout) ou Haute qualité. Vous choisissez le dossier, après acceptation de l'avertissement légal.",
+    },
+  ],
+  en: [
+    {
+      icon: "☆",
+      label: "Add to favorites",
+      desc: "Saves the open page. The star turns gold; click again to remove it.",
+    },
+    {
+      icon: "📑",
+      label: "Favorites list",
+      desc: "Your favorites sorted into folders, plus tab groups: save every open page at once and reopen them later. “Back up my favorites” exports them to a file, “Import favorites” restores them on another machine.",
+    },
+    {
+      icon: "⬇️",
+      label: "Download the video",
+      desc: "Only appears on video sites (over 30 platforms). Two qualities: Fast (MP4 720p, plays anywhere) or High quality. You pick the folder, once you have accepted the legal notice.",
+    },
+  ],
+  ar: [
+    {
+      icon: "☆",
+      label: "إضافة إلى المفضلة",
+      desc: "يحفظ الصفحة المفتوحة. تصبح النجمة ذهبية؛ انقر مرة أخرى لإزالتها.",
+    },
+    {
+      icon: "📑",
+      label: "قائمة المفضلة",
+      desc: "مفضّلاتك مرتّبة في مجلدات، ومجموعات الألسنة: احفظ كل الصفحات المفتوحة دفعة واحدة لإعادة فتحها لاحقاً. «نسخ احتياطي للمفضلة» يصدّرها في ملف، و«استيراد المفضلة» يستعيدها على جهاز آخر.",
+    },
+    {
+      icon: "⬇️",
+      label: "تحميل الفيديو",
+      desc: "يظهر فقط في مواقع الفيديو (أكثر من 30 منصة). جودتان: «سريع» (MP4 بدقة 720p، يُقرأ في كل مكان) أو «جودة عالية». تختار المجلد، بعد الموافقة على التنبيه القانوني.",
+    },
+  ],
 };
 
 const UI: Record<Lang, { next: string; prev: string; skip: string; finish: string; close: string }> = {
@@ -249,6 +310,7 @@ export const TutorialOverlay = () => {
   const index = Math.min(tutorial.currentStep, Math.max(0, steps.length - 1));
   const step = steps[index];
   const isLanguageStep = step?.id === "language";
+  const isLegendStep = step?.id === "toolbar";
   const isFirst = index === 0;
   const isLast = index === steps.length - 1;
 
@@ -298,6 +360,13 @@ export const TutorialOverlay = () => {
 
   useEffect(() => () => popObserver.current?.disconnect(), []);
 
+  // La carte est le même nœud DOM d'une étape à l'autre : la ref-callback
+  // ne se redéclenche donc pas et la hauteur mémorisée restait celle de
+  // l'étape précédente. On la relit à chaque changement de contenu.
+  useLayoutEffect(() => {
+    if (popRef.current) setPopH(popRef.current.offsetHeight);
+  }, [tutorial.currentStep, tutorial.isActive, stepIds.length, lang]);
+
   if (!tutorial.isActive || !step) return null;
 
   // Largeur adaptative : sur une fenêtre étroite, une largeur fixe
@@ -307,9 +376,12 @@ export const TutorialOverlay = () => {
   // ── Placement de la carte ───────────────────────────────────────
   const placement: Placement = (() => {
     if (!rect) {
+      // Centrage confié au CSS (cf. `centered` plus bas) : le calculer à
+      // partir de la hauteur mesurée l'exposait à une mesure périmée, ce
+      // qui faisait déborder la carte de l'écran sur les étapes hautes.
       return {
         left: Math.round((viewport.w - POPOVER_W) / 2),
-        top: Math.round(Math.max(MARGIN, (viewport.h - popH) / 2)),
+        top: 0,
         arrow: null,
         arrowX: 0,
       };
@@ -399,6 +471,20 @@ export const TutorialOverlay = () => {
           transition:width .25s ease}
         .tuto-step-count{font-size:11.5px;color:rgba(255,255,255,0.4);font-variant-numeric:tabular-nums}
         .light .tuto-step-count{color:rgba(12,26,19,0.45)}
+        /* Légende : plafonnée en hauteur d'écran pour qu'une fenêtre basse
+           ne fasse pas déborder la carte hors du cadre visible. */
+        .tuto-legend{display:flex;flex-direction:column;gap:13px;margin-top:15px;
+          max-height:44vh;overflow-y:auto}
+        .tuto-legend-row{display:flex;align-items:flex-start;gap:11px}
+        .tuto-ico{flex-shrink:0;width:30px;height:30px;border-radius:4px;
+          display:flex;align-items:center;justify-content:center;font-size:15px;line-height:1;
+          background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.14)}
+        .light .tuto-ico{background:rgba(0,99,65,0.05);border-color:rgba(0,99,65,0.2)}
+        .tuto-legend b{display:block;font-size:13px;font-weight:650;color:#fff;margin-bottom:3px}
+        .light .tuto-legend b{color:#0c1a13}
+        .tuto-legend-desc{display:block;font-size:12.5px;line-height:1.55;
+          color:rgba(255,255,255,0.68)}
+        .light .tuto-legend-desc{color:rgba(12,26,19,0.72)}
       `}</style>
 
       {/* Voile + trou de projecteur. Un masque SVG évacue complètement la
@@ -438,7 +524,22 @@ export const TutorialOverlay = () => {
       <div
         ref={attachPopover}
         className="tuto-card"
-        style={{ left: placement.left, top: placement.top, width: POPOVER_W }}
+        style={{
+          left: placement.left,
+          width: POPOVER_W,
+          // Sans cible, on centre en CSS et on plafonne la hauteur : la
+          // carte reste dans le cadre quelle que soit la longueur du texte.
+          // Avec cible, la position calculée sert la flèche (qui déborde
+          // volontairement de la carte, d'où l'absence de `overflow`).
+          ...(placement.arrow
+            ? { top: placement.top }
+            : {
+                top: "50%",
+                transform: "translateY(-50%)",
+                maxHeight: `calc(100vh - ${MARGIN * 2}px)`,
+                overflowY: "auto" as const,
+              }),
+        }}
         dir={isRTL ? "rtl" : "ltr"}
       >
         {/* Flèche : repère franc entre la carte et l'élément désigné */}
@@ -470,8 +571,17 @@ export const TutorialOverlay = () => {
             <p className="tuto-title" style={{ textAlign: "center", marginTop: 2 }}>
               Bienvenue dans Hnaya · Welcome to Hnaya
             </p>
-            <p className="tuto-body" style={{ textAlign: "center" }}>
-              اختر لغتك · Choisissez votre langue · Choose your language
+            {/* Invitation rédigée en entier dans chaque langue : le lecteur
+                doit trouver une phrase complète qu'il comprend, pas trois
+                fragments accolés. */}
+            <p className="tuto-body" style={{ textAlign: "center", margin: "12px 0 0" }} dir="rtl">
+              اختر لغتك للمتابعة
+            </p>
+            <p className="tuto-body" style={{ textAlign: "center", margin: "2px 0 0" }}>
+              Choisissez votre langue pour continuer
+            </p>
+            <p className="tuto-body" style={{ textAlign: "center", margin: "2px 0 0" }}>
+              Choose your language to continue
             </p>
             <div className="tuto-lang">
               <button onClick={() => handlePickLanguage("ar")} dir="rtl">
@@ -497,6 +607,20 @@ export const TutorialOverlay = () => {
               </button>
             </div>
             <p className="tuto-body">{content?.body}</p>
+
+            {isLegendStep && (
+              <div className="tuto-legend">
+                {LEGEND[lang].map((row) => (
+                  <div className="tuto-legend-row" key={row.label}>
+                    <span className="tuto-ico" aria-hidden="true">{row.icon}</span>
+                    <div>
+                      <b>{row.label}</b>
+                      <span className="tuto-legend-desc">{row.desc}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
 
             <div style={{ marginTop: 18 }}>
               <div className="tuto-progress">
