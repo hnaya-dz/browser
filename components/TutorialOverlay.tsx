@@ -207,7 +207,7 @@ const LEGEND: Record<Lang, { icon: string; label: string; desc: string }[]> = {
     {
       icon: "🔐",
       label: "Mots de passe",
-      desc: "Vos identifiants sont chiffrés sur ce poste (AES-256, clé protégée par Windows) : aucun compte, aucun serveur, rien n'est transmis. Ils restent masqués dans la liste et sont saisis directement dans la page, jamais par le presse-papier. Un point vert signale qu'un identifiant existe pour la page ouverte. « Sauvegarder mes mots de passe » en écrit une copie chiffrée.",
+      desc: "Vos identifiants sont chiffrés sur ce poste (AES-256, clé protégée par Windows) : aucun compte, aucun serveur, rien n'est transmis. Ils restent masqués dans la liste et sont saisis directement dans la page, jamais par le presse-papier. Un point vert signale qu'un identifiant existe pour la page ouverte. Pour changer de machine, « Sauvegarder mes mots de passe » crée un fichier protégé par une phrase secrète que vous choisissez, et « Restaurer » le relit sur le nouveau poste.",
     },
     {
       icon: "⬇️",
@@ -229,7 +229,7 @@ const LEGEND: Record<Lang, { icon: string; label: string; desc: string }[]> = {
     {
       icon: "🔐",
       label: "Passwords",
-      desc: "Your logins are encrypted on this machine (AES-256, key protected by Windows): no account, no server, nothing sent anywhere. They stay hidden in the list and are typed straight into the page, never through the clipboard. A green dot means a login exists for the open page. “Back up my passwords” writes an encrypted copy.",
+      desc: "Your logins are encrypted on this machine (AES-256, key protected by Windows): no account, no server, nothing sent anywhere. They stay hidden in the list and are typed straight into the page, never through the clipboard. A green dot means a login exists for the open page. When you move to another computer, “Back up my passwords” writes a file protected by a passphrase you choose, and “Restore” reads it back there.",
     },
     {
       icon: "⬇️",
@@ -251,7 +251,7 @@ const LEGEND: Record<Lang, { icon: string; label: string; desc: string }[]> = {
     {
       icon: "🔐",
       label: "كلمات المرور",
-      desc: "بيانات دخولك مشفّرة على هذا الجهاز (AES-256، والمفتاح محمي بواسطة ويندوز): لا حساب، لا خادم، ولا شيء يُرسل. تبقى مخفيّة في القائمة وتُكتب مباشرة في الصفحة، لا عبر الحافظة. النقطة الخضراء تعني وجود بيانات محفوظة للصفحة الحالية. «نسخ احتياطي لكلمات المرور» يكتب نسخة مشفّرة.",
+      desc: "بيانات دخولك مشفّرة على هذا الجهاز (AES-256، والمفتاح محمي بواسطة ويندوز): لا حساب، لا خادم، ولا شيء يُرسل. تبقى مخفيّة في القائمة وتُكتب مباشرة في الصفحة، لا عبر الحافظة. النقطة الخضراء تعني وجود بيانات محفوظة للصفحة الحالية. وعند الانتقال إلى جهاز آخر، «نسخ احتياطي لكلمات المرور» ينشئ ملفاً تحميه عبارة سرية تختارها، و«استعادة» يقرأه هناك.",
     },
     {
       icon: "⬇️",

@@ -14,6 +14,7 @@ const ALLOWED_INVOKE = [
   "vault-inject",
   "vault-save-from-page",
   "vault-export",
+  "vault-import",
   "chat-session-get",
   "chat-session-save",
   "chat-session-forget",

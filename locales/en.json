@@ -86,7 +86,17 @@
     "unavailable": "Encryption is not available on this device.",
     "confirmDelete": "Delete this saved password?",
     "injected": "Fields filled automatically",
-    "injectError": "Could not find input fields on this page"
+    "injectError": "Could not find input fields on this page",
+    "import": "Restore a backup",
+    "passphrase": "Passphrase",
+    "passphraseConfirm": "Confirm the passphrase",
+    "passTooShort": "The passphrase must be at least 8 characters long.",
+    "passMismatch": "The two passphrases do not match.",
+    "passWarning": "This passphrase is the ONLY way to read the file back. Nobody, not even Hnaya, can recover it: write it down somewhere safe.",
+    "exportHelp": "The file is encrypted with your passphrase. It can be read on any machine — unlike this computer's vault, which is sealed by Windows.",
+    "importHelp": "Pick a Hnaya backup file and enter the passphrase that protected it. The passwords will be added to those already saved.",
+    "exportDone": "Backup saved",
+    "importDone": "Passwords restored"
   },
   "Favorites": {
     "title": "Favorites",

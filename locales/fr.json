@@ -86,7 +86,17 @@
     "unavailable": "Le chiffrement n'est pas disponible sur cet appareil.",
     "confirmDelete": "Supprimer ce mot de passe enregistré ?",
     "injected": "Champs remplis automatiquement",
-    "injectError": "Impossible de trouver les champs sur cette page"
+    "injectError": "Impossible de trouver les champs sur cette page",
+    "import": "Restaurer une sauvegarde",
+    "passphrase": "Phrase secrète",
+    "passphraseConfirm": "Confirmez la phrase secrète",
+    "passTooShort": "La phrase secrète doit compter au moins 8 caractères.",
+    "passMismatch": "Les deux phrases secrètes ne correspondent pas.",
+    "passWarning": "Cette phrase est le SEUL moyen de relire le fichier. Personne, pas même Hnaya, ne peut la retrouver : notez-la en lieu sûr.",
+    "exportHelp": "Le fichier créé est chiffré par votre phrase secrète. Il se relit sur n'importe quelle machine — contrairement au coffre de ce poste, scellé par Windows.",
+    "importHelp": "Choisissez un fichier de sauvegarde Hnaya et saisissez la phrase secrète qui l'a protégé. Les mots de passe seront ajoutés à ceux déjà présents.",
+    "exportDone": "Sauvegarde enregistrée",
+    "importDone": "Mots de passe restaurés"
   },
   "Favorites": {
     "title": "Favoris",

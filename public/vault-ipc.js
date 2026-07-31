@@ -10,10 +10,12 @@
 // ══════════════════════════════════════════════════════════════════
 
 import { ipcMain, dialog } from "electron";
+import { randomBytes } from "crypto";
 import {
-  vaultRead, vaultUpsert, vaultDelete,
+  vaultRead, vaultUpsert, vaultDelete, vaultWrite,
   vaultFindByDomain, vaultIsAvailable
 } from "./vault.js";
+import { exportPortable, importPortable } from "./vault-portable.js";
 
 // ⚠️ Les codes de la Messagerie locale NE VIVENT PAS ICI. Un code de
 // salon est un secret PARTAGÉ par un service entier, pas un identifiant
@@ -148,22 +150,76 @@ export function registerVaultIpc(getMainWindow, getBrowserViews, getActiveTabId)
     return { ok: vaultUpsert({ site, login: login || "", password, url }) };
   });
 
-  // Exporter le vault (fichier chiffré) — pour sauvegarde
-  ipcMain.handle("vault-export", async () => {
+  // Sauvegarder le vault dans un fichier TRANSPORTABLE
+  //
+  // ⚠️ L'ancienne version copiait simplement userData/vault.enc. Ce
+  // fichier était inexploitable : sa clé vit dans vault.key, elle-même
+  // scellée par DPAPI pour le compte Windows de ce poste. La sauvegarde
+  // ne pouvait donc être relue ni sur une autre machine, ni après une
+  // réinstallation — alors que le bouton promet « Sauvegarder ».
+  // La clé dérive désormais d'une phrase secrète fournie par
+  // l'utilisateur (voir vault-portable.js).
+  ipcMain.handle("vault-export", async (event, { passphrase } = {}) => {
+    const entries = vaultRead();
+    if (!entries.length) return { ok: false, error: "empty" };
+    let contenu;
+    try {
+      contenu = exportPortable(entries, passphrase);
+    } catch (e) {
+      return { ok: false, error: e.message };
+    }
     const mainWindow = getMainWindow();
     const { filePath, canceled } = await dialog.showSaveDialog(mainWindow, {
-      title: "Exporter le vault Hnaya DZ",
-      defaultPath: `hnaya-vault-${Date.now()}.enc`,
-      filters: [{ name: "Vault chiffré", extensions: ["enc"] }],
+      title: "Sauvegarder les mots de passe Hnaya DZ",
+      defaultPath: `hnaya-mots-de-passe-${new Date().toISOString().slice(0, 10)}.hnaya`,
+      filters: [{ name: "Sauvegarde Hnaya", extensions: ["hnaya"] }],
     });
-    if (canceled || !filePath) return { ok: false };
+    if (canceled || !filePath) return { ok: false, error: "canceled" };
     try {
-      const { readFileSync, writeFileSync } = await import("fs");
-      const { join } = await import("path");
-      const { app } = await import("electron");
-      const src = join(app.getPath("userData"), "vault.enc");
-      writeFileSync(filePath, readFileSync(src));
-      return { ok: true };
+      const { writeFileSync } = await import("fs");
+      writeFileSync(filePath, contenu, "utf8");
+      return { ok: true, count: entries.length };
+    } catch (e) {
+      return { ok: false, error: e.message };
+    }
+  });
+
+  // Restaurer depuis une sauvegarde transportable.
+  // Les entrées sont fusionnées : une même paire (site, identifiant) est
+  // mise à jour plutôt que dupliquée, et les identifiants internes sont
+  // régénérés pour ne pas heurter ceux du poste d'accueil.
+  ipcMain.handle("vault-import", async (event, { passphrase } = {}) => {
+    const mainWindow = getMainWindow();
+    const { filePaths, canceled } = await dialog.showOpenDialog(mainWindow, {
+      title: "Restaurer des mots de passe Hnaya DZ",
+      filters: [{ name: "Sauvegarde Hnaya", extensions: ["hnaya"] }],
+      properties: ["openFile"],
+    });
+    if (canceled || !filePaths[0]) return { ok: false, error: "canceled" };
+    try {
+      const { readFileSync } = await import("fs");
+      const importees = importPortable(readFileSync(filePaths[0], "utf8"), passphrase);
+
+      const entries = vaultRead();
+      let ajoutes = 0, misAJour = 0;
+      for (const e of importees) {
+        if (!e || !e.site || !e.password) continue; // entrée inutilisable
+        const i = entries.findIndex(
+          (x) => x.site === e.site && (x.login || "") === (e.login || ""),
+        );
+        if (i >= 0) {
+          entries[i] = { ...entries[i], password: e.password, url: e.url || entries[i].url };
+          misAJour++;
+        } else {
+          entries.push({
+            site: e.site, login: e.login || "", password: e.password, url: e.url || "",
+            id: randomBytes(8).toString("hex"), createdAt: Date.now(),
+          });
+          ajoutes++;
+        }
+      }
+      if (!vaultWrite(entries)) return { ok: false, error: "write" };
+      return { ok: true, added: ajoutes, updated: misAJour };
     } catch (e) {
       return { ok: false, error: e.message };
     }

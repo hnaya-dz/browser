@@ -34,6 +34,7 @@
       "public/shared/**/*",
       "public/vault.js",
       "public/vault-ipc.js",
+      "public/vault-portable.js",
       "public/chat-session.js",
       "public/favorites.js",
       "public/favorites-ipc.js",

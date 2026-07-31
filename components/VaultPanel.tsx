@@ -17,7 +17,13 @@ interface VaultPanelProps {
   onClose: () => void;
 }
 
-type VaultView = "list" | "add" | "unavailable";
+type VaultView = "list" | "add" | "unavailable" | "backup";
+
+// Sauvegarde et restauration partagent le même écran : une phrase
+// secrète, saisie deux fois lorsqu'il s'agit d'en créer une.
+type BackupMode = "export" | "import";
+
+const MIN_PASSPHRASE = 8; // doit rester aligné sur public/vault-portable.js
 
 function getThemeName() {
   if (typeof document === "undefined") return "dark";
@@ -38,6 +44,13 @@ export default function VaultPanel({ onClose }: VaultPanelProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [injectStatus, setInjectStatus] = useState<Record<string, string>>({});
   const [saveStatus, setSaveStatus] = useState("");
+  const [backupMode, setBackupMode] = useState<BackupMode>("export");
+  const [pass1, setPass1] = useState("");
+  const [pass2, setPass2] = useState("");
+  const [showPass, setShowPass] = useState(false);
+  const [backupBusy, setBackupBusy] = useState(false);
+  const [backupError, setBackupError] = useState("");
+  const [backupDone, setBackupDone] = useState("");
 
   const api = typeof window !== "undefined" ? (window as any).electronAPI : null;
   const currentTab = tabs.find(t => t.id === activeTab);
@@ -109,8 +122,45 @@ export default function VaultPanel({ onClose }: VaultPanelProps) {
     if (res?.ok) onClose();
   };
 
-  const handleExport = async () => {
-    await api?.invoke("vault-export");
+  const openBackup = (mode: BackupMode) => {
+    setBackupMode(mode);
+    setPass1(""); setPass2(""); setShowPass(false);
+    setBackupError(""); setBackupDone("");
+    setView("backup");
+  };
+
+  const handleBackup = async () => {
+    setBackupError(""); setBackupDone("");
+    if (pass1.length < MIN_PASSPHRASE) {
+      setBackupError(t("Vault.passTooShort")); return;
+    }
+    if (backupMode === "export" && pass1 !== pass2) {
+      setBackupError(t("Vault.passMismatch")); return;
+    }
+    setBackupBusy(true);
+    try {
+      const res = await api?.invoke(
+        backupMode === "export" ? "vault-export" : "vault-import",
+        { passphrase: pass1 },
+      );
+      if (res?.ok) {
+        setBackupDone(
+          backupMode === "export"
+            ? t("Vault.exportDone")
+            : `${t("Vault.importDone")} (+${res.added ?? 0} / ↻${res.updated ?? 0})`,
+        );
+        setPass1(""); setPass2("");
+        if (backupMode === "import") await loadEntries();
+      } else if (res?.error && res.error !== "canceled") {
+        // « empty » et les échecs de déchiffrement remontent tels quels :
+        // l'utilisateur doit savoir si sa phrase est refusée.
+        setBackupError(res.error === "empty" ? t("Vault.empty") : res.error);
+      }
+    } catch (e: any) {
+      setBackupError(e?.message || String(e));
+    } finally {
+      setBackupBusy(false);
+    }
   };
 
   const inputStyle: React.CSSProperties = {
@@ -226,11 +276,16 @@ export default function VaultPanel({ onClose }: VaultPanelProps) {
                 </div>
               ))
             )}
-            {entries.length > 0 && (
-              <button onClick={handleExport} style={{ ...btnStyle(), fontSize: 12, alignSelf: "flex-end" }}>
-                📦 {t("Vault.export")}
+            <div style={{ display: "flex", gap: 8, alignSelf: "flex-end", flexWrap: "wrap" }}>
+              {entries.length > 0 && (
+                <button onClick={() => openBackup("export")} style={{ ...btnStyle(), fontSize: 12 }}>
+                  📦 {t("Vault.export")}
+                </button>
+              )}
+              <button onClick={() => openBackup("import")} style={{ ...btnStyle(), fontSize: 12 }}>
+                📥 {t("Vault.import")}
               </button>
-            )}
+            </div>
           </>
         )}
 
@@ -283,6 +338,81 @@ export default function VaultPanel({ onClose }: VaultPanelProps) {
                 {saveStatus === "saving" ? "…"
                  : saveStatus === "ok"   ? "✓ " + t("Vault.saved")
                  : t("Vault.save")}
+              </button>
+            </div>
+          </>
+        )}
+
+        {/* Sauvegarde / restauration par phrase secrète */}
+        {view === "backup" && (
+          <>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <p style={{ fontSize: 12.5, lineHeight: 1.6, color: muted, margin: 0 }}>
+                {backupMode === "export" ? t("Vault.exportHelp") : t("Vault.importHelp")}
+              </p>
+
+              <div>
+                <div style={{ fontSize: 11, color: muted, marginBottom: 4 }}>
+                  {t("Vault.passphrase")} *
+                </div>
+                <div style={{ position: "relative" }}>
+                  <input
+                    style={{ ...inputStyle, paddingRight: 40 }}
+                    type={showPass ? "text" : "password"}
+                    value={pass1}
+                    onChange={e => setPass1(e.target.value)}
+                    autoComplete="new-password"
+                    dir="ltr"
+                  />
+                  <button
+                    onClick={() => setShowPass(s => !s)}
+                    style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: muted, cursor: "pointer", fontSize: 14 }}
+                  >
+                    {showPass ? "🙈" : "👁️"}
+                  </button>
+                </div>
+              </div>
+
+              {backupMode === "export" && (
+                <div>
+                  <div style={{ fontSize: 11, color: muted, marginBottom: 4 }}>
+                    {t("Vault.passphraseConfirm")} *
+                  </div>
+                  <input
+                    style={inputStyle}
+                    type={showPass ? "text" : "password"}
+                    value={pass2}
+                    onChange={e => setPass2(e.target.value)}
+                    autoComplete="new-password"
+                    dir="ltr"
+                  />
+                </div>
+              )}
+
+              {backupMode === "export" && (
+                <p style={{ fontSize: 11.5, lineHeight: 1.55, color: "#e0a030", margin: 0 }}>
+                  ⚠️ {t("Vault.passWarning")}
+                </p>
+              )}
+
+              {backupError && (
+                <p style={{ fontSize: 12, color: "#ff8080", margin: 0 }}>{backupError}</p>
+              )}
+              {backupDone && (
+                <p style={{ fontSize: 12, color: "#4ade80", margin: 0 }}>✓ {backupDone}</p>
+              )}
+            </div>
+
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={() => setView("list")} style={{ ...btnStyle(), flex: 1 }}>
+                {t("Vault.cancel")}
+              </button>
+              <button
+                onClick={handleBackup}
+                disabled={backupBusy || pass1.length < MIN_PASSPHRASE}
+                style={{ ...btnStyle(true), flex: 2, opacity: (backupBusy || pass1.length < MIN_PASSPHRASE) ? 0.5 : 1 }}
+              >
+                {backupBusy ? "…" : backupMode === "export" ? t("Vault.export") : t("Vault.import")}
               </button>
             </div>
           </>
