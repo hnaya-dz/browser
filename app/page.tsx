@@ -512,7 +512,7 @@ export default function Home() {
               <div className={`flex gap-2 mb-4 ${isRTL ? "flex-row-reverse" : ""}`}>
                 <input type="text" value={algerieQuery} onChange={(e) => setAlgerieQuery(e.target.value)} onKeyDown={(e) => e.key === "Enter" && performAlgerieSearch()} placeholder={tr.algeriePlaceholder} className="glass-input flex-1 h-11 px-4 rounded text-[14px]" dir={isRTL ? "rtl" : "ltr"} />
                 <button onClick={performAlgerieSearch} className="glass-btn-primary h-11 px-5 rounded font-bold text-white text-[13px]">{tr.algerieButton}</button>
-                <button onClick={() => addTab(algerieQuery.trim() ? `https://hnaya.dz/boutique/?search=${encodeURIComponent(algerieQuery.trim())}` : "https://hnaya.dz/boutique/")} className="glass-btn-amber h-11 px-4 rounded font-bold text-white text-[13px] flex items-center gap-2">
+                <button onClick={() => addTab(algerieQuery.trim() ? `https://hnaya.dz/boutique/?search=${encodeURIComponent(algerieQuery.trim())}` : "https://hnaya.dz/boutique/")} className="glass-btn-amber h-11 px-4 rounded font-bold text-white text-[13px] flex items-center gap-2" data-tutorial="shop-btn">
                   <img src="/icons/market.png" alt="" className="w-5 h-5 object-contain" />
                   {tr.shop}
                 </button>

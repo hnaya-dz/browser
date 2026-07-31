@@ -22,6 +22,7 @@ const ALL_STEPS = [
   { id: "urlbar", target: "[data-tutorial='urlbar']" },
   { id: "navigation", target: "[data-tutorial='nav-buttons']" },
   { id: "search", target: "[data-tutorial='search-scope']" },
+  { id: "shop", target: "[data-tutorial='shop-btn']" },
   { id: "tabs", target: "[data-tutorial='tabbar']" },
   { id: "download", target: "[data-tutorial='download-btn']" },
   { id: "vault", target: "[data-tutorial='vault-btn']" },
@@ -49,6 +50,10 @@ const CONTENT: Record<Lang, Record<string, { title: string; body: string }>> = {
     search: {
       title: "Recherche Algérie ou Monde",
       body: "« Algérie » privilégie les sites algériens, « Monde » interroge le web entier. Choisissez selon ce que vous cherchez.",
+    },
+    shop: {
+      title: "Achat",
+      body: "Ce bouton lance votre recherche sur Hnaya Market et affiche directement les résultats d'une sélection de sites e-commerce algériens connus et fiables.",
     },
     tabs: {
       title: "Vos onglets",
@@ -100,6 +105,10 @@ const CONTENT: Record<Lang, Record<string, { title: string; body: string }>> = {
       title: "Algeria or World search",
       body: "“Algeria” favours Algerian websites, “World” searches the whole web. Pick whichever fits what you are looking for.",
     },
+    shop: {
+      title: "Buy",
+      body: "This button runs your search on Hnaya Market and shows results straight from a curated selection of known, trustworthy Algerian e-commerce sites.",
+    },
     tabs: {
       title: "Your tabs",
       body: "Each open site gets a tab. Click one to show it, drag to reorder, and use the cross to close it.",
@@ -149,6 +158,10 @@ const CONTENT: Record<Lang, Record<string, { title: string; body: string }>> = {
     search: {
       title: "البحث في الجزائر أو العالم",
       body: "«الجزائر» يرجّح المواقع الجزائرية، و«العالم» يبحث في الويب كلّه. اختر حسب ما تبحث عنه.",
+    },
+    shop: {
+      title: "الشراء",
+      body: "يشغّل هذا الزر بحثك على حنايا ماركت ويعرض النتائج مباشرة من مجموعة مختارة من مواقع البيع الجزائرية المعروفة والموثوقة.",
     },
     tabs: {
       title: "ألسنتك",
