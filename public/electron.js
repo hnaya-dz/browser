@@ -2,7 +2,7 @@ import { app, BrowserWindow, WebContentsView, ipcMain, Menu, dialog, shell, scre
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import { spawn, fork } from "child_process";
-import { existsSync, createReadStream, statSync, readFileSync, writeFileSync } from "fs";
+import { existsSync, createReadStream, statSync, readFileSync, writeFileSync, mkdirSync, unlinkSync } from "fs";
 import http from "http";
 // ✅ PATCH 1 — import depuis shared/ (supprime la duplication avec urlbar.tsx)
 import { isDownloadableUrl } from "./shared/supportedHosts.js";
@@ -972,6 +972,17 @@ function ensureChatWorker() {
   // ("chat-event") — évite d'avoir à whitelister un canal par type
   // d'événement dans preload.js (voir TECHNIQUES.md section 1).
   chatWorker.on("message", (msg) => {
+    // Étape E — réponses de transfert : elles répondent à une promesse
+    // précise (chatMediaRequest) et n'ont rien à faire dans le flux
+    // d'événements général du renderer.
+    if (msg?.reqId && chatMediaPending.has(msg.reqId)) {
+      const pending = chatMediaPending.get(msg.reqId);
+      chatMediaPending.delete(msg.reqId);
+      clearTimeout(pending.timer);
+      if (msg.event === "media-error") pending.reject(new Error(msg.reason || "media"));
+      else pending.resolve(msg);
+      return;
+    }
     mainWindow?.webContents.send("chat-event", msg);
   });
   chatWorker.on("exit", () => { chatWorker = null; });
@@ -1039,6 +1050,76 @@ ipcMain.on("chat-join", (event, joinParams) => {
 
 ipcMain.on("chat-send-message", (event, { text, groupId, media }) => {
   chatWorker?.send({ cmd: "send-message", text, groupId, media });
+});
+
+// ── Étape E — pièces jointes : pont renderer ↔ worker ──────────────────
+// Les octets ne traversent JAMAIS l'IPC du fork : ils sont écrits dans un
+// fichier temporaire et seul le CHEMIN est transmis au worker. Sérialiser
+// 25 Mio en JSON à travers fork() coûterait bien plus cher qu'une écriture
+// disque, et ferait gonfler la mémoire des deux processus.
+const chatMediaPending = new Map(); // reqId -> { resolve, reject, timer }
+const chatMediaTmpDir = () => join(app.getPath("userData"), "chat-media-tmp");
+
+function chatMediaRequest(cmd, params, timeoutMs = 120000) {
+  return new Promise((resolve, reject) => {
+    const worker = ensureChatWorker();
+    if (!worker) { reject(new Error("module-absent")); return; }
+    const reqId = "med_" + Math.random().toString(36).slice(2) + Date.now().toString(36);
+    const timer = setTimeout(() => {
+      chatMediaPending.delete(reqId);
+      reject(new Error("timeout"));
+    }, timeoutMs);
+    chatMediaPending.set(reqId, { resolve, reject, timer });
+    worker.send({ cmd, reqId, ...params });
+  });
+}
+
+ipcMain.handle("chat-media-upload", async (event, { bytes, kind, mime, thumb }) => {
+  try {
+    mkdirSync(chatMediaTmpDir(), { recursive: true });
+    const tmp = join(chatMediaTmpDir(), `up-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    // Le worker supprime ce fichier après lecture, quoi qu'il arrive.
+    writeFileSync(tmp, Buffer.from(bytes));
+    const res = await chatMediaRequest("media-upload", { path: tmp, kind, mime, thumb: thumb || null });
+    return { ok: true, sha256: res.sha256, size: res.size };
+  } catch (e) {
+    return { ok: false, error: e?.message || "upload" };
+  }
+});
+
+ipcMain.handle("chat-media-download", async (event, { sha256, mime }) => {
+  try {
+    mkdirSync(chatMediaTmpDir(), { recursive: true });
+    const outPath = join(chatMediaTmpDir(), `dl-${sha256.slice(0, 16)}`);
+    const res = await chatMediaRequest("media-download", { sha256, mime, outPath });
+    const buf = readFileSync(res.path);
+    try { unlinkSync(res.path); } catch { /* déjà retiré */ }
+    // Renvoyé au renderer en Uint8Array (clone structuré natif d'Electron,
+    // bien plus efficace qu'une chaîne base64) — il en fait un Blob.
+    return { ok: true, bytes: new Uint8Array(buf) };
+  } catch (e) {
+    return { ok: false, error: e?.message || "download" };
+  }
+});
+
+// Enregistrer une pièce jointe sur le disque de l'utilisateur.
+ipcMain.handle("chat-media-save", async (event, { sha256, mime, name }) => {
+  try {
+    const { filePath, canceled } = await dialog.showSaveDialog(mainWindow, {
+      title: "Enregistrer la pièce jointe",
+      defaultPath: name || sha256.slice(0, 16),
+    });
+    if (canceled || !filePath) return { ok: false, error: "canceled" };
+    mkdirSync(chatMediaTmpDir(), { recursive: true });
+    const outPath = join(chatMediaTmpDir(), `save-${sha256.slice(0, 16)}`);
+    const res = await chatMediaRequest("media-download", { sha256, mime, outPath });
+    writeFileSync(filePath, readFileSync(res.path));
+    try { unlinkSync(res.path); } catch { /* déjà retiré */ }
+    shell.showItemInFolder(filePath);
+    return { ok: true, path: filePath };
+  } catch (e) {
+    return { ok: false, error: e?.message || "save" };
+  }
 });
 
 ipcMain.on("chat-mark-read", (event, { messageId, groupId }) => {

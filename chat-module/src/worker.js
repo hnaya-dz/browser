@@ -20,6 +20,8 @@
 //   { cmd: "send-message", text, groupId, media }
 //   { cmd: "mark-read", messageId, groupId }
 //   { cmd: "admin", adminPin, action, reqId, ... }   (étape D)
+//   { cmd: "media-upload", reqId, path, kind, mime, thumb }   (étape E)
+//   { cmd: "media-download", reqId, sha256, mime, outPath }   (étape E)
 //   { cmd: "leave" }
 //
 // Événements envoyés (process.send) :
@@ -31,9 +33,13 @@
 //   { event: "join-failed", reason }
 //   { event: "message", message }
 //   { event: "presence", online }
+//   { event: "media-uploaded", reqId, sha256, size }  (étape E)
+//   { event: "media-downloaded", reqId, path, size }  (étape E)
+//   { event: "media-error", reqId, reason }           (étape E)
 //   { event: "error", message }
 
 import os from "node:os";
+import { readFileSync, writeFileSync, unlinkSync } from "node:fs";
 import { startHost } from "./server.js";
 import { discoverSessions, joinSession } from "./client.js";
 import { initStore, listRooms, deleteRoom } from "./store.js";
@@ -255,6 +261,43 @@ function handleCommand(msg) {
       // silencieux dans le vide.
       if (!clientHandle) { process.send({ event: "disconnected" }); break; }
       clientHandle.send(msg.text, msg.groupId, msg.media || null);
+      break;
+    }
+
+    // ── Étape E — pièces jointes ──────────────────────────────────
+    // Les octets ne traversent PAS l'IPC : le processus principal écrit
+    // d'abord un fichier temporaire et ne transmet ici qu'un CHEMIN. Une
+    // pièce jointe de 25 Mio sérialisée en JSON à travers fork() coûterait
+    // bien plus cher que de la relire sur le disque.
+    case "media-upload": {
+      if (!clientHandle) { process.send({ event: "media-error", reqId: msg.reqId, reason: "disconnected" }); break; }
+      (async () => {
+        try {
+          const buffer = readFileSync(msg.path);
+          const res = await clientHandle.uploadMedia({
+            kind: msg.kind, mime: msg.mime, buffer, thumb: msg.thumb || null,
+          });
+          process.send({ event: "media-uploaded", reqId: msg.reqId, sha256: res.sha256, size: res.size });
+        } catch (e) {
+          process.send({ event: "media-error", reqId: msg.reqId, reason: e?.message || "upload" });
+        } finally {
+          try { unlinkSync(msg.path); } catch { /* déjà retiré */ }
+        }
+      })();
+      break;
+    }
+
+    case "media-download": {
+      if (!clientHandle) { process.send({ event: "media-error", reqId: msg.reqId, reason: "disconnected" }); break; }
+      (async () => {
+        try {
+          const buffer = await clientHandle.fetchMedia({ sha256: msg.sha256, mime: msg.mime });
+          writeFileSync(msg.outPath, buffer);
+          process.send({ event: "media-downloaded", reqId: msg.reqId, path: msg.outPath, size: buffer.length });
+        } catch (e) {
+          process.send({ event: "media-error", reqId: msg.reqId, reason: e?.message || "download" });
+        }
+      })();
       break;
     }
 

@@ -277,7 +277,18 @@
     "mediaBusy": "Trop de transferts simultanés — attendez la fin des envois en cours.",
     "mediaFailed": "L'envoi de la pièce jointe a échoué.",
     "mediaGone": "Cette pièce jointe n'est plus disponible sur le poste hôte.",
-    "mediaIntegrity": "Le fichier reçu ne correspond pas à ce qui était annoncé — téléchargement abandonné."
+    "mediaIntegrity": "Le fichier reçu ne correspond pas à ce qui était annoncé — téléchargement abandonné.",
+    "mediaAttach": "Joindre un fichier",
+    "mediaRecord": "Enregistrer un message vocal",
+    "mediaStopRecording": "Arrêter l'enregistrement",
+    "mediaRemove": "Retirer la pièce jointe",
+    "mediaVoiceMessage": "Message vocal",
+    "mediaAttachment": "Pièce jointe",
+    "mediaCaptionPlaceholder": "Ajouter un mot (facultatif)…",
+    "mediaSave": "Enregistrer",
+    "mediaOpenFull": "Ouvrir en grand",
+    "mediaNoPreview": "Aperçu indisponible",
+    "mediaMicDenied": "Microphone indisponible — vérifiez qu'il est branché et autorisé."
   },
   "Privacy": {
     "title": "Confidentialité",

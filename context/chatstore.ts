@@ -21,6 +21,21 @@ export interface ChatMessage {
   // coordonnées dans extra {name, address, wsPort, httpPort, pin}
   type?: "message" | "invite";
   extra?: { name: string; address: string; wsPort: number; httpPort: number; pin: string | null } | null;
+  // Étape E — pièce jointe : MÉTADONNÉES seulement. Le fichier vit chez
+  // l'hôte et n'est téléchargé qu'à l'ouverture ; `thumb` est une vignette
+  // minuscule embarquée, qui permet un aperçu immédiat même dans
+  // l'historique (voir chat-module/src/media.js).
+  media?: {
+    kind: "image" | "voice" | "file";
+    mime: string;
+    sha256: string;
+    size: number;
+    thumb?: string | null;
+    w?: number | null;
+    h?: number | null;
+    duration?: number | null;
+    name?: string | null;
+  } | null;
   deviceFp?: string | null;
   signatureValid?: boolean;
 }

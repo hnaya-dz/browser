@@ -277,7 +277,18 @@
     "mediaBusy": "عمليات إرسال كثيرة في آن واحد — انتظر انتهاء الجارية.",
     "mediaFailed": "فشل إرسال المرفق.",
     "mediaGone": "لم يعد هذا المرفق متاحاً على الجهاز المضيف.",
-    "mediaIntegrity": "الملف المستلَم لا يطابق ما أُعلن عنه — أُلغي التحميل."
+    "mediaIntegrity": "الملف المستلَم لا يطابق ما أُعلن عنه — أُلغي التحميل.",
+    "mediaAttach": "إرفاق ملف",
+    "mediaRecord": "تسجيل رسالة صوتية",
+    "mediaStopRecording": "إيقاف التسجيل",
+    "mediaRemove": "إزالة المرفق",
+    "mediaVoiceMessage": "رسالة صوتية",
+    "mediaAttachment": "مرفق",
+    "mediaCaptionPlaceholder": "أضف كلمة (اختياري)…",
+    "mediaSave": "حفظ",
+    "mediaOpenFull": "فتح بالحجم الكامل",
+    "mediaNoPreview": "المعاينة غير متاحة",
+    "mediaMicDenied": "الميكروفون غير متاح — تأكد من توصيله والسماح باستخدامه."
   },
   "Privacy": {
     "title": "الخصوصية",

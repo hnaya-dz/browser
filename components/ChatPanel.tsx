@@ -6,6 +6,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { MessageSquare, Shield, Lock, Smartphone, KeyRound, Eye, EyeOff, Send, History, DoorOpen, Trash2, KeySquare } from "lucide-react";
 import ChatAdminPanel from "./ChatAdminPanel";
 import ChatServerSetup from "./ChatServerSetup";
+import ChatComposerMedia, { MediaPreview, type PreparedMedia } from "./ChatComposerMedia";
+import ChatMediaBubble from "./ChatMediaBubble";
 import qrcode from "qrcode-generator";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useLanguage } from "@/context/langcontext";
@@ -129,6 +131,10 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
   const [sessionNameInput, setSessionNameInput] = useState("");
   const [pinInput, setPinInput] = useState("");
   const [messageInput, setMessageInput] = useState("");
+  // Étape E — pièce jointe préparée, en attente d'envoi
+  const [pendingMedia, setPendingMedia] = useState<PreparedMedia | null>(null);
+  const [mediaBusy, setMediaBusy] = useState(false);
+  const [mediaError, setMediaError] = useState("");
   const [setupBusy, setSetupBusy] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
   // Panneau admin (étape D) — remplace le fil tant qu'il est ouvert ;
@@ -474,12 +480,54 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
     });
   };
 
-  const handleSend = () => {
+  const handleSend = async () => {
     const api = getApi();
     const text = messageInput.trim();
-    if (!api?.send || !text) return;
-    api.send("chat-send-message", { text, groupId: "all", media: null });
-    setMessageInput("");
+    // Un vocal ou une image peut partir SANS texte — d'où la condition
+    // sur l'un ou l'autre, et non sur le texte seul.
+    if (!api?.send || (!text && !pendingMedia)) return;
+
+    if (!pendingMedia) {
+      api.send("chat-send-message", { text, groupId: "all", media: null });
+      setMessageInput("");
+      return;
+    }
+
+    // Le fichier monte D'ABORD chez l'hôte ; le message ne part qu'ensuite,
+    // avec l'empreinte calculée par l'hôte — c'est elle qui scelle la
+    // signature (voir chat-module/src/identity.js).
+    setMediaBusy(true); setMediaError("");
+    try {
+      const up = await getApi()?.invoke?.("chat-media-upload", {
+        bytes: pendingMedia.bytes,
+        kind: pendingMedia.kind,
+        mime: pendingMedia.mime,
+        thumb: pendingMedia.thumb || null,
+      });
+      if (!up?.ok) {
+        const codes: Record<string, string> = {
+          "quota-bytes": "mediaQuotaBytes", "quota-files": "mediaQuotaFiles",
+          size: "mediaTooBig", mime: "mediaTypeRefused", busy: "mediaBusy",
+        };
+        setMediaError(t(`Chat.${codes[up?.error] || "mediaFailed"}`));
+        return;
+      }
+      api.send("chat-send-message", {
+        text, groupId: "all",
+        media: {
+          kind: pendingMedia.kind, mime: pendingMedia.mime,
+          sha256: up.sha256, size: up.size,
+          thumb: pendingMedia.thumb || null,
+          w: pendingMedia.w, h: pendingMedia.h,
+          duration: pendingMedia.duration,
+          name: pendingMedia.name,
+        },
+      });
+      setMessageInput("");
+      setPendingMedia(null);
+    } finally {
+      setMediaBusy(false);
+    }
   };
 
   /** Quitte la CONVERSATION en laissant le salon ouvert pour les autres. */
@@ -1203,11 +1251,22 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
                       borderRadius: 8, padding: "6px 10px",
                     }}>
                       {!isMine && <div style={{ fontSize: 10, color: muted, fontWeight: 700 }}>{m.from}</div>}
-                      <MessageText
-                        text={m.text}
-                        accent={theme === "sunset" ? "#ffb060" : "#00c853"}
-                        onOpen={(url) => addTab(url)}
-                      />
+                      {/* Texte facultatif : un vocal ou une image peut
+                          partir seul, sans un mot */}
+                      {m.text ? (
+                        <MessageText
+                          text={m.text}
+                          accent={theme === "sunset" ? "#ffb060" : "#00c853"}
+                          onOpen={(url) => addTab(url)}
+                        />
+                      ) : null}
+                      {m.media && (
+                        <ChatMediaBubble
+                          media={m.media}
+                          muted={muted} border={border}
+                          accent={theme === "sunset" ? "#ffb060" : "#00c853"}
+                        />
+                      )}
                     </div>
                   );
                 })
@@ -1216,17 +1275,39 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
               <div ref={messagesEndRef} />
             </div>}
 
-            {!showAdmin && <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-              <input
-                style={{ ...inputStyle, flex: 1 }}
-                value={messageInput}
-                onChange={(e) => setMessageInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleSend()}
-                placeholder={t("Chat.messagePlaceholder")}
-              />
-              <button onClick={handleSend} disabled={!messageInput.trim()} style={btnStyle(true, !messageInput.trim())}>
-                {t("Chat.send")}
-              </button>
+            {!showAdmin && <div style={{ flexShrink: 0 }}>
+              {pendingMedia && (
+                <MediaPreview
+                  media={pendingMedia}
+                  onCancel={() => { setPendingMedia(null); setMediaError(""); }}
+                  muted={muted} border={border} accent={accent}
+                />
+              )}
+              {mediaError && (
+                <div style={{ fontSize: 10.5, color: "#ff8080", marginBottom: 5, lineHeight: 1.45 }}>{mediaError}</div>
+              )}
+              <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                <ChatComposerMedia
+                  accent={accent} muted={muted} border={border}
+                  disabled={mediaBusy || !!pendingMedia}
+                  onPrepared={(m) => { setPendingMedia(m); setMediaError(""); }}
+                  onError={(msg) => setMediaError(msg)}
+                />
+                <input
+                  style={{ ...inputStyle, flex: 1, minWidth: 0 }}
+                  value={messageInput}
+                  onChange={(e) => setMessageInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleSend()}
+                  placeholder={pendingMedia ? t("Chat.mediaCaptionPlaceholder") : t("Chat.messagePlaceholder")}
+                />
+                <button
+                  onClick={handleSend}
+                  disabled={mediaBusy || (!messageInput.trim() && !pendingMedia)}
+                  style={{ ...btnStyle(true, mediaBusy || (!messageInput.trim() && !pendingMedia)), flexShrink: 0 }}
+                >
+                  {mediaBusy ? "…" : t("Chat.send")}
+                </button>
+              </div>
             </div>}
           </>
         )}

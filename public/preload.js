@@ -39,6 +39,10 @@ const ALLOWED_INVOKE = [
   "chat-network-setup",
   "chat-admin-export",
   // ✅ Serveur permanent (tier premium) — déploiement depuis ce poste
+  // ✅ Étape E — pièces jointes (images, vocaux, documents)
+  "chat-media-upload",
+  "chat-media-download",
+  "chat-media-save",
   "chat-server-get-info",
   "chat-server-pick-licence",
   "chat-server-install",

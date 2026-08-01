@@ -277,7 +277,18 @@
     "mediaBusy": "Too many transfers at once — wait for the current uploads to finish.",
     "mediaFailed": "Sending the attachment failed.",
     "mediaGone": "This attachment is no longer available on the host computer.",
-    "mediaIntegrity": "The received file does not match what was announced — download aborted."
+    "mediaIntegrity": "The received file does not match what was announced — download aborted.",
+    "mediaAttach": "Attach a file",
+    "mediaRecord": "Record a voice message",
+    "mediaStopRecording": "Stop recording",
+    "mediaRemove": "Remove attachment",
+    "mediaVoiceMessage": "Voice message",
+    "mediaAttachment": "Attachment",
+    "mediaCaptionPlaceholder": "Add a note (optional)…",
+    "mediaSave": "Save",
+    "mediaOpenFull": "Open full size",
+    "mediaNoPreview": "Preview unavailable",
+    "mediaMicDenied": "Microphone unavailable — check that it is plugged in and allowed."
   },
   "Privacy": {
     "title": "Privacy",
