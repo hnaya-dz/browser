@@ -4,19 +4,26 @@
 <meta charset="utf-8">
 <!-- Pas de maximum-scale : le zoom d'accessibilité doit rester possible ;
      l'anti-débordement est géré par overflow-x:hidden + min-width:0 -->
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
 <title>Hnaya — Messagerie locale</title>
 <style>
   :root { --bg:#0d1a12; --panel:#122419; --border:rgba(255,255,255,0.12); --text:#fff;
           --muted:rgba(255,255,255,0.5); --accent:#006341; --accent2:#00c853; --danger:#ff5252; }
   * { box-sizing:border-box; margin:0; padding:0; min-width:0; }
-  html,body { height:100%; overflow-x:hidden; }
+  /* ⚠️ 100dvh et NON 100% : sur mobile, 100% se calcule sur le GRAND
+     viewport (celui qui inclut la zone masquée par la barre d'outils du
+     navigateur). Le composeur se retrouvait alors sous le pli, hors de
+     l'écran — retour terrain. 100dvh suit la hauteur réellement visible,
+     barre repliée ou dépliée. Le 100vh reste en repli pour les
+     navigateurs anciens. */
+  html,body { height:100vh; height:100dvh; overflow:hidden; overscroll-behavior:none; }
   /* Retour de test terrain : la page paraissait « mode PC », trop petite.
      Base 16px minimum partout — jamais en dessous sur mobile. */
   body { background:var(--bg); color:var(--text); font-size:16px;
          font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
          display:flex; flex-direction:column; }
-  header { padding:14px 16px; background:var(--panel); border-bottom:1px solid var(--border);
+  header { padding:14px 16px; padding-top:calc(14px + env(safe-area-inset-top));
+           background:var(--panel); border-bottom:1px solid var(--border);
            display:flex; align-items:center; gap:12px; flex-shrink:0; }
   header .logo { width:34px; height:34px; border-radius:8px; background:var(--accent); flex-shrink:0;
                  display:flex; align-items:center; justify-content:center; font-weight:700; font-size:18px; }
@@ -25,11 +32,23 @@
                         overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   header select { background:var(--panel); color:var(--text); border:1px solid var(--border);
                   border-radius:8px; font-size:14px; padding:6px 8px; }
-  main { flex:1; display:flex; flex-direction:column; overflow:hidden; }
-  .screen { flex:1; display:none; flex-direction:column; overflow:hidden; }
+  main { flex:1; min-height:0; display:flex; flex-direction:column; overflow:hidden; }
+  .screen { flex:1; min-height:0; display:none; flex-direction:column; overflow:hidden; }
   .screen.active { display:flex; }
   /* — Écran de connexion — */
-  #join { justify-content:center; padding:24px; gap:16px; max-width:440px; width:100%; margin:0 auto; }
+  #join { justify-content:center; padding:24px; gap:16px; max-width:440px; width:100%;
+          margin:0 auto; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+  /* Écran court (clavier ouvert, ou téléphone compact) : on récupère de la
+     place sur les marges et l'en-tête SANS toucher aux tailles de texte —
+     la lisibilité obtenue au test terrain précédent reste intacte. */
+  @media (max-height:620px) {
+    header { padding:8px 14px; }
+    header .logo { width:28px; height:28px; font-size:16px; }
+    #join { padding:14px 20px; gap:11px; justify-content:flex-start; }
+    #join h1 { font-size:20px; }
+    #messages { padding:10px 14px; gap:8px; }
+    #composer { padding:9px 12px calc(9px + env(safe-area-inset-bottom)); }
+  }
   #join h1 { font-size:22px; }
   #join p.sub { color:var(--muted); font-size:15px; line-height:1.5; }
   label { font-size:14px; color:var(--muted); display:block; margin-bottom:6px; }
@@ -48,8 +67,9 @@
   #status.show { display:flex; }
   #status button { margin-inline-start:auto; background:none; border:1px solid var(--danger);
                    color:var(--danger); border-radius:8px; padding:6px 14px; font-size:14px; cursor:pointer; }
-  #messages { flex:1; overflow-y:auto; overflow-x:hidden; padding:14px 16px;
-              display:flex; flex-direction:column; gap:10px; }
+  #messages { flex:1; min-height:0; overflow-y:auto; overflow-x:hidden; padding:14px 16px;
+              display:flex; flex-direction:column; gap:10px;
+              -webkit-overflow-scrolling:touch; }
   .msg { max-width:85%; padding:10px 14px; border-radius:14px; background:rgba(255,255,255,0.07);
          align-self:flex-start; font-size:16px; line-height:1.45; word-break:break-word;
          overflow-wrap:anywhere; }
@@ -158,7 +178,18 @@ const joinScreen = $("join"), chatScreen = $("chat"), joinBtn = $("joinBtn"),
   roomNameEl = $("roomName"), langSel = $("lang");
 
 langSel.onchange = () => { lang = langSel.value; localStorage.setItem("hnaya-mobile-lang", lang); applyLang(); };
-nicknameInput.value = localStorage.getItem("hnaya-chat-nickname") || "";
+// « Ajouter mon mobile » : le QR peut transporter le pseudo du poste qui
+// invite (paramètre ?u=). Le téléphone rejoint alors sous LA MÊME
+// identité, sans que l'utilisateur ait à retaper — ou à inventer — un
+// second pseudo. Le PIN, lui, n'est JAMAIS mis dans l'URL : un QR
+// photographié par-dessus l'épaule donnerait l'accès au salon.
+const paramsUrl = new URLSearchParams(location.search);
+const pseudoInvite = (paramsUrl.get("u") || "").slice(0, 24).trim();
+nicknameInput.value = pseudoInvite || localStorage.getItem("hnaya-chat-nickname") || "";
+if (pseudoInvite) {
+  // Le champ PIN prend le focus : c'est la seule chose qui reste à saisir.
+  setTimeout(() => { try { pinInput.focus(); } catch { /* champ absent */ } }, 250);
+}
 applyLang();
 
 // Nom du salon + port WS — servis par l'hôte

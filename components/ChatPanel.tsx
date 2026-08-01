@@ -136,7 +136,9 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
   const [mediaBusy, setMediaBusy] = useState(false);
   const [mediaError, setMediaError] = useState("");
   const [setupBusy, setSetupBusy] = useState(false);
-  const [showInvite, setShowInvite] = useState(false);
+  // false = masqué ; "guest" = inviter quelqu'un d'autre ; "mine" = lier
+  // SON PROPRE téléphone (le QR emporte alors le pseudo courant)
+  const [showInvite, setShowInvite] = useState<false | "guest" | "mine">(false);
   // Panneau admin (étape D) — remplace le fil tant qu'il est ouvert ;
   // l'état d'authentification est réinitialisé à chaque fermeture
   const [showAdmin, setShowAdmin] = useState(false);
@@ -303,13 +305,25 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
   }, [store.messages.length, store.status]);
 
   // QR d'invitation mobile — recalculé uniquement quand l'URL change
-  const inviteQrSvg = useMemo(() => {
+  // Deux QR distincts : « inviter un mobile » (URL nue, pour un collègue
+  // qui choisira son pseudo) et « ajouter mon mobile » (URL + pseudo, pour
+  // que le téléphone rejoigne sous LA MÊME identité). Le PIN n'est dans
+  // aucun des deux : un QR se photographie par-dessus l'épaule.
+  const inviteQrTarget = useMemo(() => {
     if (!store.inviteUrl) return "";
+    if (showInvite === "mine" && nickname.trim()) {
+      return `${store.inviteUrl}/?u=${encodeURIComponent(nickname.trim())}`;
+    }
+    return store.inviteUrl;
+  }, [store.inviteUrl, showInvite, nickname]);
+
+  const inviteQrSvg = useMemo(() => {
+    if (!inviteQrTarget) return "";
     const qr = qrcode(0, "M");
-    qr.addData(store.inviteUrl);
+    qr.addData(inviteQrTarget);
     qr.make();
     return qr.createSvgTag({ cellSize: 3, margin: 0 });
-  }, [store.inviteUrl]);
+  }, [inviteQrTarget]);
 
   const theme = getThemeName();
   const isDark = theme === "dark";
@@ -1026,19 +1040,37 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
                   l'hôte — visible pour tous les participants (l'URL pointe
                   toujours vers l'hôte), masqué si le poste n'a pas de LAN */}
               {store.inviteUrl && !showAdmin && (
-                <button
-                  onClick={() => setShowInvite(v => !v)}
-                  style={{
-                    ...btnStyle(showInvite), padding: "4px 8px", fontSize: 10,
-                    display: "flex", alignItems: "center", gap: 4, flexShrink: 0,
-                  }}
-                  title={showInvite ? t("Chat.inviteClose") : t("Chat.invitePhone")}
-                >
-                  <Smartphone size={12} />
-                  {/* Le bouton devient « Fermer » quand le QR est affiché —
-                      demande explicite du test terrain (dégager le dock) */}
-                  {showInvite ? t("Chat.inviteClose") : t("Chat.invitePhone")}
-                </button>
+                <>
+                  {/* Lier SON PROPRE téléphone : le QR emporte le pseudo, le
+                      mobile rejoint sous la même identité sans en inventer
+                      un second. */}
+                  <button
+                    onClick={() => setShowInvite(v => (v === "mine" ? false : "mine"))}
+                    disabled={!nickname.trim()}
+                    style={{
+                      ...btnStyle(showInvite === "mine", !nickname.trim()),
+                      padding: "4px 8px", fontSize: 10,
+                      display: "flex", alignItems: "center", gap: 4, flexShrink: 0,
+                    }}
+                    title={showInvite === "mine" ? t("Chat.inviteClose") : t("Chat.addMyPhone")}
+                  >
+                    <Smartphone size={12} />
+                    {showInvite === "mine" ? t("Chat.inviteClose") : t("Chat.addMyPhone")}
+                  </button>
+                  <button
+                    onClick={() => setShowInvite(v => (v === "guest" ? false : "guest"))}
+                    style={{
+                      ...btnStyle(showInvite === "guest"), padding: "4px 8px", fontSize: 10,
+                      display: "flex", alignItems: "center", gap: 4, flexShrink: 0,
+                    }}
+                    title={showInvite === "guest" ? t("Chat.inviteClose") : t("Chat.invitePhone")}
+                  >
+                    <Smartphone size={12} />
+                    {/* Le bouton devient « Fermer » quand le QR est affiché —
+                        demande explicite du test terrain (dégager le dock) */}
+                    {showInvite === "guest" ? t("Chat.inviteClose") : t("Chat.invitePhone")}
+                  </button>
+                </>
               )}
               {/* D.2 — inviter les membres vers un autre salon (sous-salon) */}
               {!showAdmin && (
@@ -1181,9 +1213,11 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
                   // de lisibilité pour les caméras de téléphone
                   dangerouslySetInnerHTML={{ __html: inviteQrSvg }}
                 />
-                <div style={{ fontSize: 11, fontWeight: 700, marginTop: 6, direction: "ltr" }}>{store.inviteUrl}</div>
+                <div style={{ fontSize: 11, fontWeight: 700, marginTop: 6, direction: "ltr", wordBreak: "break-all" }}>
+                  {inviteQrTarget}
+                </div>
                 <div style={{ fontSize: 9.5, color: muted, marginTop: 4, lineHeight: 1.5 }}>
-                  {t("Chat.inviteHint")}
+                  {showInvite === "mine" ? t("Chat.addMyPhoneHint") : t("Chat.inviteHint")}
                 </div>
               </div>
             )}

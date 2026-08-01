@@ -288,7 +288,9 @@
     "mediaSave": "Save",
     "mediaOpenFull": "Open full size",
     "mediaNoPreview": "Preview unavailable",
-    "mediaMicDenied": "Microphone unavailable — check that it is plugged in and allowed."
+    "mediaMicDenied": "Microphone unavailable — check that it is plugged in and allowed.",
+    "addMyPhone": "Add my phone",
+    "addMyPhoneHint": "Scan with YOUR phone: it joins the room under your own nickname, without creating a second one. Then enter the PIN — it is never in the QR code."
   },
   "Privacy": {
     "title": "Privacy",

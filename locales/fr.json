@@ -288,7 +288,9 @@
     "mediaSave": "Enregistrer",
     "mediaOpenFull": "Ouvrir en grand",
     "mediaNoPreview": "Aperçu indisponible",
-    "mediaMicDenied": "Microphone indisponible — vérifiez qu'il est branché et autorisé."
+    "mediaMicDenied": "Microphone indisponible — vérifiez qu'il est branché et autorisé.",
+    "addMyPhone": "Ajouter mon mobile",
+    "addMyPhoneHint": "Scannez avec VOTRE téléphone : il rejoindra le salon sous votre pseudo, sans en créer un second. Saisissez ensuite le PIN — il n'est jamais dans le QR."
   },
   "Privacy": {
     "title": "Confidentialité",
