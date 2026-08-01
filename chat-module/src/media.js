@@ -28,25 +28,67 @@ import path from "node:path";
 
 // Plafonds. Volontairement modestes : on vise un partage de photos et de
 // messages vocaux sur un réseau local, pas un service de fichiers.
-export const MAX_MEDIA_BYTES = 8 * 1024 * 1024; // 8 Mo par pièce jointe
+// 25 Mio : un PDF scanné volumineux ou une photo non compressée passent,
+// et le transfert reste de l'ordre de deux secondes sur un réseau local.
+// Le disque de l'hôte est protégé en aval par la purge de rétention ET
+// par le quota horaire par appareil (voir server.js).
+export const MAX_MEDIA_BYTES = 25 * 1024 * 1024;
 export const MAX_THUMB_BYTES = 24 * 1024;       // vignette inline (base64)
 export const CHUNK_BYTES = 64 * 1024;           // taille d'un morceau brut
 export const MAX_CONCURRENT_UPLOADS = 4;        // par connexion
 
-// Types acceptés — liste FERMÉE. Tout le reste est refusé : c'est ce qui
-// évite qu'un « message vocal » soit en réalité un exécutable.
+// Types acceptés — liste FERMÉE, et c'est essentiel : elle interdit tout
+// ce qui s'exécute. Un « message vocal » ne peut pas être un .exe, et
+// aucun .bat/.ps1/.js ne circule entre les postes.
+//
+// ⚠️ NE JAMAIS y ajouter un type exécutable ou script, ni ouvrir la liste
+// à un joker. Les documents bureautiques ci-dessous peuvent contenir des
+// macros : l'application ne les ouvre jamais elle-même — elle enregistre
+// le fichier et laisse Windows décider, avec ses propres protections.
 export const ALLOWED_MIME = new Map([
+  // Images
   ["image/jpeg", "jpg"],
   ["image/png", "png"],
   ["image/webp", "webp"],
   ["image/gif", "gif"],
+  // Audio (messages vocaux)
   ["audio/webm", "weba"],
   ["audio/ogg", "ogg"],
   ["audio/mpeg", "mp3"],
   ["audio/mp4", "m4a"],
+  // Documents — besoin métier PME/administration
+  ["application/pdf", "pdf"],
+  ["application/msword", "doc"],
+  ["application/vnd.openxmlformats-officedocument.wordprocessingml.document", "docx"],
+  ["application/vnd.ms-excel", "xls"],
+  ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "xlsx"],
+  ["application/vnd.ms-powerpoint", "ppt"],
+  ["application/vnd.openxmlformats-officedocument.presentationml.presentation", "pptx"],
+  ["application/vnd.oasis.opendocument.text", "odt"],
+  ["application/vnd.oasis.opendocument.spreadsheet", "ods"],
+  ["text/plain", "txt"],
+  ["text/csv", "csv"],
+  ["application/zip", "zip"],
 ]);
 
-export const KINDS = new Set(["image", "voice"]);
+// image : aperçu inline ; voice : lecteur audio ; file : carte
+// téléchargeable (nom + taille), aucun aperçu.
+export const KINDS = new Set(["image", "voice", "file"]);
+
+// Nom d'origine conservé pour les documents (« bon-commande.pdf » plutôt
+// qu'une empreinte illisible). Nettoyé : le nom vient du réseau et ne doit
+// jamais servir à construire un chemin — il n'est qu'affiché, et proposé
+// à l'enregistrement.
+export const MAX_FILENAME_LEN = 120;
+export function sanitizeFilename(name) {
+  const base = String(name || "").split(/[\\/]/).pop() || "";
+  const clean = base
+    .replace(/[\x00-\x1f<>:"|?*]/g, "")   // caractères interdits sous Windows
+    .replace(/^\.+/, "")                   // pas de fichier caché ni de « .. »
+    .trim()
+    .slice(0, MAX_FILENAME_LEN);
+  return clean || null;
+}
 
 export function mediaDir(dataDir) {
   return path.join(dataDir, "media");
@@ -67,9 +109,11 @@ export function validateAnnounce({ kind, mime, size, thumb }) {
   if (!KINDS.has(kind)) return "kind";
   if (!ALLOWED_MIME.has(mime)) return "mime";
   // Cohérence type/nature : une « image » audio n'a pas de sens et
-  // trahirait une tentative de contourner le filtre.
+  // trahirait une tentative de contourner le filtre. Un document annoncé
+  // en « image » se verrait sinon affiché comme un aperçu.
   if (kind === "image" && !mime.startsWith("image/")) return "mime";
   if (kind === "voice" && !mime.startsWith("audio/")) return "mime";
+  if (kind === "file" && (mime.startsWith("image/") || mime.startsWith("audio/"))) return "mime";
   if (!Number.isInteger(size) || size <= 0 || size > MAX_MEDIA_BYTES) return "size";
   if (thumb && Buffer.byteLength(String(thumb), "utf8") > MAX_THUMB_BYTES) return "thumb";
   return null;

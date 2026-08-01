@@ -269,7 +269,15 @@
     "serverUninstall": "Remove the server from this computer",
     "serverUninstallNote": "Data (history, devices, licence) is kept: reinstalling resumes the room as it was.",
     "serverUacNote": "Windows will ask for administrator confirmation (once): startup task and firewall rules.",
-    "serverUacRefused": "Administrator authorization refused — nothing was changed."
+    "serverUacRefused": "Administrator authorization refused — nothing was changed.",
+    "mediaQuotaBytes": "Upload limit reached for this device (200 MB per hour). Try again later.",
+    "mediaQuotaFiles": "Too many files sent from this device in the past hour. Try again later.",
+    "mediaTooBig": "File too large (25 MB maximum).",
+    "mediaTypeRefused": "This file type is not allowed in messaging.",
+    "mediaBusy": "Too many transfers at once — wait for the current uploads to finish.",
+    "mediaFailed": "Sending the attachment failed.",
+    "mediaGone": "This attachment is no longer available on the host computer.",
+    "mediaIntegrity": "The received file does not match what was announced — download aborted."
   },
   "Privacy": {
     "title": "Privacy",

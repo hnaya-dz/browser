@@ -269,7 +269,15 @@
     "serverUninstall": "Retirer le serveur de ce poste",
     "serverUninstallNote": "Les données (historique, appareils, licence) sont conservées : une réinstallation reprend le salon tel quel.",
     "serverUacNote": "Windows demandera une confirmation administrateur (une seule fois) : création de la tâche de démarrage et des règles de pare-feu.",
-    "serverUacRefused": "Autorisation administrateur refusée — rien n'a été modifié."
+    "serverUacRefused": "Autorisation administrateur refusée — rien n'a été modifié.",
+    "mediaQuotaBytes": "Limite de volume atteinte pour cet appareil (200 Mo par heure). Réessayez plus tard.",
+    "mediaQuotaFiles": "Trop de fichiers envoyés depuis cet appareil dans la dernière heure. Réessayez plus tard.",
+    "mediaTooBig": "Fichier trop volumineux (25 Mo maximum).",
+    "mediaTypeRefused": "Ce type de fichier n'est pas autorisé dans la messagerie.",
+    "mediaBusy": "Trop de transferts simultanés — attendez la fin des envois en cours.",
+    "mediaFailed": "L'envoi de la pièce jointe a échoué.",
+    "mediaGone": "Cette pièce jointe n'est plus disponible sur le poste hôte.",
+    "mediaIntegrity": "Le fichier reçu ne correspond pas à ce qui était annoncé — téléchargement abandonné."
   },
   "Privacy": {
     "title": "Confidentialité",

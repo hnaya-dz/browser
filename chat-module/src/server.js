@@ -23,8 +23,9 @@ import { startMobileServer } from "./mobile-server.js";
 import { existsSync } from "node:fs";
 import {
   createUpload, mediaPath, readChunks, purgeOrphans,
-  MAX_CONCURRENT_UPLOADS, MAX_THUMB_BYTES, KINDS,
+  MAX_CONCURRENT_UPLOADS, MAX_THUMB_BYTES, KINDS, sanitizeFilename,
 } from "./media.js";
+import { createQuota } from "./quota.js";
 
 const WS_PORT = 4802; // port local arbitraire pour le chat LAN Hnaya
 const PURGE_INTERVAL_MS = 6 * 60 * 60 * 1000; // purge de rétention toutes les 6h
@@ -77,6 +78,10 @@ export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, 
   // Répertoire réel (l'appelant peut n'avoir rien précisé) — c'est là que
   // les pièces jointes sont écrites, à côté de la base.
   const mediaRoot = getDataDir();
+  // Quota de téléversement par appareil — voir src/quota.js. Vit au niveau
+  // du salon (et non de la connexion) : se reconnecter ne remet pas les
+  // compteurs à zéro.
+  const uploadQuota = createQuota();
   const roomPin = room.roomPin || (pin ?? generatePin());
   let currentAdminPin = room.adminPin;
   const sessionKey = deriveKeyFromPin(roomPin);
@@ -121,8 +126,14 @@ export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, 
     if (kind === "image") {
       out.w = Number.isFinite(Number(m.w)) ? Math.max(0, Math.round(Number(m.w))) : null;
       out.h = Number.isFinite(Number(m.h)) ? Math.max(0, Math.round(Number(m.h))) : null;
-    } else {
+    } else if (kind === "voice") {
       out.duration = Number.isFinite(Number(m.duration)) ? Math.max(0, Math.round(Number(m.duration))) : null;
+    } else {
+      // Document : le nom d'origine est conservé pour l'affichage et
+      // l'enregistrement (« bon-commande.pdf » plutôt qu'une empreinte).
+      // Nettoyé — il vient du réseau et ne sert JAMAIS à construire un
+      // chemin côté hôte (le fichier est nommé d'après son empreinte).
+      out.name = sanitizeFilename(m.name);
     }
     return out;
   };
@@ -339,6 +350,15 @@ export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, 
           sendTo({ v: 1, type: "media-failed", uploadId: payload.uploadId, reason: "busy" });
           return;
         }
+        // Quota horaire : contrôlé sur la taille ANNONCÉE, donc avant le
+        // moindre octet écrit sur le disque. La clé est l'empreinte de
+        // l'appareil quand elle existe (stable, contrairement au pseudo).
+        const quotaKey = clients.get(userId)?.device?.fingerprint || `user:${userId}`;
+        const refus = uploadQuota.check(quotaKey, Number(payload.size) || 0);
+        if (refus) {
+          sendTo({ v: 1, type: "media-failed", uploadId: payload.uploadId, reason: refus });
+          return;
+        }
         try {
           uploads.set(String(payload.uploadId), createUpload({
             dataDir: mediaRoot,
@@ -372,6 +392,10 @@ export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, 
         uploads.delete(String(payload.uploadId));
         try {
           const res = up.finish();
+          uploadQuota.record(
+            clients.get(userId)?.device?.fingerprint || `user:${userId}`,
+            res.size,
+          );
           // L'empreinte est celle CALCULÉE par l'hôte sur les octets reçus,
           // jamais celle annoncée par le client : c'est elle qui scellera
           // la signature du message.
@@ -545,6 +569,7 @@ export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, 
   const purgeAll = () => {
     const n = purgeOldMessages();
     try { purgeOrphans(mediaRoot, listReferencedMedia()); } catch { /* disque occupé */ }
+    uploadQuota.sweep();
     return n;
   };
   const purgeInterval = setInterval(purgeAll, PURGE_INTERVAL_MS);
