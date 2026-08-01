@@ -122,18 +122,21 @@ export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, 
     if (!KINDS.has(kind)) return null;
     const thumb = typeof m.thumb === "string" && Buffer.byteLength(m.thumb, "utf8") <= MAX_THUMB_BYTES
       ? m.thumb : null;
-    const out = { kind, mime, sha256: sha, size: Number(m.size) || 0, thumb };
+    // Le nom d'origine est conservé pour TOUS les types, y compris les
+    // images : sans lui, le destinataire n'avait à l'enregistrement qu'une
+    // empreinte tronquée, sans extension — un fichier que Windows refuse
+    // d'ouvrir. Nettoyé, car il vient du réseau, et il ne sert JAMAIS à
+    // construire un chemin côté hôte (le fichier est nommé d'après son
+    // empreinte, voir mediaPath).
+    const out = {
+      kind, mime, sha256: sha, size: Number(m.size) || 0, thumb,
+      name: sanitizeFilename(m.name),
+    };
     if (kind === "image") {
       out.w = Number.isFinite(Number(m.w)) ? Math.max(0, Math.round(Number(m.w))) : null;
       out.h = Number.isFinite(Number(m.h)) ? Math.max(0, Math.round(Number(m.h))) : null;
     } else if (kind === "voice") {
       out.duration = Number.isFinite(Number(m.duration)) ? Math.max(0, Math.round(Number(m.duration))) : null;
-    } else {
-      // Document : le nom d'origine est conservé pour l'affichage et
-      // l'enregistrement (« bon-commande.pdf » plutôt qu'une empreinte).
-      // Nettoyé — il vient du réseau et ne sert JAMAIS à construire un
-      // chemin côté hôte (le fichier est nommé d'après son empreinte).
-      out.name = sanitizeFilename(m.name);
     }
     return out;
   };

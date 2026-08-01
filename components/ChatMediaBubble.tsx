@@ -63,7 +63,8 @@ export default function ChatMediaBubble({ media, muted, border, accent }: {
     setBusy(true); setError("");
     try {
       const res = await getApi()?.invoke?.("chat-media-save", {
-        sha256: media.sha256, mime: media.mime, name: media.name || undefined,
+        sha256: media.sha256, mime: media.mime,
+        name: media.name || undefined, kind: media.kind,
       });
       if (!res?.ok && res?.error !== "canceled") setError(t("Chat.mediaFailed"));
     } finally { setBusy(false); }
@@ -110,11 +111,15 @@ export default function ChatMediaBubble({ media, muted, border, accent }: {
   }
 
   // ── Vocal : lecteur audio natif, chargé au premier clic ───────────
+  // ⚠️ minWidth indispensable : sans texte, la bulle se rétracte autour de
+  // son contenu et le lecteur natif se retrouve écrasé — les commandes de
+  // lecture devenaient inutilisables tant qu'un message assez long ne
+  // venait pas élargir la bulle (retour terrain).
   if (media.kind === "voice") {
     return (
-      <div style={{ ...box, padding: 8 }}>
+      <div style={{ ...box, padding: 8, minWidth: 232, maxWidth: "100%" }}>
         {objectUrl ? (
-          <audio controls src={objectUrl} style={{ width: "100%", height: 32 }} />
+          <audio controls src={objectUrl} style={{ width: "100%", minWidth: 216, height: 34, display: "block" }} />
         ) : (
           <button
             onClick={load} disabled={busy}

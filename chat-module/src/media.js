@@ -79,6 +79,49 @@ export const KINDS = new Set(["image", "voice", "file"]);
 // qu'une empreinte illisible). Nettoyé : le nom vient du réseau et ne doit
 // jamais servir à construire un chemin — il n'est qu'affiché, et proposé
 // à l'enregistrement.
+// Extensions reconnues comme telles à la FIN d'un nom de fichier. Sert
+// uniquement à décider si le dernier segment est une extension (donc
+// remplaçable) ou une partie du nom. Plus large que les extensions que
+// nous produisons : « photo.JPEG » et « photo.jpg » désignent la même
+// chose, et un nom venu d'un autre appareil peut employer la variante.
+const KNOWN_EXTENSIONS = new Set([
+  ...ALLOWED_MIME.values(),
+  "jpeg", "jpe", "tif", "tiff", "bmp", "heic", "avif",
+  "webm", "oga", "opus", "wav", "aac", "flac", "m4v",
+  "rtf", "odp", "pages", "numbers", "key", "rar", "7z", "tar", "gz",
+]);
+
+/** Extension correspondant à un type — source unique de vérité, utilisée
+ *  aussi bien pour nommer le fichier chez l'hôte que pour proposer un nom
+ *  à l'enregistrement côté destinataire. Sans elle, Windows reçoit un
+ *  fichier sans extension et refuse de l'ouvrir. */
+export function extensionForMime(mime) {
+  // Les navigateurs ajoutent parfois des paramètres (« audio/webm;codecs=opus »)
+  const base = String(mime || "").split(";")[0].trim().toLowerCase();
+  return ALLOWED_MIME.get(base) || null;
+}
+
+/** Nom de fichier proposé à l'enregistrement : le nom d'origine si on l'a,
+ *  sinon un nom lisible dérivé de l'empreinte — et TOUJOURS avec la bonne
+ *  extension. */
+export function suggestedFilename({ name, mime, sha256, kind }) {
+  const ext = extensionForMime(mime);
+  const fallback = kind === "voice" ? "message-vocal"
+    : kind === "image" ? "image-hnaya"
+    : "fichier-hnaya";
+  let base = sanitizeFilename(name) || `${fallback}-${String(sha256 || "").slice(0, 8)}`;
+  if (ext && !base.toLowerCase().endsWith(`.${ext}`)) {
+    // Si le nom porte DÉJÀ une extension connue mais différente (« photo.png »
+    // pour une image recompressée en JPEG, ou un nom venu d'un client plus
+    // ancien), on la REMPLACE plutôt que d'empiler « photo.png.jpg ».
+    const connues = KNOWN_EXTENSIONS;
+    const m = base.match(/\.([A-Za-z0-9]{1,8})$/);
+    if (m && connues.has(m[1].toLowerCase())) base = base.slice(0, -m[0].length);
+    base += `.${ext}`;
+  }
+  return base;
+}
+
 export const MAX_FILENAME_LEN = 120;
 export function sanitizeFilename(name) {
   const base = String(name || "").split(/[\\/]/).pop() || "";

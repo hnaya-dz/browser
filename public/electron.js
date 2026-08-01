@@ -1103,11 +1103,20 @@ ipcMain.handle("chat-media-download", async (event, { sha256, mime }) => {
 });
 
 // Enregistrer une pièce jointe sur le disque de l'utilisateur.
-ipcMain.handle("chat-media-save", async (event, { sha256, mime, name }) => {
+ipcMain.handle("chat-media-save", async (event, { sha256, mime, name, kind }) => {
   try {
+    // ⚠️ L'extension est déduite du TYPE réel, jamais laissée au hasard du
+    // nom : un fichier enregistré sans extension est inouvrable sous
+    // Windows (« Type du fichier : Fichier »). Le filtre la fait aussi
+    // rajouter par le dialogue si l'utilisateur modifie le nom.
+    const { pathToFileURL: toUrl } = await import("node:url");
+    const { suggestedFilename, extensionForMime } = await import(toUrl(chatMediaJsPath).href);
+    const suggested = suggestedFilename({ name, mime, sha256, kind });
+    const ext = extensionForMime(mime);
     const { filePath, canceled } = await dialog.showSaveDialog(mainWindow, {
       title: "Enregistrer la pièce jointe",
-      defaultPath: name || sha256.slice(0, 16),
+      defaultPath: suggested,
+      filters: ext ? [{ name: ext.toUpperCase(), extensions: [ext] }] : undefined,
     });
     if (canceled || !filePath) return { ok: false, error: "canceled" };
     mkdirSync(chatMediaTmpDir(), { recursive: true });
@@ -1336,6 +1345,9 @@ ipcMain.handle("chat-network-setup", async () => {
 const chatServeJsPath = app.isPackaged
   ? join(process.resourcesPath, "chat-module", "src", "serve.js")
   : join(__dirname, "..", "chat-module", "src", "serve.js");
+const chatMediaJsPath = app.isPackaged
+  ? join(process.resourcesPath, "chat-module", "src", "media.js")
+  : join(__dirname, "..", "chat-module", "src", "media.js");
 const chatLicenceJsPath = app.isPackaged
   ? join(process.resourcesPath, "chat-module", "src", "licence.js")
   : join(__dirname, "..", "chat-module", "src", "licence.js");

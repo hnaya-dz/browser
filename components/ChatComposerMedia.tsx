@@ -75,7 +75,11 @@ export async function prepareFile(file: File): Promise<PreparedMedia> {
       kind: "image", mime: "image/jpeg",
       bytes: bytes.buffer as ArrayBuffer, size: bytes.length,
       w: full.w, h: full.h, thumb: thumb.dataUrl,
-      previewUrl: full.dataUrl, name: file.name,
+      previewUrl: full.dataUrl,
+      // Le nom doit décrire les octets RÉELLEMENT envoyés : on recompresse
+      // toujours en JPEG, donc « photo.png » deviendrait « photo.png.jpg »
+      // à l'enregistrement. On remplace l'extension d'origine.
+      name: file.name.replace(/\.[^.\\/]{1,8}$/, "") + ".jpg",
     };
   }
   const buf = await file.arrayBuffer();
