@@ -17,6 +17,7 @@ import {
   banDevice, unbanDevice, isBanned, listBans,
   addRoomMember, isRoomMember, setRoomLocked,
   getDevice, countDevices, getDataDir, listReferencedMedia,
+  setDeviceRole, listRoster,
 } from "./store.js";
 import { fingerprintFromRawPublicKey, rawFromSpkiBase64, verifyMessage } from "./identity.js";
 import { startMobileServer } from "./mobile-server.js";
@@ -26,6 +27,7 @@ import {
   MAX_CONCURRENT_UPLOADS, MAX_THUMB_BYTES, KINDS, sanitizeFilename,
 } from "./media.js";
 import { createQuota } from "./quota.js";
+import { isDirectGroup, isMemberOfDirect, directMembers } from "./direct.js";
 
 const WS_PORT = 4802; // port local arbitraire pour le chat LAN Hnaya
 const PURGE_INTERVAL_MS = 6 * 60 * 60 * 1000; // purge de rétention toutes les 6h
@@ -221,7 +223,13 @@ export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, 
 
         // Renvoie les messages manqués depuis la dernière connexion
         const since = payload.lastSeenTs || 0;
-        const missed = (payload.groups || ["all"]).flatMap((g) => getMessagesSince(g, since, activeRoomId));
+        // ⚠️ Étape F — un client demande les groupes qu'il veut relire. Un
+        // fil privé n'est servi QUE si son empreinte y figure : sans ce
+        // filtre, n'importe qui pouvait réclamer l'historique de deux
+        // collègues en devinant l'identifiant du fil.
+        const demandes = (payload.groups || ["all"]).filter((g) =>
+          !isDirectGroup(g) || (device && isMemberOfDirect(g, device.fingerprint)));
+        const missed = demandes.flatMap((g) => getMessagesSince(g, since, activeRoomId));
         ws.send(encryptPayload(sessionKey, { v: 1, type: "backlog", messages: missed }));
 
         broadcastPresence();
@@ -231,6 +239,14 @@ export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, 
       if (payload.type === "message") {
         const now = Date.now();
         const device = clients.get(userId)?.device || null;
+        // ⚠️ Étape F — écrire dans un fil privé exige d'y appartenir. Sans
+        // ce contrôle, un tiers pouvait déposer un message dans la
+        // conversation de deux collègues (elle lui serait restée invisible,
+        // mais eux l'auraient vu arriver).
+        if (isDirectGroup(payload.groupId)
+            && !(device && isMemberOfDirect(payload.groupId, device.fingerprint))) {
+          return;
+        }
         let msg;
 
         if (payload.signature && payload.id && payload.ts && device) {
@@ -434,6 +450,29 @@ export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, 
         return;
       }
 
+      // ═══ Étape F — ANNUAIRE ═══════════════════════════════════════
+      // Accessible à TOUS les membres du salon, contrairement aux
+      // commandes d'administration : chacun doit pouvoir voir qui existe
+      // pour lui écrire. Ne révèle que ce qui est nécessaire à cela —
+      // ni IP, ni machine, ni empreinte d'appareil autre que la sienne.
+      if (payload.type === "roster") {
+        if (!userId) return;
+        const enLigne = new Set(
+          [...clients.values()].map((c) => c.device?.fingerprint).filter(Boolean),
+        );
+        const moi = clients.get(userId)?.device?.fingerprint || null;
+        const gens = listRoster(activeRoomId).map((d) => ({
+          fingerprint: d.fingerprint,
+          name: d.lastNickname || null,
+          role: d.role || null,
+          online: enLigne.has(d.fingerprint),
+          lastSeen: Number(d.lastSeen) || 0,
+          isMe: d.fingerprint === moi,
+        }));
+        sendTo({ v: 1, type: "roster", people: gens, me: moi });
+        return;
+      }
+
       // ✅ Étape D — commandes d'ADMINISTRATION (registre, historique,
       // réglages). Même canal chiffré que le reste : il faut déjà le PIN
       // du salon pour parler au serveur, PUIS le PIN admin pour ces
@@ -462,6 +501,13 @@ export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, 
               setDeviceLabel(String(payload.fingerprint || ""), payload.label ?? null);
               reply({ ok: true, data: listDevices(activeRoomId) });
               break;
+            case "role":
+              // Fonction dans l'organisation (DRH, DGA…) — décrit la
+              // PERSONNE, là où « label » nomme l'APPAREIL.
+              setDeviceRole(payload.fingerprint, payload.role);
+              reply({ ok: true, data: listDevices(activeRoomId) });
+              break;
+
             case "search":
               // roomId imposé côté serveur : l'admin de CE salon ne peut
               // pas fouiller l'historique des autres salons de la machine
@@ -547,6 +593,18 @@ export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, 
   });
 
   function broadcastToGroup(groupId, data) {
+    // ⚠️ Étape F — un fil privé se route par APPARTENANCE, jamais par le
+    // joker « all ». Sans cette branche, un message privé partait vers
+    // TOUS les participants : chacun rejoint avec groups:["all"], et la
+    // condition ci-dessous suffisait donc toujours.
+    if (isDirectGroup(groupId)) {
+      for (const { ws, device } of clients.values()) {
+        if (device && isMemberOfDirect(groupId, device.fingerprint)) {
+          ws.send(encryptPayload(sessionKey, data));
+        }
+      }
+      return;
+    }
     for (const { ws, groups } of clients.values()) {
       if (groups.includes(groupId) || groups.includes("all")) {
         ws.send(encryptPayload(sessionKey, data));

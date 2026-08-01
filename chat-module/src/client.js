@@ -55,6 +55,7 @@ export function joinSession({
   onPresence,
   onAdminResult,
   onInviteSent,
+  onRoster,
 }) {
   const sessionKey = deriveKeyFromPin(pin);
   // ✅ Étape D — identité d'appareil : pseudo libre en surface, clé Ed25519
@@ -113,6 +114,8 @@ export function joinSession({
     else if (payload.type === "invite") onMessage?.(payload);
     else if (payload.type === "invite-sent") onInviteSent?.(payload);
     else if (payload.type === "admin-result") onAdminResult?.(payload);
+    // Étape F — annuaire : qui est inscrit, sa fonction, sa présence
+    else if (payload.type === "roster") onRoster?.(payload);
     // ── Étape E — réponses liées aux pièces jointes ──
     else if (payload.type === "media-go") {
       uploads.get(payload.uploadId)?.start?.();
@@ -233,9 +236,15 @@ export function joinSession({
     ws.send(encryptPayload(sessionKey, { v: 1, type: "invite", to, room }));
   }
 
+  /** Demande l'annuaire du salon. La réponse arrive via onRoster. */
+  function requestRoster() {
+    ws.send(encryptPayload(sessionKey, { v: 1, type: "roster" }));
+  }
+
   return {
     send,
     markRead,
+    requestRoster,
     sendAdmin,
     sendInvite,
     uploadMedia,

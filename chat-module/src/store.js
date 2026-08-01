@@ -118,6 +118,14 @@ export function initStore(dataDir = DEFAULT_DATA_DIR) {
     db.exec("ALTER TABLE messages ADD COLUMN type TEXT NOT NULL DEFAULT 'message'");
     db.exec("ALTER TABLE messages ADD COLUMN extra TEXT");
   }
+  // ── Migration F : annuaire ────────────────────────────────────────────
+  // `role` = fonction dans l'organisation (DRH, DGA…), attribuée par
+  // l'admin. Distincte de `label`, qui sert à nommer l'APPAREIL
+  // (« portable de l'accueil ») — ici on décrit la PERSONNE.
+  if (!db.prepare("PRAGMA table_info(devices)").all().some((c) => c.name === "role")) {
+    db.exec("ALTER TABLE devices ADD COLUMN role TEXT");
+  }
+
   // ── Migration E : pièces jointes ──────────────────────────────────────
   // `media` = métadonnées JSON (empreinte, type, dimensions, vignette).
   // Le fichier lui-même vit sous dataDir/media/ — voir src/media.js.
@@ -250,6 +258,25 @@ export function upsertDeviceSeen({ fingerprint, publicKeySpki, nickname, hostnam
       .run(fingerprint, publicKeySpki, now, now, nickname || null,
            JSON.stringify(nickname ? [nickname] : []), hostname || null, platform || null, ip || null);
   }
+}
+
+/** Fonction de la personne (DRH, DGA…) — affichée dans l'annuaire. */
+export function setDeviceRole(fingerprint, role) {
+  ensureDb().prepare("UPDATE devices SET role = ? WHERE fingerprint = ?")
+    .run(role ? String(role).slice(0, 40) : null, String(fingerprint));
+}
+
+/** Annuaire d'un salon : qui est inscrit, sous quel nom, avec quelle
+ *  fonction. La présence (en ligne) est ajoutée par le serveur, qui seul
+ *  connaît les connexions ouvertes. */
+export function listRoster(roomId) {
+  return ensureDb().prepare(
+    `SELECT dev.fingerprint, dev.lastNickname, dev.role, dev.label, dev.lastSeen
+     FROM devices dev
+     JOIN room_members m ON m.fingerprint = dev.fingerprint
+     WHERE m.roomId = ?
+     ORDER BY dev.lastNickname COLLATE NOCASE ASC`,
+  ).all(String(roomId));
 }
 
 export function setDeviceLabel(fingerprint, label) {
