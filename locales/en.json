@@ -290,7 +290,18 @@
     "mediaNoPreview": "Preview unavailable",
     "mediaMicDenied": "Microphone unavailable — check that it is plugged in and allowed.",
     "addMyPhone": "Add my phone",
-    "addMyPhoneHint": "Scan with YOUR phone: it joins the room under your own nickname, without creating a second one. Then enter the PIN — it is never in the QR code."
+    "addMyPhoneHint": "Scan with YOUR phone: it joins the room under your own nickname, without creating a second one. Then enter the PIN — it is never in the QR code.",
+    "rosterTitle": "Directory",
+    "rosterEmpty": "Nobody else has joined this room yet.",
+    "rosterOnline": "Online",
+    "rosterMe": "you",
+    "rosterUnnamed": "Unnamed",
+    "rosterWriteTo": "Send a private message",
+    "rosterJustNow": "just now",
+    "threadBack": "Back to the room",
+    "threadPrivate": "Private",
+    "threadEmpty": "No messages in this private conversation yet.",
+    "adminRolePlaceholder": "Role (HR director, CEO…)"
   },
   "Privacy": {
     "title": "Privacy",

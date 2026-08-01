@@ -3,11 +3,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 // ✅ Icônes vectorielles (lucide, déjà dans les dépendances) plutôt
 // qu'emoji : les emoji sont rendus par la police du système et diffèrent
 // visuellement entre Windows 10 et 11 — incohérent d'un poste à l'autre.
-import { MessageSquare, Shield, Lock, Smartphone, KeyRound, Eye, EyeOff, Send, History, DoorOpen, Trash2, KeySquare } from "lucide-react";
+import { MessageSquare, Shield, Lock, Smartphone, KeyRound, Eye, EyeOff, Send, History, DoorOpen, Trash2, KeySquare, Users, ArrowLeft } from "lucide-react";
 import ChatAdminPanel from "./ChatAdminPanel";
 import ChatServerSetup from "./ChatServerSetup";
 import ChatComposerMedia, { MediaPreview, type PreparedMedia } from "./ChatComposerMedia";
 import ChatMediaBubble from "./ChatMediaBubble";
+import ChatRoster from "./ChatRoster";
 import qrcode from "qrcode-generator";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useLanguage } from "@/context/langcontext";
@@ -132,6 +133,11 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
   const [pinInput, setPinInput] = useState("");
   const [messageInput, setMessageInput] = useState("");
   // Étape E — pièce jointe préparée, en attente d'envoi
+  // Étape F — annuaire ouvert, et personne à qui l'on écrit en privé
+  const [showRoster, setShowRoster] = useState(false);
+  const [threadPeer, setThreadPeer] = useState<{ name: string | null; role: string | null } | null>(null);
+  // Non-lus par fil privé : remis à zéro à l'ouverture du fil concerné.
+  const [unreadByThread, setUnreadByThread] = useState<Record<string, number>>({});
   const [pendingMedia, setPendingMedia] = useState<PreparedMedia | null>(null);
   const [mediaBusy, setMediaBusy] = useState(false);
   const [mediaError, setMediaError] = useState("");
@@ -161,6 +167,41 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
   useEffect(() => {
     if (store.status === "idle") getApi()?.send?.("chat-list-rooms");
   }, [store.status]);
+
+  // Étape F — l'annuaire est demandé dès l'entrée dans un salon : sans
+  // lui on ne connaît pas sa propre empreinte, donc on ne peut composer
+  // aucun identifiant de fil privé.
+  useEffect(() => {
+    if (store.status === "joined") getApi()?.send?.("chat-roster");
+  }, [store.status]);
+
+  // Compteur de non-lus par fil privé. Le fil ouvert ne compte pas, et
+  // nos propres messages non plus.
+  useEffect(() => {
+    const dernier = store.messages[store.messages.length - 1];
+    if (!dernier?.groupId?.startsWith("dm:")) return;
+    if (dernier.groupId === store.activeThread) return;
+    if (dernier.from === nickname) return;
+    setUnreadByThread((u) => ({ ...u, [dernier.groupId]: (u[dernier.groupId] || 0) + 1 }));
+  }, [store.messages.length]);
+
+  const ouvrirFil = (threadId: string, personne: { name: string | null; role: string | null }) => {
+    patchStore({ activeThread: threadId });
+    setThreadPeer(personne);
+    setShowRoster(false);
+    setUnreadByThread((u) => ({ ...u, [threadId]: 0 }));
+  };
+
+  const revenirAuSalon = () => {
+    patchStore({ activeThread: "all" });
+    setThreadPeer(null);
+  };
+
+  // Le fil affiché ne montre QUE ses propres messages. Les anciens
+  // messages sans groupId (versions antérieures) restent dans le salon.
+  const messagesDuFil = store.messages.filter(
+    (m) => (m.groupId || "all") === store.activeThread,
+  );
 
   // Pré-remplissage du formulaire d'invitation : le salon qu'on héberge
   // (cas type : je viens de créer « Service Y », j'invite depuis « X »),
@@ -502,7 +543,9 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
     if (!api?.send || (!text && !pendingMedia)) return;
 
     if (!pendingMedia) {
-      api.send("chat-send-message", { text, groupId: "all", media: null });
+      // Le message part dans le fil OUVERT : le salon, ou la conversation
+      // privée en cours.
+      api.send("chat-send-message", { text, groupId: store.activeThread, media: null });
       setMessageInput("");
       return;
     }
@@ -527,7 +570,7 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
         return;
       }
       api.send("chat-send-message", {
-        text, groupId: "all",
+        text, groupId: store.activeThread,
         media: {
           kind: pendingMedia.kind, mime: pendingMedia.mime,
           sha256: up.sha256, size: up.size,
@@ -1072,6 +1115,32 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
                   </button>
                 </>
               )}
+              {/* Étape F — annuaire : écrire à quelqu'un sans créer de
+                  salon ni partager de PIN. Le total de non-lus privés est
+                  visible depuis le bouton, fil fermé. */}
+              {!showAdmin && (
+                <button
+                  onClick={() => { setShowRoster(v => !v); getApi()?.send?.("chat-roster"); }}
+                  style={{
+                    ...btnStyle(showRoster), padding: "4px 8px", fontSize: 10,
+                    display: "flex", alignItems: "center", gap: 4, flexShrink: 0,
+                  }}
+                  title={showRoster ? t("Chat.inviteClose") : t("Chat.rosterTitle")}
+                >
+                  <Users size={12} />
+                  {showRoster ? t("Chat.inviteClose") : t("Chat.rosterTitle")}
+                  {(() => {
+                    const total = Object.values(unreadByThread).reduce((a, b) => a + b, 0);
+                    return total > 0 ? (
+                      <span style={{
+                        background: "#ff5252", color: "#fff", borderRadius: 8,
+                        minWidth: 15, height: 15, fontSize: 9, fontWeight: 700,
+                        display: "flex", alignItems: "center", justifyContent: "center", padding: "0 4px",
+                      }}>{total}</span>
+                    ) : null;
+                  })()}
+                </button>
+              )}
               {/* D.2 — inviter les membres vers un autre salon (sous-salon) */}
               {!showAdmin && (
                 <button
@@ -1224,17 +1293,53 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
 
             {/* Fil de messages : occupe tout l'espace restant du dock,
                 défile indépendamment (minHeight: 0 requis en flex) */}
-            {!showAdmin && <div style={{
+            {/* Étape F — bandeau du fil privé : on doit savoir À QUI l'on
+                écrit, et pouvoir revenir au salon d'un geste. */}
+            {!showAdmin && threadPeer && store.activeThread !== "all" && (
+              <div style={{
+                display: "flex", alignItems: "center", gap: 7, flexShrink: 0,
+                background: `${accent}18`, border: `1px solid ${accent}40`,
+                borderRadius: 6, padding: "6px 8px",
+              }}>
+                <button
+                  onClick={revenirAuSalon}
+                  style={{ background: "transparent", border: "none", color: muted, cursor: "pointer", padding: 2, display: "flex" }}
+                  title={t("Chat.threadBack")}
+                  aria-label={t("Chat.threadBack")}
+                >
+                  {isRTL ? <ArrowLeft size={14} style={{ transform: "scaleX(-1)" }} /> : <ArrowLeft size={14} />}
+                </button>
+                <span style={{ flex: 1, minWidth: 0, fontSize: 11.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  <b>{threadPeer.name || t("Chat.rosterUnnamed")}</b>
+                  {threadPeer.role && <span style={{ color: accent }}> · {threadPeer.role}</span>}
+                </span>
+                <span style={{ fontSize: 9.5, color: muted, flexShrink: 0 }}>{t("Chat.threadPrivate")}</span>
+              </div>
+            )}
+
+            {/* Annuaire : remplace le fil tant qu'il est ouvert */}
+            {!showAdmin && showRoster && <div style={{
+              flex: 1, minHeight: 0, overflowY: "auto",
+              background: "rgba(255,255,255,0.03)", borderRadius: 8, padding: 10,
+            }}>
+              <ChatRoster
+                accent={accent} muted={muted} border={border}
+                onOpenThread={ouvrirFil}
+                unreadByThread={unreadByThread}
+              />
+            </div>}
+
+            {!showAdmin && !showRoster && <div style={{
               flex: 1, minHeight: 0, overflowY: "auto",
               display: "flex", flexDirection: "column", gap: 8,
               background: "rgba(255,255,255,0.03)", borderRadius: 8, padding: 10,
             }}>
-              {store.messages.length === 0 ? (
+              {messagesDuFil.length === 0 ? (
                 <div style={{ textAlign: "center", color: muted, fontSize: 12, padding: "16px 0" }}>
-                  {t("Chat.noMessages")}
+                  {store.activeThread === "all" ? t("Chat.noMessages") : t("Chat.threadEmpty")}
                 </div>
               ) : (
-                store.messages.map((m) => {
+                messagesDuFil.map((m) => {
                   const isMine = m.from === store.userId;
                   // D.2 — carte d'invitation : cliquable, rejoint le salon
                   // invité avec le PIN prérempli s'il a été transmis

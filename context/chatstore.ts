@@ -40,6 +40,24 @@ export interface ChatMessage {
   signatureValid?: boolean;
 }
 
+/** Une personne de l'annuaire du salon (étape F). Le serveur ne renvoie
+ *  QUE ces champs : ni IP, ni machine, ni clé publique. */
+export interface RosterPerson {
+  fingerprint: string;
+  name: string | null;
+  role: string | null;
+  online: boolean;
+  lastSeen: number;
+  isMe: boolean;
+}
+
+/** Identifiant d'un fil privé — même règle que côté module
+ *  (chat-module/src/direct.js) : empreintes triées, donc les deux côtés
+ *  calculent le même sans se concerter. */
+export function directThreadId(fpA: string, fpB: string): string {
+  return "dm:" + [String(fpA).toLowerCase(), String(fpB).toLowerCase()].sort().join("+");
+}
+
 /** Salon hébergé par CE poste (liste « Rouvrir un salon ») */
 export interface KnownRoom {
   roomId: string;
@@ -89,6 +107,14 @@ export interface ChatStore {
   userId: string;
   messages: ChatMessage[];
   online: string[];
+  // ── Étape F — annuaire et conversations privées ──
+  // roster : qui est inscrit dans ce salon (nom, fonction, présence).
+  // myFingerprint : notre propre empreinte, indispensable pour composer
+  // l'identifiant d'un fil privé (voir chat-module/src/direct.js).
+  // activeThread : "all" = le salon ; "dm:…" = un fil privé.
+  roster: RosterPerson[];
+  myFingerprint: string | null;
+  activeThread: string;
   discovered: Map<string, DiscoveredSession>;
   error: string | null;
   selectedSession: DiscoveredSession | null;
@@ -151,6 +177,9 @@ export interface AdminDevice {
   platform: string | null;
   lastIp: string | null;
   label: string | null;
+  // Étape F — fonction de la PERSONNE dans l'organisation (DRH, DGA…),
+  // affichée dans l'annuaire ; `label` nomme l'APPAREIL.
+  role: string | null;
 }
 
 export const store: ChatStore = {
@@ -161,6 +190,9 @@ export const store: ChatStore = {
   userId: "",
   messages: [],
   online: [],
+  roster: [],
+  myFingerprint: null,
+  activeThread: "all",
   discovered: new Map(),
   error: null,
   selectedSession: null,
@@ -377,6 +409,15 @@ export function ensureListening() {
       }
       case "presence":
         patchStore({ online: evt.online || [] });
+        // La présence vient de changer : l'annuaire affiché doit suivre,
+        // sinon la pastille verte ment jusqu'au prochain aller-retour.
+        if (store.roster.length) getApi()?.send?.("chat-roster");
+        break;
+      case "roster":
+        patchStore({
+          roster: (evt.people || []) as RosterPerson[],
+          myFingerprint: evt.me || store.myFingerprint,
+        });
         break;
       case "admin-result": {
         const r = evt.result || {};

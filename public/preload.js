@@ -76,6 +76,7 @@ const ALLOWED_SEND = [
   "chat-join",
   "chat-send-message",
   "chat-mark-read",
+  "chat-roster",
   "chat-leave",
   "chat-admin",
   "chat-list-rooms",

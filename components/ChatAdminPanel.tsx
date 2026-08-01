@@ -76,6 +76,7 @@ export default function ChatAdminPanel({ accent, muted, border, inputBg, inputSt
   };
   const [tab, setTab] = useState<"devices" | "history" | "settings">("devices");
   const [labelDrafts, setLabelDrafts] = useState<Record<string, string>>({});
+  const [roleDrafts, setRoleDrafts] = useState<Record<string, string>>({});
   const [q, setQ] = useState("");
   const [author, setAuthor] = useState("");
   const [retentionDraft, setRetentionDraft] = useState<string | null>(null);
@@ -209,6 +210,23 @@ export default function ChatAdminPanel({ accent, muted, border, inputBg, inputSt
                 {t("Chat.adminNicknames")} : {d.nicknames.join(", ") || "—"}
                 <br />
                 {t("Chat.adminSeen")} : {new Date(d.lastSeen).toLocaleString()}
+              </div>
+              {/* Étape F — FONCTION dans l'organisation (DRH, DGA…). Elle
+                  décrit la PERSONNE et apparaît dans l'annuaire, là où
+                  l'étiquette ci-dessous nomme l'APPAREIL. */}
+              <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
+                <input
+                  style={{ ...inputStyle, flex: 1, fontSize: 11, padding: "5px 8px" }}
+                  placeholder={t("Chat.adminRolePlaceholder")}
+                  value={roleDrafts[d.fingerprint] ?? d.role ?? ""}
+                  onChange={(e) => setRoleDrafts((s) => ({ ...s, [d.fingerprint]: e.target.value }))}
+                />
+                <button
+                  onClick={() => admin({ action: "role", fingerprint: d.fingerprint, role: (roleDrafts[d.fingerprint] ?? d.role ?? "").trim() || null })}
+                  style={{ ...btnStyle(true), padding: "5px 10px", fontSize: 10.5 }}
+                >
+                  {t("Chat.adminSave")}
+                </button>
               </div>
               <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
                 <input

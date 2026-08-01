@@ -17,7 +17,7 @@ import {
   banDevice, unbanDevice, isBanned, listBans,
   addRoomMember, isRoomMember, setRoomLocked,
   getDevice, countDevices, getDataDir, listReferencedMedia,
-  setDeviceRole, listRoster,
+  setDeviceRole, listRoster, listDirectThreads,
 } from "./store.js";
 import { fingerprintFromRawPublicKey, rawFromSpkiBase64, verifyMessage } from "./identity.js";
 import { startMobileServer } from "./mobile-server.js";
@@ -229,6 +229,15 @@ export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, 
         // collègues en devinant l'identifiant du fil.
         const demandes = (payload.groups || ["all"]).filter((g) =>
           !isDirectGroup(g) || (device && isMemberOfDirect(g, device.fingerprint)));
+        // Ses fils privés sont AJOUTÉS d'office : l'appareil n'a pas à
+        // savoir d'avance dans quels fils on lui a écrit pendant son
+        // absence. Le filtre ci-dessus reste la garantie qu'aucun fil
+        // étranger ne se glisse dans la demande.
+        if (device) {
+          for (const g of listDirectThreads(activeRoomId, device.fingerprint)) {
+            if (!demandes.includes(g)) demandes.push(g);
+          }
+        }
         const missed = demandes.flatMap((g) => getMessagesSince(g, since, activeRoomId));
         ws.send(encryptPayload(sessionKey, { v: 1, type: "backlog", messages: missed }));
 

@@ -279,6 +279,19 @@ export function listRoster(roomId) {
   ).all(String(roomId));
 }
 
+/** Fils privés auxquels cet appareil participe, dans ce salon. Sert à lui
+ *  rendre son historique privé à la reconnexion : il n'a pas à connaître
+ *  d'avance les fils dans lesquels on lui a écrit pendant son absence. */
+export function listDirectThreads(roomId, fingerprint) {
+  const fp = String(fingerprint || "").toLowerCase();
+  if (!/^[0-9a-f]{16}$/.test(fp)) return [];
+  const rows = ensureDb().prepare(
+    `SELECT DISTINCT groupId FROM messages
+     WHERE roomId = ? AND groupId LIKE 'dm:%' AND groupId LIKE ?`,
+  ).all(String(roomId), `%${fp}%`);
+  return rows.map((r) => r.groupId);
+}
+
 export function setDeviceLabel(fingerprint, label) {
   ensureDb().prepare("UPDATE devices SET label = ? WHERE fingerprint = ?")
     .run(label || null, fingerprint);

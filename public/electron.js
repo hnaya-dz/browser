@@ -1131,6 +1131,10 @@ ipcMain.handle("chat-media-save", async (event, { sha256, mime, name, kind }) =>
   }
 });
 
+// Étape F — annuaire du salon (qui est inscrit, fonction, présence).
+// La réponse revient par le canal d'événements général ("chat-event").
+ipcMain.on("chat-roster", () => { chatWorker?.send({ cmd: "roster" }); });
+
 ipcMain.on("chat-mark-read", (event, { messageId, groupId }) => {
   chatWorker?.send({ cmd: "mark-read", messageId, groupId });
 });

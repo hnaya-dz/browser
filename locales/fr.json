@@ -290,7 +290,18 @@
     "mediaNoPreview": "Aperçu indisponible",
     "mediaMicDenied": "Microphone indisponible — vérifiez qu'il est branché et autorisé.",
     "addMyPhone": "Ajouter mon mobile",
-    "addMyPhoneHint": "Scannez avec VOTRE téléphone : il rejoindra le salon sous votre pseudo, sans en créer un second. Saisissez ensuite le PIN — il n'est jamais dans le QR."
+    "addMyPhoneHint": "Scannez avec VOTRE téléphone : il rejoindra le salon sous votre pseudo, sans en créer un second. Saisissez ensuite le PIN — il n'est jamais dans le QR.",
+    "rosterTitle": "Annuaire",
+    "rosterEmpty": "Personne d'autre n'a encore rejoint ce salon.",
+    "rosterOnline": "En ligne",
+    "rosterMe": "vous",
+    "rosterUnnamed": "Sans nom",
+    "rosterWriteTo": "Écrire en privé",
+    "rosterJustNow": "à l'instant",
+    "threadBack": "Revenir au salon",
+    "threadPrivate": "Privé",
+    "threadEmpty": "Aucun message dans cette conversation privée.",
+    "adminRolePlaceholder": "Fonction (DRH, DGA…)"
   },
   "Privacy": {
     "title": "Confidentialité",

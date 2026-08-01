@@ -217,6 +217,8 @@ function handleCommand(msg) {
         onPresence: (online) => process.send({ event: "presence", online }),
         onAdminResult: (result) => process.send({ event: "admin-result", result }),
         onInviteSent: (r) => process.send({ event: "invite-sent", to: r.to, delivered: r.delivered }),
+        // Étape F — annuaire du salon (pseudos, fonctions, présence)
+        onRoster: (r) => process.send({ event: "roster", people: r.people, me: r.me }),
       });
       clientHandle = handle;
       handle.raw.on("open", () => process.send({ event: "joined" }));
@@ -298,6 +300,11 @@ function handleCommand(msg) {
           process.send({ event: "media-error", reqId: msg.reqId, reason: e?.message || "download" });
         }
       })();
+      break;
+    }
+
+    case "roster": {
+      clientHandle?.requestRoster();
       break;
     }
 
