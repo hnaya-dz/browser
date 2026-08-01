@@ -13,6 +13,7 @@ import {
 } from "./chat-session.js";
 import { registerFavoritesIpc } from "./favorites-ipc.js";
 import { checkForUpdate } from "./update-check.js";
+import net from "node:net";
 
 // ✅ Détecte les URLs d'authentification Google qu'Electron ne peut pas gérer
 // (Google bloque volontairement l'OAuth dans les WebViews embarquées depuis 2021)
@@ -1240,6 +1241,180 @@ ipcMain.handle("chat-network-setup", async () => {
     return { ok: true };
   }
   return { ok: false, refused: code === 125 };
+});
+
+// ── Serveur permanent (tier premium) — déploiement depuis CE poste ──────────
+// L'astuce qui rend le déploiement possible sans AUCUN téléchargement :
+// l'exe du navigateur exécute du Node pur avec ELECTRON_RUN_AS_NODE=1, et le
+// module serveur (serve.js) est déjà dans resources/chat-module. Une tâche
+// planifiée « Au démarrage » (compte SYSTEM) lance donc le salon permanent
+// même sans session ouverte — le vieux PC toujours allumé d'une PME devient
+// le serveur, avec pour seul prérequis le navigateur déjà installé.
+// La licence (fichier .hnaya-lic vendu par Hnaya DZ) est vérifiée ICI avant
+// l'installation, puis revérifiée par serve.js à CHAQUE démarrage.
+const chatServeJsPath = app.isPackaged
+  ? join(process.resourcesPath, "chat-module", "src", "serve.js")
+  : join(__dirname, "..", "chat-module", "src", "serve.js");
+const chatLicenceJsPath = app.isPackaged
+  ? join(process.resourcesPath, "chat-module", "src", "licence.js")
+  : join(__dirname, "..", "chat-module", "src", "licence.js");
+const CHAT_SERVER_TASK = "Hnaya Chat Serveur";
+// ProgramData et non userData : la tâche tourne en SYSTEM, hors de toute
+// session — les données ne peuvent pas dépendre d'un profil utilisateur.
+const chatServerDataDir = join(process.env.ProgramData || "C:\\ProgramData", "Hnaya Chat Server");
+
+async function verifyLicenceFile(filePath) {
+  const { pathToFileURL: toUrl } = await import("node:url");
+  const { verifyLicence } = await import(toUrl(chatLicenceJsPath).href);
+  let contenu;
+  try { contenu = readFileSync(filePath, "utf8"); }
+  catch { return { ok: false, error: "Fichier illisible" }; }
+  return verifyLicence(contenu);
+}
+
+const chatServerTaskExists = async () => {
+  // schtasks plutôt que Get-ScheduledTask : sortie stable, pas de CIM
+  // (dont la lecture est parfois refusée en session normale — cf. pare-feu)
+  const { code } = await runPowerShell(["-Command",
+    `schtasks /Query /TN "${CHAT_SERVER_TASK}" *> $null; exit $LASTEXITCODE`]);
+  return code === 0;
+};
+
+const chatServerPortAlive = () => new Promise((resolve) => {
+  const s = net.connect({ host: "127.0.0.1", port: 4802 });
+  const done = (r) => { try { s.destroy(); } catch {} resolve(r); };
+  s.setTimeout(800, () => done(false));
+  s.on("connect", () => done(true));
+  s.on("error", () => done(false));
+});
+
+ipcMain.handle("chat-server-get-info", async () => {
+  if (process.platform !== "win32") return { supported: false };
+  const installed = await chatServerTaskExists();
+  const running = installed ? await chatServerPortAlive() : false;
+  let licence = null;
+  if (installed) {
+    const res = await verifyLicenceFile(join(chatServerDataDir, "licence.hnaya-lic"));
+    if (res.licence) {
+      licence = { org: res.licence.org, expires: res.licence.expires,
+        maxDevices: res.licence.maxDevices, daysLeft: res.daysLeft ?? -1, valid: !!res.ok };
+    }
+  }
+  return { supported: true, installed, running, dataDir: chatServerDataDir, licence };
+});
+
+ipcMain.handle("chat-server-pick-licence", async () => {
+  const { filePaths, canceled } = await dialog.showOpenDialog(mainWindow, {
+    title: "Licence Hnaya Chat Serveur",
+    filters: [{ name: "Licence Hnaya", extensions: ["hnaya-lic"] }],
+    properties: ["openFile"],
+  });
+  if (canceled || !filePaths[0]) return { ok: false, error: "canceled" };
+  const res = await verifyLicenceFile(filePaths[0]);
+  if (!res.ok) return { ok: false, error: res.error };
+  return { ok: true, path: filePaths[0], org: res.licence.org,
+    maxDevices: res.licence.maxDevices, expires: res.licence.expires, daysLeft: res.daysLeft };
+});
+
+ipcMain.handle("chat-server-install", async (event, { licencePath, name, pin, adminPin } = {}) => {
+  if (process.platform !== "win32") return { ok: false, error: "windows-only" };
+  // Validations côté non-élevé — tout ce qui entre dans le script est
+  // ensuite garanti inoffensif pour cmd/PowerShell.
+  const licCheck = await verifyLicenceFile(licencePath || "");
+  if (!licCheck.ok) return { ok: false, error: licCheck.error || "licence" };
+  if (!/^\d{6}$/.test(String(pin || ""))) return { ok: false, error: "pin" };
+  if (adminPin !== undefined && adminPin !== "" && !/^\d{6}$/.test(String(adminPin))) return { ok: false, error: "adminPin" };
+  // Nom : ASCII sûr uniquement — un .cmd est lu dans la page de codes OEM,
+  // les accents/arabe y seraient corrompus. Le salon peut être renommé
+  // ensuite depuis l'espace admin, sans cette contrainte.
+  const safeName = String(name || "").trim();
+  if (safeName && !/^[A-Za-z0-9 ._-]{1,40}$/.test(safeName)) return { ok: false, error: "name" };
+
+  const { mkdtempSync } = await import("fs");
+  const { tmpdir } = await import("os");
+  const dir = mkdtempSync(join(tmpdir(), "hnaya-srv-"));
+  const ps1 = join(dir, "hnaya-server-install.ps1");
+  const resultFile = join(dir, "result.txt");
+  const q = (s) => String(s).replace(/'/g, "''");
+  const wrapper = join(chatServerDataDir, "start-server.cmd");
+  const exe = process.execPath;
+
+  const cmdArgs = [`--data "${chatServerDataDir}"`, `--licence "${join(chatServerDataDir, "licence.hnaya-lic")}"`, `--pin ${pin}`];
+  if (adminPin) cmdArgs.push(`--admin-pin ${adminPin}`);
+  if (safeName) cmdArgs.push(`--name "${safeName}"`);
+  const cmdLine = `"${exe}" "${chatServeJsPath}" ${cmdArgs.join(" ")} >> "${join(chatServerDataDir, "server.log")}" 2>&1`;
+
+  // Script élevé (ASCII uniquement — voir chat-network-setup) : répertoire,
+  // licence, wrapper, règles pare-feu si absentes, tâche SYSTEM, démarrage
+  // immédiat, verdict par fichier.
+  const script = [
+    "$ErrorActionPreference = 'Stop'",
+    "try {",
+    "  New-Item -ItemType Directory -Force -Path '" + q(chatServerDataDir) + "' | Out-Null",
+    "  Copy-Item -LiteralPath '" + q(licencePath) + "' -Destination '" + q(join(chatServerDataDir, "licence.hnaya-lic")) + "' -Force",
+    // Le wrapper est ecrit en OEM : c'est la page de codes dans laquelle
+    // cmd.exe relira le fichier au demarrage de la tache.
+    "  $lines = @('@echo off', 'set ELECTRON_RUN_AS_NODE=1', '" + q(cmdLine) + "')",
+    "  Set-Content -LiteralPath '" + q(wrapper) + "' -Value $lines -Encoding OEM",
+    "  $exe = '" + q(exe) + "'",
+    "  if (-not (Get-NetFirewallRule -DisplayName '" + FIREWALL_RULE_TCP + "' -ErrorAction SilentlyContinue)) { New-NetFirewallRule -DisplayName '" + FIREWALL_RULE_TCP + "' -Direction Inbound -Action Allow -Protocol TCP -LocalPort 4802-4809 -Program $exe -RemoteAddress LocalSubnet -Profile Any | Out-Null }",
+    "  if (-not (Get-NetFirewallRule -DisplayName '" + FIREWALL_RULE_UDP + "' -ErrorAction SilentlyContinue)) { New-NetFirewallRule -DisplayName '" + FIREWALL_RULE_UDP + "' -Direction Inbound -Action Allow -Protocol UDP -LocalPort 41234 -Program $exe -RemoteAddress LocalSubnet -Profile Any | Out-Null }",
+    "  schtasks /Create /F /TN '" + CHAT_SERVER_TASK + "' /TR '\\\"" + q(wrapper) + "\\\"' /SC ONSTART /RU SYSTEM /RL HIGHEST | Out-Null",
+    "  schtasks /Run /TN '" + CHAT_SERVER_TASK + "' | Out-Null",
+    "  Set-Content -LiteralPath '" + q(resultFile) + "' -Value 'OK'",
+    "} catch {",
+    "  Set-Content -LiteralPath '" + q(resultFile) + "' -Value ('FAIL ' + $_.Exception.Message)",
+    "}",
+    "exit 0",
+  ].join("\r\n");
+  writeFileSync(ps1, script, "utf8");
+
+  const { code } = await runPowerShell(["-Command",
+    "try { $p = Start-Process powershell -Verb RunAs -Wait -WindowStyle Hidden -PassThru -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-File','\"" + ps1.replace(/'/g, "''") + "\"'; exit $p.ExitCode } catch { exit 125 }",
+  ]);
+
+  // Même doctrine que le pare-feu : le verdict vient du terrain, pas du
+  // code de sortie. 1) fichier écrit par le script élevé ; 2) la tâche
+  // existe-t-elle réellement ; 3) le port répond-il (jusqu'à ~6 s).
+  let verdict = "";
+  try { verdict = readFileSync(resultFile, "utf8").trim(); } catch {}
+  if (!verdict.startsWith("OK")) {
+    if (code === 125 || !verdict) return { ok: false, refused: true };
+    return { ok: false, error: verdict.replace(/^FAIL\s*/, "") };
+  }
+  if (!(await chatServerTaskExists())) return { ok: false, error: "task-missing" };
+  let running = false;
+  for (let i = 0; i < 6 && !running; i++) {
+    await new Promise((r) => setTimeout(r, 1000));
+    running = await chatServerPortAlive();
+  }
+  return { ok: true, running, dataDir: chatServerDataDir };
+});
+
+ipcMain.handle("chat-server-uninstall", async () => {
+  if (process.platform !== "win32") return { ok: false };
+  const { mkdtempSync } = await import("fs");
+  const { tmpdir } = await import("os");
+  const dir = mkdtempSync(join(tmpdir(), "hnaya-srv-"));
+  const ps1 = join(dir, "hnaya-server-uninstall.ps1");
+  const resultFile = join(dir, "result.txt");
+  const q = (s) => String(s).replace(/'/g, "''");
+  // Les DONNÉES (historique, registre, licence) sont volontairement
+  // conservées : une réinstallation reprend le salon là où il était.
+  const script = [
+    "schtasks /End /TN '" + CHAT_SERVER_TASK + "' 2>&1 | Out-Null",
+    "schtasks /Delete /F /TN '" + CHAT_SERVER_TASK + "' 2>&1 | Out-Null",
+    "Set-Content -LiteralPath '" + q(resultFile) + "' -Value 'OK'",
+    "exit 0",
+  ].join("\r\n");
+  writeFileSync(ps1, script, "utf8");
+  const { code } = await runPowerShell(["-Command",
+    "try { $p = Start-Process powershell -Verb RunAs -Wait -WindowStyle Hidden -PassThru -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-File','\"" + ps1.replace(/'/g, "''") + "\"'; exit $p.ExitCode } catch { exit 125 }",
+  ]);
+  let verdict = "";
+  try { verdict = readFileSync(resultFile, "utf8").trim(); } catch {}
+  if (verdict !== "OK") return { ok: false, refused: code === 125 };
+  return { ok: !(await chatServerTaskExists()) };
 });
 
 // ✅ Fermeture propre : le worker reçoit "disconnect" (fork() le fait

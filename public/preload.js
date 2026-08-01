@@ -38,6 +38,11 @@ const ALLOWED_INVOKE = [
   "chat-network-check",
   "chat-network-setup",
   "chat-admin-export",
+  // ✅ Serveur permanent (tier premium) — déploiement depuis ce poste
+  "chat-server-get-info",
+  "chat-server-pick-licence",
+  "chat-server-install",
+  "chat-server-uninstall",
   // ✅ Confidentialité — interrupteurs utilisateur
   "privacy-get-settings",
 ];

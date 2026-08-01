@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 // visuellement entre Windows 10 et 11 — incohérent d'un poste à l'autre.
 import { MessageSquare, Shield, Lock, Smartphone, KeyRound, Eye, EyeOff, Send, History, DoorOpen, Trash2, KeySquare } from "lucide-react";
 import ChatAdminPanel from "./ChatAdminPanel";
+import ChatServerSetup from "./ChatServerSetup";
 import qrcode from "qrcode-generator";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useLanguage } from "@/context/langcontext";
@@ -749,6 +750,13 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
                 {t("Chat.joinRoom")}
               </button>
             </div>
+
+            {/* Serveur permanent (tier premium) — section repliée, ne
+                concerne que l'IT/gérant sur la machine toujours allumée */}
+            <ChatServerSetup
+              accent={accent} muted={muted} border={border}
+              inputStyle={inputStyle} btnStyle={btnStyle}
+            />
 
             <div style={{ fontSize: 10, color: muted, textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>
               <Lock size={11} style={{ flexShrink: 0 }} /> {t("Chat.securityNotice")}
