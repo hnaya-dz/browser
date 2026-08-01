@@ -333,6 +333,7 @@ export function ensureListening() {
           error: evt.reason === "pin-incorrect" ? "pinIncorrect"
             : evt.reason === "banned" ? "accessBanned"     // D.2 : appareil bloqué
             : evt.reason === "locked" ? "roomLocked"       // D.2 : salon verrouillé
+            : evt.reason === "device-limit" ? "deviceLimit" // licence : plafond atteint
             : "genericError",
         });
         break;

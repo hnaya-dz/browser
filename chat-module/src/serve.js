@@ -21,9 +21,38 @@
 // cloisonnement de l'information est physique, pas logiciel.
 
 import path from "node:path";
-import { pathToFileURL } from "node:url";
+import { readFileSync } from "node:fs";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { startHost } from "./server.js";
 import { initStore, getConfig, setConfig, closeStore, getRoom } from "./store.js";
+import { verifyLicence } from "./licence.js";
+
+const MODULE_DATA_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "data");
+
+// ── Licence (tier premium) ─────────────────────────────────────────────
+// Le salon PERMANENT est la prestation payante ; le mode poste (salon
+// éphémère depuis le navigateur) reste libre et ne passe jamais par ici.
+// Vérification 100 % hors-ligne — voir src/licence.js.
+function requireLicence(licencePath, dataDir) {
+  const chemin = licencePath || path.join(dataDir || MODULE_DATA_DIR, "licence.hnaya-lic");
+  let contenu;
+  try {
+    contenu = readFileSync(chemin, "utf8");
+  } catch {
+    throw new Error(`Licence introuvable (${chemin}).
+Le serveur permanent est réservé aux organisations disposant d'une licence
+Hnaya DZ. Placez le fichier .hnaya-lic remis à l'installation dans le
+répertoire de données, ou indiquez son chemin avec --licence.
+Le mode poste (salon créé depuis le navigateur) reste libre et sans licence.`);
+  }
+  const res = verifyLicence(contenu);
+  if (!res.ok) throw new Error(`Licence refusée : ${res.error}`);
+  console.log(`[hnaya-serve] Licence « ${res.licence.org} » — ${res.licence.maxDevices} appareils, échéance ${new Date(Date.parse(res.licence.expires)).toLocaleDateString("fr-FR")}`);
+  if (res.daysLeft <= 30) {
+    console.warn(`[hnaya-serve] ⚠️ Licence expirant dans ${res.daysLeft} jour(s) — contactez Hnaya DZ pour le renouvellement.`);
+  }
+  return res.licence;
+}
 
 function parseArgs(argv) {
   const args = {};
@@ -32,6 +61,7 @@ function parseArgs(argv) {
     else if (argv[i] === "--pin") args.pin = argv[++i];
     else if (argv[i] === "--admin-pin") args.adminPin = argv[++i];
     else if (argv[i] === "--data") args.data = argv[++i];
+    else if (argv[i] === "--licence") args.licence = argv[++i];
     else if (argv[i] === "--ws-port") args.wsPort = Number(argv[++i]);
     else if (argv[i] === "--http-port") args.httpPort = Number(argv[++i]);
     else if (argv[i] === "--help" || argv[i] === "-h") args.help = true;
@@ -39,8 +69,11 @@ function parseArgs(argv) {
   return args;
 }
 
-export function startPermanentServer({ name, pin, data, adminPin, wsPort, httpPort } = {}) {
+export function startPermanentServer({ name, pin, data, adminPin, wsPort, httpPort, licence } = {}) {
   const dataDir = data ? path.resolve(data) : undefined;
+  // La licence est contrôlée AVANT d'ouvrir quoi que ce soit (ni base, ni
+  // port) : un serveur sans licence ne laisse aucune trace de démarrage.
+  const lic = requireLicence(licence, dataDir);
   initStore(dataDir);
 
   if (pin !== undefined && !/^\d{6}$/.test(String(pin))) {
@@ -65,6 +98,8 @@ export function startPermanentServer({ name, pin, data, adminPin, wsPort, httpPo
     // et --http-port distincts
     wsPort: wsPort || undefined,
     httpPort: httpPort || undefined,
+    // Plafond d'appareils de la licence — appliqué par server.js au join
+    maxDevices: lic.maxDevices,
     onError: (friendly) => {
       console.error(`[hnaya-serve] ${friendly}`);
       process.exit(1);
@@ -104,6 +139,7 @@ Usage : node src/serve.js [options]
                       instances avec --data et ports distincts)
   --http-port 4803    port de la page mobile
   --data <dossier>    répertoire des données (base SQLite, identité)
+  --licence <fichier> licence Hnaya DZ (.hnaya-lic ; défaut : dans --data)
   --help              cette aide`);
     process.exit(0);
   }

@@ -16,6 +16,7 @@ import {
   createRoom, getRoom, touchRoom, setRoomAdminPin, setRoomPin,
   banDevice, unbanDevice, isBanned, listBans,
   addRoomMember, isRoomMember, setRoomLocked,
+  getDevice, countDevices,
 } from "./store.js";
 import { fingerprintFromRawPublicKey, rawFromSpkiBase64, verifyMessage } from "./identity.js";
 import { startMobileServer } from "./mobile-server.js";
@@ -39,7 +40,7 @@ const HEARTBEAT_MS = 10000;
  * @param {string} [opts.pin] PIN à 6 chiffres ; généré aléatoirement si absent
  * @returns {{ pin: string, stop: () => void }}
  */
-export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, wsPort = WS_PORT, httpPort, onError } = {}) {
+export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, wsPort = WS_PORT, httpPort, onError, maxDevices = null } = {}) {
   const clients = new Map(); // userId -> { ws, groups, device }
   initStore(dataDir); // dataDir undefined → défaut du module (chat-module/data)
 
@@ -117,6 +118,17 @@ export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, 
         if (payload.device?.publicKey) {
           try {
             const fingerprint = fingerprintFromRawPublicKey(rawFromSpkiBase64(payload.device.publicKey));
+            // Plafond de licence (mode serveur permanent uniquement) :
+            // un appareil DÉJÀ connu repasse toujours ; seul un appareil
+            // NOUVEAU au-delà du plafond est refusé — le contrôle précède
+            // l'inscription au registre pour ne pas le gonfler au passage.
+            // (Les clients v1 sans identité ne sont pas comptables ; un
+            // déploiement sous licence utilise des salons verrouillés,
+            // qui les refusent déjà — voir code 4005.)
+            if (maxDevices !== null && !getDevice(fingerprint) && countDevices() >= maxDevices) {
+              ws.close(4006, "licence-device-limit");
+              return;
+            }
             device = { fingerprint, publicKeySpki: payload.device.publicKey };
             upsertDeviceSeen({
               fingerprint,

@@ -249,7 +249,8 @@
     "pinRemember": "Stay connected to this room on this PC",
     "pinRememberHint": "The code will be kept encrypted on this device — only do this on a computer you alone use.",
     "backToMenu": "Menu",
-    "backToMenuHint": "Back to the menu, leaving this room open (to open another one or invite to another room)"
+    "backToMenuHint": "Back to the menu, leaving this room open (to open another one or invite to another room)",
+    "deviceLimit": "This server has reached its licensed device limit. The administrator can free a slot or extend the licence with Hnaya DZ."
   },
   "Privacy": {
     "title": "Privacy",

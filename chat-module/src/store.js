@@ -243,6 +243,13 @@ export function listDevices(roomId) {
   return rows.map((r) => ({ ...r, nicknames: safeJson(r.nicknames, []) }));
 }
 
+/** Nombre total d'appareils connus de CETTE machine serveur — sert au
+ *  plafond de licence (maxDevices). Tous salons confondus : la licence
+ *  couvre l'organisation, pas un salon. */
+export function countDevices() {
+  return ensureDb().prepare("SELECT COUNT(*) AS n FROM devices").get().n;
+}
+
 export function getDevice(fingerprint) {
   const r = ensureDb().prepare("SELECT * FROM devices WHERE fingerprint = ?").get(fingerprint);
   return r ? { ...r, nicknames: safeJson(r.nicknames, []) } : null;

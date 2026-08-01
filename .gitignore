@@ -45,3 +45,6 @@ public/bin/
 # et données runtime (messages persistés par l'hôte) : jamais dans Git
 chat-module/node_modules/
 chat-module/data/
+
+# Licences du serveur permanent (les cles .pem sont deja ignorees plus haut)
+*.hnaya-lic

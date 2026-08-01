@@ -249,7 +249,8 @@
     "pinRemember": "Rester connecté à ce salon sur ce PC",
     "pinRememberHint": "Le code sera conservé chiffré sur cet appareil — à réserver à un poste dont vous êtes le seul utilisateur.",
     "backToMenu": "Menu",
-    "backToMenuHint": "Revenir au menu en laissant ce salon ouvert (pour en ouvrir un autre ou inviter vers un autre salon)"
+    "backToMenuHint": "Revenir au menu en laissant ce salon ouvert (pour en ouvrir un autre ou inviter vers un autre salon)",
+    "deviceLimit": "Nombre maximal d'appareils de la licence atteint sur ce serveur. L'administrateur peut libérer une place ou étendre la licence auprès de Hnaya DZ."
   },
   "Privacy": {
     "title": "Confidentialité",

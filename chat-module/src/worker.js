@@ -231,6 +231,11 @@ function handleCommand(msg) {
           // D.2 — salon verrouillé : cet appareil n'était pas membre
           // avant le verrouillage
           process.send({ event: "join-failed", reason: "locked" });
+        } else if (code === 4006) {
+          // Étape D premium — plafond d'appareils de la licence atteint
+          // sur un serveur permanent : l'admin doit libérer une place ou
+          // étendre la licence, ce n'est pas un problème réseau
+          process.send({ event: "join-failed", reason: "device-limit" });
         } else {
           // ✅ Déconnexion involontaire (hôte fermé, réseau perdu…) —
           // sans cet événement, l'UI resterait « connectée » et les
