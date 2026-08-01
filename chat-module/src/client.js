@@ -14,6 +14,7 @@ import { fileURLToPath } from "node:url";
 import { deriveKeyFromPin, encryptPayload, decryptPayload } from "./crypto.js";
 import { listenForSessions } from "./discovery.js";
 import { loadOrCreateIdentity } from "./identity.js";
+import { CHUNK_BYTES } from "./media.js";
 
 // Répertoire par défaut de l'identité d'appareil (même défaut que store.js) ;
 // le worker Electron passe son propre dataDir (userData) via joinSession.
@@ -112,6 +113,40 @@ export function joinSession({
     else if (payload.type === "invite") onMessage?.(payload);
     else if (payload.type === "invite-sent") onInviteSent?.(payload);
     else if (payload.type === "admin-result") onAdminResult?.(payload);
+    // ── Étape E — réponses liées aux pièces jointes ──
+    else if (payload.type === "media-go") {
+      uploads.get(payload.uploadId)?.start?.();
+    }
+    else if (payload.type === "media-ready") {
+      const u = uploads.get(payload.uploadId);
+      uploads.delete(payload.uploadId);
+      u?.resolve?.({ sha256: payload.sha256, size: payload.size });
+    }
+    else if (payload.type === "media-failed") {
+      const u = uploads.get(payload.uploadId);
+      uploads.delete(payload.uploadId);
+      u?.reject?.(new Error(payload.reason || "media"));
+    }
+    else if (payload.type === "media-data") {
+      downloads.get(payload.sha256)?.chunks.push(Buffer.from(String(payload.data), "base64"));
+    }
+    else if (payload.type === "media-done") {
+      const d = downloads.get(payload.sha256);
+      downloads.delete(payload.sha256);
+      if (d) {
+        const buf = Buffer.concat(d.chunks);
+        // Contrôle d'intégrité côté destinataire : l'octet reçu doit
+        // correspondre à l'empreinte annoncée dans le message signé.
+        const sha = crypto.createHash("sha256").update(buf).digest("hex");
+        if (sha !== payload.sha256) d.waiters.forEach((w) => w.reject(new Error("integrity")));
+        else d.waiters.forEach((w) => w.resolve(buf));
+      }
+    }
+    else if (payload.type === "media-error") {
+      const d = downloads.get(payload.sha256);
+      downloads.delete(payload.sha256);
+      d?.waiters.forEach((w) => w.reject(new Error(payload.reason || "media")));
+    }
     // "read" (accusés de lecture) : à relayer vers l'UI selon les besoins
   });
 
@@ -121,6 +156,11 @@ export function joinSession({
     // peut pas générer ces champs lui-même : la signature doit couvrir
     // exactement ce que l'appareil a écrit (non-répudiation).
     const core = { id: "msg_" + crypto.randomUUID(), from: userId, text: text ?? "", ts: Date.now() };
+    // Étape E — la pièce jointe entre dans le périmètre signé (5e élément
+    // du noyau, voir identity.js) : elle ne peut plus être substituée sans
+    // casser la signature. Un message sans pièce jointe signe exactement
+    // les mêmes octets qu'avant.
+    if (media?.sha256) core.mediaSha = String(media.sha256);
     ws.send(encryptPayload(sessionKey, {
       v: 2,
       type: "message",
@@ -131,6 +171,49 @@ export function joinSession({
       media,
       signature: identity.signMessage(core),
     }));
+  }
+
+  // ── Étape E — pièces jointes ────────────────────────────────────────
+  // Transferts en cours, par identifiant : la réponse de l'hôte arrive de
+  // façon asynchrone sur le même canal, il faut savoir à qui la rendre.
+  const uploads = new Map();   // uploadId  -> { resolve, reject }
+  const downloads = new Map(); // sha256    -> { chunks, resolve, reject }
+
+  /**
+   * Téléverse un fichier vers l'hôte, morceau par morceau.
+   * Résout avec l'empreinte CALCULÉE PAR L'HÔTE — c'est elle qui doit
+   * ensuite figurer dans le message (et donc dans la signature).
+   */
+  function uploadMedia({ kind, mime, buffer, thumb }, onProgress) {
+    return new Promise((resolve, reject) => {
+      const uploadId = "up_" + crypto.randomUUID();
+      uploads.set(uploadId, { resolve, reject });
+      ws.send(encryptPayload(sessionKey, {
+        v: 1, type: "media-begin", uploadId, kind, mime, size: buffer.length, thumb: thumb || null,
+      }));
+      // L'envoi effectif attend le feu vert de l'hôte (media-go) : inutile
+      // d'expédier des mégaoctets qu'il refusera.
+      uploads.get(uploadId).start = () => {
+        for (let off = 0, seq = 0; off < buffer.length; off += CHUNK_BYTES, seq++) {
+          const part = buffer.subarray(off, Math.min(off + CHUNK_BYTES, buffer.length));
+          ws.send(encryptPayload(sessionKey, {
+            v: 1, type: "media-chunk", uploadId, seq, data: Buffer.from(part).toString("base64"),
+          }));
+          onProgress?.(Math.min(off + part.length, buffer.length), buffer.length);
+        }
+        ws.send(encryptPayload(sessionKey, { v: 1, type: "media-end", uploadId }));
+      };
+    });
+  }
+
+  /** Récupère une pièce jointe. Le contenu n'est demandé qu'à l'ouverture. */
+  function fetchMedia({ sha256, mime }) {
+    return new Promise((resolve, reject) => {
+      const existing = downloads.get(sha256);
+      if (existing) { existing.waiters.push({ resolve, reject }); return; }
+      downloads.set(sha256, { chunks: [], waiters: [{ resolve, reject }] });
+      ws.send(encryptPayload(sessionKey, { v: 1, type: "media-get", sha256, mime }));
+    });
   }
 
   function markRead(messageId, groupId) {
@@ -155,6 +238,8 @@ export function joinSession({
     markRead,
     sendAdmin,
     sendInvite,
+    uploadMedia,
+    fetchMedia,
     close: () => ws.close(),
     raw: ws, // accès direct si besoin (ex. écouter "close"/"error" côté Electron)
   };

@@ -16,10 +16,15 @@ import {
   createRoom, getRoom, touchRoom, setRoomAdminPin, setRoomPin,
   banDevice, unbanDevice, isBanned, listBans,
   addRoomMember, isRoomMember, setRoomLocked,
-  getDevice, countDevices,
+  getDevice, countDevices, getDataDir, listReferencedMedia,
 } from "./store.js";
 import { fingerprintFromRawPublicKey, rawFromSpkiBase64, verifyMessage } from "./identity.js";
 import { startMobileServer } from "./mobile-server.js";
+import { existsSync } from "node:fs";
+import {
+  createUpload, mediaPath, readChunks, purgeOrphans,
+  MAX_CONCURRENT_UPLOADS, MAX_THUMB_BYTES, KINDS,
+} from "./media.js";
 
 const WS_PORT = 4802; // port local arbitraire pour le chat LAN Hnaya
 const PURGE_INTERVAL_MS = 6 * 60 * 60 * 1000; // purge de rétention toutes les 6h
@@ -69,12 +74,19 @@ export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, 
     });
   }
   const activeRoomId = room.roomId;
+  // Répertoire réel (l'appelant peut n'avoir rien précisé) — c'est là que
+  // les pièces jointes sont écrites, à côté de la base.
+  const mediaRoot = getDataDir();
   const roomPin = room.roomPin || (pin ?? generatePin());
   let currentAdminPin = room.adminPin;
   const sessionKey = deriveKeyFromPin(roomPin);
   sessionName = room.name;
 
-  const wss = new WebSocketServer({ port: wsPort });
+  // maxPayload : plafond DUR sur une trame WebSocket. Sans lui, ws accepte
+  // jusqu'à 100 Mio par trame — un poste du réseau pourrait saturer la
+  // mémoire de l'hôte d'un seul envoi. Les pièces jointes voyagent en
+  // morceaux de 64 Ko (voir src/media.js), largement sous ce plafond.
+  const wss = new WebSocketServer({ port: wsPort, maxPayload: 1024 * 1024 });
   console.log(`[hnaya-chat] Salon "${sessionName}" ouvert sur le port ${wsPort} — PIN : ${roomPin}`);
 
   // ✅ Étape D — plus de crash brut sur EADDRINUSE (un salon tourne déjà
@@ -89,10 +101,41 @@ export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, 
     else console.error(`[hnaya-chat] Erreur serveur : ${friendly}`);
   });
 
+  // Étape E — le serveur ne relaie QUE des champs connus (même règle que
+  // pour les invitations) et refuse une pièce jointe dont le fichier n'a
+  // pas réellement été reçu : un client ne peut pas fabriquer un message
+  // qui pointe vers un contenu inexistant ou vers autre chose que ce qu'il
+  // a téléversé.
+  const sanitizeMedia = (m) => {
+    if (!m || typeof m !== "object") return null;
+    const sha = String(m.sha256 || "");
+    const mime = String(m.mime || "");
+    const kind = String(m.kind || "");
+    let filePath;
+    try { filePath = mediaPath(mediaRoot, sha, mime); } catch { return null; }
+    if (!existsSync(filePath)) return null;
+    if (!KINDS.has(kind)) return null;
+    const thumb = typeof m.thumb === "string" && Buffer.byteLength(m.thumb, "utf8") <= MAX_THUMB_BYTES
+      ? m.thumb : null;
+    const out = { kind, mime, sha256: sha, size: Number(m.size) || 0, thumb };
+    if (kind === "image") {
+      out.w = Number.isFinite(Number(m.w)) ? Math.max(0, Math.round(Number(m.w))) : null;
+      out.h = Number.isFinite(Number(m.h)) ? Math.max(0, Math.round(Number(m.h))) : null;
+    } else {
+      out.duration = Number.isFinite(Number(m.duration)) ? Math.max(0, Math.round(Number(m.duration))) : null;
+    }
+    return out;
+  };
+
   wss.on("connection", (ws, req) => {
     let userId = null;
     const remoteIp = req?.socket?.remoteAddress || null;
     ws.isAlive = true;
+    // Transferts de pièces jointes en cours sur CETTE connexion. Liés à
+    // la connexion (et non globaux) : une déconnexion abandonne proprement
+    // ses transferts, et un poste ne peut pas en ouvrir un nombre illimité.
+    const uploads = new Map();
+    ws.on("close", () => { for (const u of uploads.values()) u.abort(); uploads.clear(); });
     ws.on("pong", () => { ws.isAlive = true; });
 
     ws.on("message", (raw) => {
@@ -182,6 +225,11 @@ export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, 
           // client. Horodatage trop dérivé → on garde le message (horodaté
           // serveur) mais signatureValid=false : pas d'antidatage signé.
           const core = { id: String(payload.id), from: userId, text: payload.text ?? "", ts: Number(payload.ts) };
+          // Étape E — la pièce jointe entre dans le périmètre signé : son
+          // empreinte est ajoutée au noyau signable quand il y en a une.
+          // Sans cela, la signature ne couvrait que le texte et une image
+          // pouvait être substituée après coup sans la casser.
+          if (payload.media?.sha256) core.mediaSha = String(payload.media.sha256);
           const verified = verifyMessage(core, payload.signature, device.publicKeySpki);
           const driftOk = Math.abs(now - core.ts) <= MAX_CLOCK_DRIFT_MS;
           msg = {
@@ -192,7 +240,7 @@ export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, 
             groupId: payload.groupId || "all",
             from: userId,
             text: core.text,
-            media: payload.media || null,
+            media: sanitizeMedia(payload.media),
             ts: driftOk ? core.ts : now,
             deviceFp: device.fingerprint,
             signature: payload.signature,
@@ -208,11 +256,11 @@ export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, 
             groupId: payload.groupId || "all",
             from: userId,
             text: payload.text ?? "",
-            // media : réservé à la V2 (image/audio/vidéo) — voir README.md,
-            // section "Étape suivante". Ne pas mettre de gros binaires ici
-            // tel quel : prévoir un transfert par chunks ou un endpoint
-            // HTTP local séparé pour les fichiers volumineux.
-            media: payload.media || null,
+            // Étape E — les pièces jointes existent désormais (transfert
+            // par morceaux, fichier chez l'hôte : voir src/media.js). Un
+            // client v1 n'en produit pas, mais le filtre s'applique quand
+            // même : rien n'entre sans passer par sanitizeMedia.
+            media: sanitizeMedia(payload.media),
             ts: now,
             deviceFp: device?.fingerprint || null,
             signature: null,
@@ -274,6 +322,88 @@ export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, 
           messageId: payload.messageId,
           userId,
         });
+        return;
+      }
+
+      // ═══ Étape E — PIÈCES JOINTES ═══════════════════════════════════
+      // Le fichier ne transite JAMAIS dans le message : il monte à part,
+      // en morceaux, sur ce même canal chiffré. Le message qui suivra ne
+      // portera que des métadonnées + une vignette minuscule. Sans cela,
+      // l'historique renvoyé à chaque connexion recharrierait toutes les
+      // images du salon.
+      const sendTo = (obj) => { try { ws.send(encryptPayload(sessionKey, obj)); } catch { /* connexion fermée */ } };
+
+      if (payload.type === "media-begin") {
+        if (!userId) return; // pas encore identifié
+        if (uploads.size >= MAX_CONCURRENT_UPLOADS) {
+          sendTo({ v: 1, type: "media-failed", uploadId: payload.uploadId, reason: "busy" });
+          return;
+        }
+        try {
+          uploads.set(String(payload.uploadId), createUpload({
+            dataDir: mediaRoot,
+            kind: payload.kind,
+            mime: payload.mime,
+            size: Number(payload.size),
+            thumb: payload.thumb,
+          }));
+          sendTo({ v: 1, type: "media-go", uploadId: payload.uploadId });
+        } catch (e) {
+          sendTo({ v: 1, type: "media-failed", uploadId: payload.uploadId, reason: e.message });
+        }
+        return;
+      }
+
+      if (payload.type === "media-chunk") {
+        const up = uploads.get(String(payload.uploadId));
+        if (!up) return;
+        try {
+          up.write(Buffer.from(String(payload.data), "base64"));
+        } catch (e) {
+          uploads.delete(String(payload.uploadId));
+          sendTo({ v: 1, type: "media-failed", uploadId: payload.uploadId, reason: e.message });
+        }
+        return;
+      }
+
+      if (payload.type === "media-end") {
+        const up = uploads.get(String(payload.uploadId));
+        if (!up) return;
+        uploads.delete(String(payload.uploadId));
+        try {
+          const res = up.finish();
+          // L'empreinte est celle CALCULÉE par l'hôte sur les octets reçus,
+          // jamais celle annoncée par le client : c'est elle qui scellera
+          // la signature du message.
+          sendTo({ v: 1, type: "media-ready", uploadId: payload.uploadId, sha256: res.sha256, size: res.size });
+        } catch (e) {
+          sendTo({ v: 1, type: "media-failed", uploadId: payload.uploadId, reason: e.message });
+        }
+        return;
+      }
+
+      // Téléchargement à la demande : le destinataire ne récupère le
+      // fichier que s'il ouvre la pièce jointe.
+      if (payload.type === "media-get") {
+        if (!userId) return;
+        const sha = String(payload.sha256 || "");
+        const mime = String(payload.mime || "");
+        let filePath;
+        try { filePath = mediaPath(mediaRoot, sha, mime); }
+        catch { sendTo({ v: 1, type: "media-error", sha256: sha, reason: "invalid" }); return; }
+        if (!existsSync(filePath)) {
+          // Purge de rétention passée par là, ou fichier jamais reçu.
+          sendTo({ v: 1, type: "media-error", sha256: sha, reason: "gone" });
+          return;
+        }
+        try {
+          for (const { seq, data } of readChunks(filePath)) {
+            sendTo({ v: 1, type: "media-data", sha256: sha, seq, data: data.toString("base64") });
+          }
+          sendTo({ v: 1, type: "media-done", sha256: sha });
+        } catch {
+          sendTo({ v: 1, type: "media-error", sha256: sha, reason: "read" });
+        }
         return;
       }
 
@@ -367,7 +497,7 @@ export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, 
               if (payload.key === "retention_days") {
                 const days = Math.max(0, Math.min(3650, Number(payload.value) || 0));
                 setConfig("retention_days", String(days));
-                purgeOldMessages();
+                purgeAll();
                 reply({ ok: true, data: { retention_days: days } });
               } else {
                 reply({ ok: false, error: "config-key" });
@@ -409,7 +539,15 @@ export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, 
   // puissent aussi afficher le QR d'invitation (URL = adresse de l'hôte).
   const mobileServer = startMobileServer({ sessionName, wsPort, httpPort });
   const stopBeacon = startBeacon({ sessionName, wsPort, httpPort: mobileServer.httpPort });
-  const purgeInterval = setInterval(purgeOldMessages, PURGE_INTERVAL_MS);
+  // Étape E — la purge de rétention efface les MESSAGES ; les fichiers
+  // joints qu'ils citaient deviennent alors orphelins et resteraient sur
+  // le disque indéfiniment. On enchaîne donc systématiquement les deux.
+  const purgeAll = () => {
+    const n = purgeOldMessages();
+    try { purgeOrphans(mediaRoot, listReferencedMedia()); } catch { /* disque occupé */ }
+    return n;
+  };
+  const purgeInterval = setInterval(purgeAll, PURGE_INTERVAL_MS);
 
   // Ping périodique de chaque participant — sans pong avant le cycle
   // suivant, la connexion est terminée (déclenche "close" côté client,

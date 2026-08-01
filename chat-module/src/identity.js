@@ -31,8 +31,19 @@ import path from "node:path";
 // ── Canonicalisation du contenu signé ──────────────────────────────────────
 // Tableau JSON à ordre FIXE — même forme côté navigateur. Ne jamais signer
 // un objet (l'ordre des clés n'est pas garanti entre implémentations).
-export function signablePayload({ id, from, text, ts }) {
-  return JSON.stringify([String(id), String(from), String(text), Number(ts)]);
+// ⚠️ Sérialisation POSITIONNELLE (tableau, pas objet) : l'ordre des clés
+// d'un objet ne peut donc pas faire diverger signataire et vérificateur.
+//
+// Étape E — pièces jointes : l'empreinte du média est ajoutée en 5e
+// position UNIQUEMENT quand il y en a une. Un message sans pièce jointe
+// produit donc exactement les mêmes octets qu'avant (compatibilité totale
+// avec les clients et les historiques antérieurs), et une pièce jointe ne
+// peut plus être substituée après coup sans casser la signature — sans
+// cela, la signature ne couvrait que le texte.
+export function signablePayload({ id, from, text, ts, mediaSha }) {
+  const core = [String(id), String(from), String(text), Number(ts)];
+  if (mediaSha) core.push(String(mediaSha));
+  return JSON.stringify(core);
 }
 
 // ── Empreinte d'appareil ───────────────────────────────────────────────────

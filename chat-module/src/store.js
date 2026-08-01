@@ -35,8 +35,14 @@ let db = null;
 // ── Ouverture / schéma ─────────────────────────────────────────────────────
 // Lazy par défaut (répertoire du module, comme db.js) ; le mode serveur
 // permanent passera son propre dataDir via initStore() AVANT tout accès.
+// Répertoire effectivement utilisé — les pièces jointes doivent atterrir
+// à côté de la base, y compris quand l'appelant n'a rien précisé.
+let currentDataDir = DEFAULT_DATA_DIR;
+export function getDataDir() { return currentDataDir; }
+
 export function initStore(dataDir = DEFAULT_DATA_DIR) {
   if (db) return db;
+  currentDataDir = dataDir;
   fs.mkdirSync(dataDir, { recursive: true });
   db = new DatabaseSync(path.join(dataDir, "hnaya-chat.db"));
   db.exec("PRAGMA journal_mode = WAL");
@@ -112,6 +118,13 @@ export function initStore(dataDir = DEFAULT_DATA_DIR) {
     db.exec("ALTER TABLE messages ADD COLUMN type TEXT NOT NULL DEFAULT 'message'");
     db.exec("ALTER TABLE messages ADD COLUMN extra TEXT");
   }
+  // ── Migration E : pièces jointes ──────────────────────────────────────
+  // `media` = métadonnées JSON (empreinte, type, dimensions, vignette).
+  // Le fichier lui-même vit sous dataDir/media/ — voir src/media.js.
+  if (!db.prepare("PRAGMA table_info(messages)").all().some((c) => c.name === "media")) {
+    db.exec("ALTER TABLE messages ADD COLUMN media TEXT");
+  }
+
   const legacyAdminPin = db.prepare("SELECT value FROM config WHERE key = 'admin_pin'").get()?.value;
   const hasDefault = db.prepare("SELECT roomId FROM rooms WHERE roomId = 'default'").get();
   if (legacyAdminPin && !hasDefault) {
@@ -141,8 +154,8 @@ export function closeStore() {
 export function saveMessage(msg) {
   const res = ensureDb()
     .prepare(`INSERT OR IGNORE INTO messages
-      (id, roomId, groupId, sender, text, ts, deviceFp, signature, signatureValid, type, extra)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      (id, roomId, groupId, sender, text, ts, deviceFp, signature, signatureValid, type, extra, media)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
     .run(
       String(msg.id),
       String(msg.roomId || "default"),
@@ -155,6 +168,7 @@ export function saveMessage(msg) {
       msg.signatureValid ? 1 : 0,
       msg.type === "invite" ? "invite" : "message",
       msg.extra ? JSON.stringify(msg.extra) : null,
+      msg.media ? JSON.stringify(msg.media) : null,
     );
   // inserted=false ⇒ id déjà en base (doublon/rejeu) — le serveur s'en sert
   // pour ne pas rediffuser
@@ -193,7 +207,21 @@ function rowToMessage(r) {
     signatureValid: !!r.signatureValid,
     type: r.type || "message",
     extra: r.extra ? safeJson(r.extra, null) : null,
+    media: r.media ? safeJson(r.media, null) : null,
   };
+}
+
+/** Empreintes des pièces jointes encore citées par un message — sert au
+ *  ménage des fichiers orphelins après la purge de rétention
+ *  (voir purgeOrphans dans src/media.js). */
+export function listReferencedMedia() {
+  const rows = ensureDb().prepare("SELECT media FROM messages WHERE media IS NOT NULL").all();
+  const set = new Set();
+  for (const r of rows) {
+    const m = safeJson(r.media, null);
+    if (m?.sha256) set.add(String(m.sha256));
+  }
+  return set;
 }
 
 // ── Registre des appareils (étape D) ───────────────────────────────────────
