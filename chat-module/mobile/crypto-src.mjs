@@ -85,8 +85,15 @@ export function decryptPayload(key, b64) {
 
 const SPKI_PREFIX = Uint8Array.from([0x30, 0x2a, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x03, 0x21, 0x00]);
 
-function signablePayload({ id, from, text, ts }) {
-  return new TextEncoder().encode(JSON.stringify([String(id), String(from), String(text), Number(ts)]));
+// ⚠️ DOIT rester octet pour octet identique à signablePayload dans
+// src/identity.js — sinon l'hôte rejette les signatures du téléphone.
+// Étape E : l'empreinte de la pièce jointe est ajoutée en 5e position
+// UNIQUEMENT quand il y en a une, de sorte qu'un message sans pièce
+// jointe signe exactement les mêmes octets qu'auparavant.
+function signablePayload({ id, from, text, ts, mediaSha }) {
+  const core = [String(id), String(from), String(text), Number(ts)];
+  if (mediaSha) core.push(String(mediaSha));
+  return new TextEncoder().encode(JSON.stringify(core));
 }
 
 /** Recharge une identité depuis sa clé privée (32 octets base64, stockée

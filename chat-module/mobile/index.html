@@ -127,6 +127,21 @@
   .att button { background:var(--accent); border:none; color:#fff; border-radius:9px;
                 padding:8px 13px; font-size:13px; font-weight:600; cursor:pointer; flex-shrink:0; }
   .msg audio { width:100%; min-width:200px; margin-top:6px; display:block; }
+  /* — Envoi de pièces jointes — */
+  #composer button.att-btn { padding:0 14px; background:transparent; border:1px solid var(--border);
+                             color:var(--text); border-radius:12px; font-size:19px; flex-shrink:0; }
+  #attPreview { display:none; align-items:center; gap:10px; padding:10px 14px;
+                background:var(--panel); border-top:1px solid var(--border); flex-shrink:0; }
+  #attPreview.show { display:flex; }
+  #attPreview img { width:44px; height:44px; object-fit:cover; border-radius:8px; flex-shrink:0; }
+  #attPreview .info { flex:1; min-width:0; font-size:14px; }
+  #attPreview .info small { display:block; color:var(--muted); font-size:12px; margin-top:2px;
+                            overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #attPreview button { background:transparent; border:none; color:var(--muted);
+                       font-size:22px; cursor:pointer; padding:0 6px; flex-shrink:0; }
+  #attError { display:none; padding:8px 14px; font-size:13px; color:var(--danger);
+              background:rgba(255,82,82,0.10); flex-shrink:0; line-height:1.45; }
+  #attError.show { display:block; }
 </style>
 </head>
 <body>
@@ -173,7 +188,25 @@
     </div>
     <div id="roster"></div>
     <div id="messages"></div>
+    <div id="attError"></div>
+    <div id="attPreview">
+      <img id="attThumb" alt="" style="display:none">
+      <span id="attIcon" style="font-size:26px;display:none"></span>
+      <span class="info"><span id="attName"></span><small id="attSize"></small></span>
+      <button id="attCancel" aria-label="Retirer">✕</button>
+    </div>
     <div id="composer">
+      <!-- Photo, image ou document. `capture` fait proposer l'appareil
+           photo sur téléphone, sans exiger de contexte sécurisé. -->
+      <input type="file" id="fileInput" style="display:none"
+             accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.odt,.ods,.txt,.csv,.zip">
+      <!-- Vocal : on délègue au magnétophone du téléphone. getUserMedia
+           est indisponible ici (page servie en http:// sur une IP privée,
+           donc contexte non sécurisé) — voir le commentaire près de
+           micSupporte dans le script. -->
+      <input type="file" id="audioInput" style="display:none" accept="audio/*" capture>
+      <button id="attBtn" class="att-btn" aria-label="Joindre">📎</button>
+      <button id="micBtn" class="att-btn" aria-label="Vocal">🎤</button>
       <input id="draft" maxlength="2000" autocomplete="off">
       <button id="sendBtn" data-i18n="send">Envoyer</button>
     </div>
@@ -208,13 +241,16 @@ function genMsgId() {
 const I18N = {
   fr: { appTitle:"Messagerie locale", joinTitle:"Rejoindre le salon", joinSub:"Communication chiffrée sur votre réseau interne — rien ne transite par Internet.", nickname:"Pseudo", pinLabel:"Code PIN (6 chiffres, communiqué par l'hôte)", joinBtn:"Rejoindre", notice:"Gardez cette page ouverte pour recevoir les messages — les notifications d'écran verrouillé ne sont pas disponibles dans cette version.", connectionLost:"Connexion au salon perdue.", rejoin:"Reconnecter", send:"Envoyer", wrongPin:"PIN incorrect — vérifiez le code auprès de l'hôte.", cantReach:"Salon injoignable — vérifiez que vous êtes sur le même wifi.", online:"en ligne", draftPlaceholder:"Écrire un message…", connecting:"Connexion…",
         rosterTitle:"Annuaire", rosterEmpty:"Personne d'autre n'a encore rejoint ce salon.", rosterMe:"vous", rosterUnnamed:"Sans nom", rosterOnline:"En ligne", rosterJustNow:"à l'instant", threadPrivate:"Privé", threadEmpty:"Aucun message dans cette conversation privée.", roomThread:"Salon",
-        attVoice:"Message vocal", attFile:"Pièce jointe", attSave:"Ouvrir", attLoading:"Chargement…", attGone:"Pièce jointe indisponible.", attFailed:"Échec du téléchargement." },
+        attVoice:"Message vocal", attFile:"Pièce jointe", attSave:"Ouvrir", attLoading:"Chargement…", attGone:"Pièce jointe indisponible.", attFailed:"Échec du téléchargement.",
+        attSending:"Envoi…", attTooBig:"Fichier trop volumineux (25 Mo maximum).", attTypeRefused:"Ce type de fichier n'est pas autorisé.", attQuotaBytes:"Limite de volume atteinte pour cet appareil (200 Mo par heure).", attQuotaFiles:"Trop de fichiers envoyés depuis cet appareil dans la dernière heure.", attBusy:"Trop d'envois simultanés — patientez.", attSendFailed:"L'envoi de la pièce jointe a échoué.", attCaption:"Ajouter un mot (facultatif)…" },
   en: { appTitle:"Local Messaging", joinTitle:"Join the room", joinSub:"Encrypted communication over your internal network — nothing goes through the Internet.", nickname:"Nickname", pinLabel:"PIN code (6 digits, provided by the host)", joinBtn:"Join", notice:"Keep this page open to receive messages — lock-screen notifications are not available in this version.", connectionLost:"Connection to the room lost.", rejoin:"Reconnect", send:"Send", wrongPin:"Incorrect PIN — check the code with the host.", cantReach:"Room unreachable — make sure you are on the same wifi.", online:"online", draftPlaceholder:"Write a message…", connecting:"Connecting…",
         rosterTitle:"Directory", rosterEmpty:"Nobody else has joined this room yet.", rosterMe:"you", rosterUnnamed:"Unnamed", rosterOnline:"Online", rosterJustNow:"just now", threadPrivate:"Private", threadEmpty:"No messages in this private conversation yet.", roomThread:"Room",
-        attVoice:"Voice message", attFile:"Attachment", attSave:"Open", attLoading:"Loading…", attGone:"Attachment unavailable.", attFailed:"Download failed." },
+        attVoice:"Voice message", attFile:"Attachment", attSave:"Open", attLoading:"Loading…", attGone:"Attachment unavailable.", attFailed:"Download failed.",
+        attSending:"Sending…", attTooBig:"File too large (25 MB maximum).", attTypeRefused:"This file type is not allowed.", attQuotaBytes:"Upload limit reached for this device (200 MB per hour).", attQuotaFiles:"Too many files sent from this device in the past hour.", attBusy:"Too many uploads at once — please wait.", attSendFailed:"Sending the attachment failed.", attCaption:"Add a note (optional)…" },
   ar: { appTitle:"المراسلة المحلية", joinTitle:"الانضمام إلى الغرفة", joinSub:"تواصل مشفّر عبر شبكتك الداخلية — لا شيء يمر عبر الإنترنت.", nickname:"الاسم المستعار", pinLabel:"رمز PIN (6 أرقام، يقدّمه المضيف)", joinBtn:"انضمام", notice:"أبقِ هذه الصفحة مفتوحة لاستقبال الرسائل — إشعارات شاشة القفل غير متاحة في هذا الإصدار.", connectionLost:"انقطع الاتصال بالغرفة.", rejoin:"إعادة الاتصال", send:"إرسال", wrongPin:"رمز PIN غير صحيح — تحقّق من الرمز لدى المضيف.", cantReach:"تعذّر الوصول إلى الغرفة — تأكّد أنك على نفس شبكة الواي فاي.", online:"متصل", draftPlaceholder:"اكتب رسالة…", connecting:"جارٍ الاتصال…",
         rosterTitle:"الدليل", rosterEmpty:"لم ينضم أحد آخر إلى هذه الغرفة بعد.", rosterMe:"أنت", rosterUnnamed:"بلا اسم", rosterOnline:"متصل", rosterJustNow:"الآن", threadPrivate:"خاص", threadEmpty:"لا توجد رسائل في هذه المحادثة الخاصة.", roomThread:"الغرفة",
-        attVoice:"رسالة صوتية", attFile:"مرفق", attSave:"فتح", attLoading:"جارٍ التحميل…", attGone:"المرفق غير متاح.", attFailed:"فشل التحميل." },
+        attVoice:"رسالة صوتية", attFile:"مرفق", attSave:"فتح", attLoading:"جارٍ التحميل…", attGone:"المرفق غير متاح.", attFailed:"فشل التحميل.",
+        attSending:"جارٍ الإرسال…", attTooBig:"الملف كبير جداً (25 ميغابايت كحد أقصى).", attTypeRefused:"هذا النوع من الملفات غير مسموح به.", attQuotaBytes:"بلغ هذا الجهاز حدّ الحجم المسموح (200 ميغابايت في الساعة).", attQuotaFiles:"أُرسلت ملفات كثيرة من هذا الجهاز خلال الساعة الأخيرة.", attBusy:"عمليات إرسال كثيرة في آن واحد — انتظر قليلاً.", attSendFailed:"فشل إرسال المرفق.", attCaption:"أضف كلمة (اختياري)…" },
 };
 let lang = localStorage.getItem("hnaya-mobile-lang")
   || (navigator.language || "fr").slice(0, 2);
@@ -512,6 +548,166 @@ function requestRoster() {
 rosterBtn.onclick = () => showRoster(!rosterEl.classList.contains("show"));
 threadBack.onclick = backToRoom;
 
+// ══════════════════════════════════════════════════════════════
+// Envoi de pièces jointes (étape E, côté mobile)
+// ══════════════════════════════════════════════════════════════
+// ⚠️ LE MICROPHONE EST HORS D'ATTEINTE ICI. La page est servie en http://
+// sur une IP privée : aucun certificat TLS n'est possible, donc le
+// contexte n'est PAS sécurisé et navigator.mediaDevices est indisponible
+// (même cause que crypto.subtle, d'où la crypto embarquée). On délègue
+// donc l'enregistrement au magnétophone du téléphone via un champ
+// fichier `capture` — qui, lui, ne demande aucun contexte sécurisé.
+const micSupporte = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+
+const fileInput = $("fileInput"), audioInput = $("audioInput"),
+  attBtn = $("attBtn"), micBtn = $("micBtn"), attPreview = $("attPreview"),
+  attThumb = $("attThumb"), attIcon = $("attIcon"), attName = $("attName"),
+  attSize = $("attSize"), attCancel = $("attCancel"), attError = $("attError");
+
+let pendingAtt = null;          // pièce jointe préparée, en attente d'envoi
+const pendingUploads = new Map(); // uploadId -> { resolve, reject, bytes }
+
+function showAttError(msg) {
+  attError.textContent = msg || "";
+  attError.classList.toggle("show", !!msg);
+}
+
+// Base64 par tranches : String.fromCharCode sur 25 Mo d'un coup ferait
+// déborder la pile d'appels.
+function toBase64(bytes) {
+  let bin = "";
+  for (let i = 0; i < bytes.length; i += 8192) {
+    bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 8192));
+  }
+  return btoa(bin);
+}
+
+// Une photo de téléphone fait 3 à 8 Mo ; réduite à 1600 px et réencodée
+// en JPEG elle tombe sous le mégaoctet, sans différence visible.
+const IMG_MAX = 1600, IMG_Q = 0.82, THUMB_MAX = 220, THUMB_Q = 0.6;
+
+function dessiner(img, maxSide, quality) {
+  const ratio = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
+  const w = Math.max(1, Math.round(img.naturalWidth * ratio));
+  const h = Math.max(1, Math.round(img.naturalHeight * ratio));
+  const c = document.createElement("canvas");
+  c.width = w; c.height = h;
+  c.getContext("2d").drawImage(img, 0, 0, w, h);
+  return { dataUrl: c.toDataURL("image/jpeg", quality), w, h };
+}
+
+function dataUrlEnOctets(dataUrl) {
+  const bin = atob(dataUrl.split(",")[1] || "");
+  const arr = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  return arr;
+}
+
+async function preparer(file, forcerVocal) {
+  if (file.type.startsWith("image/")) {
+    const img = await new Promise((res, rej) => {
+      const url = URL.createObjectURL(file);
+      const i = new Image();
+      i.onload = () => { URL.revokeObjectURL(url); res(i); };
+      i.onerror = () => { URL.revokeObjectURL(url); rej(new Error("image")); };
+      i.src = url;
+    });
+    const plein = dessiner(img, IMG_MAX, IMG_Q);
+    const vignette = dessiner(img, THUMB_MAX, THUMB_Q);
+    const bytes = dataUrlEnOctets(plein.dataUrl);
+    return {
+      kind: "image", mime: "image/jpeg", bytes, thumb: vignette.dataUrl,
+      w: plein.w, h: plein.h, preview: vignette.dataUrl,
+      // Le nom doit décrire les octets réellement envoyés : on recompresse
+      // toujours en JPEG (voir suggestedFilename dans src/media.js).
+      name: file.name.replace(/\.[^.\/\\]{1,8}$/, "") + ".jpg",
+    };
+  }
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const estAudio = forcerVocal || file.type.startsWith("audio/");
+  return {
+    kind: estAudio ? "voice" : "file",
+    mime: file.type || "application/octet-stream",
+    bytes, thumb: null, name: file.name || null, preview: null,
+  };
+}
+
+function afficherApercu(att) {
+  if (att.preview) {
+    attThumb.src = att.preview; attThumb.style.display = "";
+    attIcon.style.display = "none";
+  } else {
+    attThumb.style.display = "none";
+    attIcon.textContent = att.kind === "voice" ? "🎤" : "📄";
+    attIcon.style.display = "";
+  }
+  attName.textContent = att.kind === "voice" ? t("attVoice") : (att.name || t("attFile"));
+  attSize.textContent = humanSize(att.bytes.length);
+  attPreview.classList.add("show");
+  draft.placeholder = t("attCaption");
+}
+
+function annulerApercu() {
+  pendingAtt = null;
+  attPreview.classList.remove("show");
+  showAttError("");
+  draft.placeholder = t("draftPlaceholder");
+}
+
+async function choisir(e, forcerVocal) {
+  const file = e.target.files && e.target.files[0];
+  e.target.value = ""; // permet de reprendre le même fichier
+  if (!file) return;
+  showAttError("");
+  try {
+    pendingAtt = await preparer(file, forcerVocal);
+    afficherApercu(pendingAtt);
+  } catch {
+    showAttError(t("attSendFailed"));
+  }
+}
+
+attBtn.onclick = () => fileInput.click();
+micBtn.onclick = () => audioInput.click();
+fileInput.onchange = (e) => choisir(e, false);
+audioInput.onchange = (e) => choisir(e, true);
+attCancel.onclick = annulerApercu;
+
+/** Téléverse chez l'hôte, morceau par morceau, puis rend l'empreinte
+ *  CALCULÉE PAR L'HÔTE — c'est elle qui scellera la signature. */
+function televerser(att) {
+  return new Promise((resolve, reject) => {
+    if (!ws || ws.readyState !== 1) { reject(new Error("offline")); return; }
+    const b = crypto.getRandomValues(new Uint8Array(8));
+    const uploadId = "up_" + Array.from(b).map((x) => x.toString(16).padStart(2, "0")).join("");
+    pendingUploads.set(uploadId, { resolve, reject, bytes: att.bytes });
+    ws.send(encryptPayload(key, {
+      v: 1, type: "media-begin", uploadId,
+      kind: att.kind, mime: att.mime, size: att.bytes.length, thumb: att.thumb,
+    }));
+  });
+}
+
+// L'envoi effectif attend le feu vert de l'hôte : inutile d'expédier des
+// mégaoctets qu'il refusera (type interdit, quota, taille).
+function envoyerMorceaux(uploadId) {
+  const en = pendingUploads.get(uploadId);
+  if (!en) return;
+  const CHUNK = 64 * 1024;
+  for (let off = 0, seq = 0; off < en.bytes.length; off += CHUNK, seq++) {
+    ws.send(encryptPayload(key, {
+      v: 1, type: "media-chunk", uploadId, seq,
+      data: toBase64(en.bytes.subarray(off, Math.min(off + CHUNK, en.bytes.length))),
+    }));
+  }
+  ws.send(encryptPayload(key, { v: 1, type: "media-end", uploadId }));
+}
+
+const MSG_ERREUR = {
+  size: "attTooBig", mime: "attTypeRefused", busy: "attBusy",
+  "quota-bytes": "attQuotaBytes", "quota-files": "attQuotaFiles",
+};
+
 async function connect() {
   joinError.textContent = "";
   joinBtn.disabled = true; joinBtn.textContent = t("connecting");
@@ -575,6 +771,18 @@ async function connect() {
       myFp = payload.me || myFp;
       renderRoster();
     }
+    // ── Étape E — téléversement en cours ──
+    else if (payload.type === "media-go") {
+      envoyerMorceaux(payload.uploadId);
+    } else if (payload.type === "media-ready") {
+      const u = pendingUploads.get(payload.uploadId);
+      pendingUploads.delete(payload.uploadId);
+      if (u) u.resolve({ sha256: payload.sha256, size: payload.size });
+    } else if (payload.type === "media-failed") {
+      const u = pendingUploads.get(payload.uploadId);
+      pendingUploads.delete(payload.uploadId);
+      if (u) u.reject(new Error(payload.reason || "media"));
+    }
     // ── Étape E — pièces jointes reçues par morceaux ──
     else if (payload.type === "media-data") {
       const p = pendingMedia.get(payload.sha256);
@@ -625,12 +833,13 @@ document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible" && joined && (!ws || ws.readyState > 1)) connect();
 });
 
-function sendDraft() {
-  const text = draft.value.trim();
-  if (!text || !ws || ws.readyState !== 1) return;
+function emettre(text, media) {
   // Protocole v2 : id + horodatage générés ici puis SIGNÉS — même contrat
   // que le client de bureau (src/client.js), vérifié par le serveur.
   const core = { id: genMsgId(), from: userId, text, ts: Date.now() };
+  // La pièce jointe entre dans le périmètre signé (5e élément du noyau,
+  // voir src/identity.js) : elle ne peut plus être substituée après coup.
+  if (media && media.sha256) core.mediaSha = String(media.sha256);
   ws.send(encryptPayload(key, {
     v: 2,
     type: "message",
@@ -641,10 +850,50 @@ function sendDraft() {
     // privée en cours. Codé en dur, une réponse privée serait partie dans
     // le salon, au vu de tous.
     groupId: activeThread,
-    media: null,
+    media: media || null,
     signature: identity.signMessage(core),
   }));
-  draft.value = "";
+}
+
+async function sendDraft() {
+  const text = draft.value.trim();
+  // Connexion tombée : le dire. Un retour silencieux laissait l'utilisateur
+  // cliquer « Envoyer » sans que rien ne se passe ni ne s'explique.
+  if (!ws || ws.readyState !== 1) {
+    showStatus(true);
+    if (pendingAtt) showAttError(t("connectionLost"));
+    return;
+  }
+  // Un vocal ou une photo peut partir SANS texte — d'où la condition sur
+  // l'un ou l'autre.
+  if (!text && !pendingAtt) return;
+
+  if (!pendingAtt) { emettre(text, null); draft.value = ""; return; }
+
+  const att = pendingAtt;
+  sendBtn.disabled = true;
+  const libelle = sendBtn.textContent;
+  sendBtn.textContent = t("attSending");
+  showAttError("");
+  try {
+    // Le fichier monte D'ABORD chez l'hôte ; le message ne part qu'ensuite,
+    // avec l'empreinte que l'hôte a calculée sur les octets reçus.
+    const res = await televerser(att);
+    const media = {
+      kind: att.kind, mime: att.mime, sha256: res.sha256, size: res.size,
+      thumb: att.thumb, name: att.name,
+    };
+    if (att.kind === "image") { media.w = att.w; media.h = att.h; }
+    emettre(text, media);
+    draft.value = "";
+    annulerApercu();
+  } catch (e) {
+    const cle = MSG_ERREUR[e && e.message] || "attSendFailed";
+    showAttError(t(cle));
+  } finally {
+    sendBtn.disabled = false;
+    sendBtn.textContent = libelle;
+  }
 }
 sendBtn.onclick = sendDraft;
 draft.addEventListener("keydown", (e) => { if (e.key === "Enter") sendDraft(); });
