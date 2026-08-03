@@ -83,8 +83,17 @@ export async function prepareFile(file: File): Promise<PreparedMedia> {
     };
   }
   const buf = await file.arrayBuffer();
+  // ⚠️ Un WAV/MP3/M4A choisi via le trombone (donc PAS enregistré au
+  // micro) tombait ici avec kind:"file" alors que son type est bien
+  // audio/* — l'hôte refuse ce mélange par construction (server.js,
+  // sanitizeMedia : kind:"file" exclut explicitement les MIME audio/image,
+  // ce sont des catégories mutuellement exclusives). Un fichier audio
+  // existant est donc un « vocal » au même titre qu'un enregistrement en
+  // direct — même règle déjà appliquée côté page mobile (mobile/index.html,
+  // fonction preparer).
+  const estAudio = file.type.startsWith("audio/");
   return {
-    kind: "file",
+    kind: estAudio ? "voice" : "file",
     // Un type vide (extension inconnue de Windows) serait refusé par
     // l'hôte : on le laisse tel quel, le message d'erreur sera explicite.
     mime: file.type || "application/octet-stream",

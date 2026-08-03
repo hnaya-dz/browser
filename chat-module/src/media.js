@@ -56,6 +56,10 @@ export const ALLOWED_MIME = new Map([
   ["audio/ogg", "ogg"],
   ["audio/mpeg", "mp3"],
   ["audio/mp4", "m4a"],
+  ["audio/wav", "wav"],
+  // Chromium rapporte cette variante pour certains .wav — vérifié par
+  // sonde CDP (DOM.setFileInputFiles) sur un fichier réel, pas supposé.
+  ["audio/x-wav", "wav"],
   // Documents — besoin métier PME/administration
   ["application/pdf", "pdf"],
   ["application/msword", "doc"],
