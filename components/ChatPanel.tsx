@@ -140,6 +140,9 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
   const [unreadByThread, setUnreadByThread] = useState<Record<string, number>>({});
   const [pendingMedia, setPendingMedia] = useState<PreparedMedia | null>(null);
   const [mediaBusy, setMediaBusy] = useState(false);
+  // Conversion audio en cours (formats hors liste : FLAC, AIFF…) — null =
+  // aucune conversion, sinon avancement 0..1.
+  const [converting, setConverting] = useState<number | null>(null);
   const [mediaError, setMediaError] = useState("");
   const [setupBusy, setSetupBusy] = useState(false);
   // false = masqué ; "guest" = inviter quelqu'un d'autre ; "mine" = lier
@@ -1415,6 +1418,21 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
             </div>}
 
             {!showAdmin && <div style={{ flexShrink: 0 }}>
+              {converting !== null && (
+                <div style={{
+                  display: "flex", alignItems: "center", gap: 8, marginBottom: 6,
+                  padding: "7px 9px", border: `1px solid ${border}`, borderRadius: 4,
+                  fontSize: 11, color: muted,
+                }}>
+                  <span>{t("Chat.mediaConverting")}</span>
+                  <div style={{ flex: 1, height: 3, background: `${accent}25`, borderRadius: 2, overflow: "hidden" }}>
+                    <div style={{
+                      width: `${Math.round(converting * 100)}%`, height: "100%",
+                      background: accent, transition: "width .2s linear",
+                    }} />
+                  </div>
+                </div>
+              )}
               {pendingMedia && (
                 <MediaPreview
                   media={pendingMedia}
@@ -1428,9 +1446,10 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
               <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                 <ChatComposerMedia
                   accent={accent} muted={muted} border={border}
-                  disabled={mediaBusy || !!pendingMedia}
+                  disabled={mediaBusy || !!pendingMedia || converting !== null}
                   onPrepared={(m) => { setPendingMedia(m); setMediaError(""); }}
                   onError={(msg) => setMediaError(msg)}
+                  onConverting={setConverting}
                 />
                 <input
                   style={{ ...inputStyle, flex: 1, minWidth: 0 }}

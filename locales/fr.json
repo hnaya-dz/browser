@@ -306,7 +306,9 @@
     "serverErrAdminPin": "Le PIN administrateur doit compter 6 chiffres.",
     "serverErrName": "Le nom du salon contient des caractères non autorisés (lettres latines, chiffres, espaces, . _ - uniquement).",
     "serverErrTaskMissing": "Les fichiers ont été préparés, mais la tâche de démarrage n'a pas pu être confirmée. Cause fréquente : un antivirus (Kaspersky notamment) intercepte cette étape pendant une mise à jour en cours — redémarrez le poste puis réessayez. Le PIN et la licence restent enregistrés.",
-    "serverErrWindowsOnly": "Le serveur permanent est disponible sur Windows uniquement pour le moment."
+    "serverErrWindowsOnly": "Le serveur permanent est disponible sur Windows uniquement pour le moment.",
+    "mediaConverting": "Conversion audio en cours…",
+    "mediaDecodeFailed": "Ce fichier audio ne peut pas être lu ou converti — il est peut-être corrompu ou dans un format non pris en charge par le navigateur."
   },
   "Privacy": {
     "title": "Confidentialité",

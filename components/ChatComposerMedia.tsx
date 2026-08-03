@@ -21,6 +21,83 @@ const IMAGE_QUALITY = 0.82;
 const THUMB_MAX_SIDE = 220;
 const THUMB_QUALITY = 0.6;
 
+// Types audio déjà acceptés TELS QUELS par l'hôte (chat-module/src/media.js,
+// ALLOWED_MIME) — dupliqué ici volontairement : le renderer n'importe pas
+// le code du module serveur. Tout fichier audio HORS de cette liste (FLAC,
+// AIFF, un conteneur AAC inhabituel…) passe par convertToOpus ci-dessous
+// plutôt que d'être rejeté par l'hôte sans recours.
+const AUDIO_PASSTHROUGH = new Set([
+  "audio/webm", "audio/ogg", "audio/mpeg", "audio/mp4", "audio/wav", "audio/x-wav",
+]);
+
+/**
+ * Convertit un fichier audio QUELCONQUE (que Chromium sait décoder — WAV,
+ * FLAC, AAC, MP3, la plupart des conteneurs courants) en webm/opus, déjà
+ * accepté par l'hôte. Aucune dépendance ajoutée : AudioContext.decodeAudioData
+ * décode, MediaRecorder ré-encode — les deux fonctionnent SANS microphone et
+ * SANS contexte sécurisé (vérifié : même la page mobile, servie en http://
+ * sur une IP privée, peut les utiliser).
+ *
+ * ⚠️ Le ré-encodage passe par une lecture en TEMPS RÉEL (MediaRecorder ne
+ * sait capturer qu'un flux qui joue réellement) : convertir un fichier de
+ * 3 minutes prend environ 3 minutes. Pour les formats déjà dans
+ * AUDIO_PASSTHROUGH, aucune conversion n'a lieu — ce coût ne touche que les
+ * formats vraiment hors liste.
+ */
+async function convertToOpus(
+  file: File,
+  onProgress?: (fraction: number) => void,
+): Promise<{ bytes: ArrayBuffer; size: number; duration: number }> {
+  const arrayBuf = await file.arrayBuffer();
+  const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+  let audioBuffer: AudioBuffer;
+  try {
+    audioBuffer = await ctx.decodeAudioData(arrayBuf);
+  } catch {
+    await ctx.close();
+    throw new Error("decode");
+  }
+
+  const dest = ctx.createMediaStreamDestination();
+  const source = ctx.createBufferSource();
+  source.buffer = audioBuffer;
+  source.connect(dest);
+
+  const mime = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+    ? "audio/webm;codecs=opus" : "audio/webm";
+  const recorder = new MediaRecorder(dest.stream, { mimeType: mime });
+  const chunks: Blob[] = [];
+  recorder.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+
+  const done = new Promise<Blob>((resolve, reject) => {
+    recorder.onstop = () => resolve(new Blob(chunks, { type: "audio/webm" }));
+    recorder.onerror = () => reject(new Error("encode"));
+  });
+
+  const duration = audioBuffer.duration;
+  if (onProgress && duration > 0) {
+    const t0 = Date.now();
+    const timer = setInterval(() => {
+      onProgress(Math.min(0.99, (Date.now() - t0) / 1000 / duration));
+    }, 200);
+    done.finally(() => clearInterval(timer));
+  }
+
+  recorder.start();
+  source.start();
+  // La conversion dure aussi longtemps que l'audio source : source.onended
+  // arrive exactement quand la lecture (silencieuse — rien n'est routé vers
+  // les haut-parleurs) se termine.
+  await new Promise<void>((resolve) => { source.onended = () => resolve(); });
+  recorder.stop();
+  const blob = await done;
+  await ctx.close();
+  onProgress?.(1);
+
+  const bytes = await blob.arrayBuffer();
+  return { bytes, size: bytes.byteLength, duration };
+}
+
 export interface PreparedMedia {
   kind: "image" | "voice" | "file";
   mime: string;
@@ -63,9 +140,13 @@ const dataUrlToBytes = (dataUrl: string) => {
   return arr;
 };
 
-/** Prépare un fichier choisi : les images sont recompressées, le reste
- *  part tel quel (le serveur refusera tout type hors de sa liste). */
-export async function prepareFile(file: File): Promise<PreparedMedia> {
+/** Prépare un fichier choisi : les images sont recompressées, l'audio hors
+ *  liste est converti en opus, le reste part tel quel (le serveur refusera
+ *  tout type hors de sa liste). */
+export async function prepareFile(
+  file: File,
+  onConvertProgress?: (fraction: number) => void,
+): Promise<PreparedMedia> {
   if (file.type.startsWith("image/")) {
     const img = await loadImage(file);
     const full = drawTo(img, IMAGE_MAX_SIDE, IMAGE_QUALITY);
@@ -82,7 +163,7 @@ export async function prepareFile(file: File): Promise<PreparedMedia> {
       name: file.name.replace(/\.[^.\\/]{1,8}$/, "") + ".jpg",
     };
   }
-  const buf = await file.arrayBuffer();
+
   // ⚠️ Un WAV/MP3/M4A choisi via le trombone (donc PAS enregistré au
   // micro) tombait ici avec kind:"file" alors que son type est bien
   // audio/* — l'hôte refuse ce mélange par construction (server.js,
@@ -91,9 +172,29 @@ export async function prepareFile(file: File): Promise<PreparedMedia> {
   // existant est donc un « vocal » au même titre qu'un enregistrement en
   // direct — même règle déjà appliquée côté page mobile (mobile/index.html,
   // fonction preparer).
-  const estAudio = file.type.startsWith("audio/");
+  if (file.type.startsWith("audio/")) {
+    // Déjà dans un format accepté : envoyé tel quel, aucune conversion —
+    // seuls les formats VRAIMENT hors liste (FLAC, AIFF…) paient le coût
+    // du décodage/ré-encodage.
+    if (AUDIO_PASSTHROUGH.has(file.type)) {
+      const buf = await file.arrayBuffer();
+      return {
+        kind: "voice", mime: file.type,
+        bytes: buf, size: buf.byteLength, name: file.name, thumb: null,
+      };
+    }
+    const { bytes, size, duration } = await convertToOpus(file, onConvertProgress);
+    return {
+      kind: "voice", mime: "audio/webm",
+      bytes, size, duration: Math.round(duration),
+      name: file.name.replace(/\.[^.\\/]{1,8}$/, "") + ".webm",
+      thumb: null,
+    };
+  }
+
+  const buf = await file.arrayBuffer();
   return {
-    kind: estAudio ? "voice" : "file",
+    kind: "file",
     // Un type vide (extension inconnue de Windows) serait refusé par
     // l'hôte : on le laisse tel quel, le message d'erreur sera explicite.
     mime: file.type || "application/octet-stream",
@@ -108,9 +209,14 @@ interface Props {
   disabled?: boolean;
   onPrepared: (m: PreparedMedia) => void;
   onError: (msg: string) => void;
+  // Étape E (audio hors liste) — conversion en cours, avec avancement
+  // 0..1 : un fichier de plusieurs minutes prend un temps comparable à
+  // convertir (voir le commentaire près de convertToOpus), l'utilisateur
+  // doit savoir que quelque chose se passe.
+  onConverting?: (fraction: number | null) => void;
 }
 
-export default function ChatComposerMedia({ accent, muted, border, disabled, onPrepared, onError }: Props) {
+export default function ChatComposerMedia({ accent, muted, border, disabled, onPrepared, onError, onConverting }: Props) {
   const { t } = useTranslation();
   const fileInput = useRef<HTMLInputElement | null>(null);
   const recorder = useRef<MediaRecorder | null>(null);
@@ -126,10 +232,18 @@ export default function ChatComposerMedia({ accent, muted, border, disabled, onP
     const file = e.target.files?.[0];
     e.target.value = ""; // permet de re-choisir le même fichier
     if (!file) return;
+    // Hors liste ET pas une image : passera par convertToOpus, donc
+    // potentiellement long — on prévient l'appelant pour qu'il affiche un
+    // état « conversion en cours » plutôt qu'un aperçu qui semble figé.
+    const vaConvertir = file.type.startsWith("audio/") && !AUDIO_PASSTHROUGH.has(file.type);
     try {
-      onPrepared(await prepareFile(file));
-    } catch {
-      onError(t("Chat.mediaFailed"));
+      if (vaConvertir) onConverting?.(0);
+      const prepared = await prepareFile(file, vaConvertir ? (f) => onConverting?.(f) : undefined);
+      onPrepared(prepared);
+    } catch (err) {
+      onError((err as Error)?.message === "decode" ? t("Chat.mediaDecodeFailed") : t("Chat.mediaFailed"));
+    } finally {
+      if (vaConvertir) onConverting?.(null);
     }
   };
 
