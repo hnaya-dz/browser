@@ -1,4 +1,4 @@
-import { app, BrowserWindow, WebContentsView, ipcMain, Menu, dialog, shell, screen, clipboard } from "electron";
+import { app, BrowserWindow, WebContentsView, ipcMain, Menu, dialog, shell, screen, clipboard, powerMonitor } from "electron";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import { spawn, fork } from "child_process";
@@ -992,6 +992,20 @@ function ensureChatWorker() {
   });
   return chatWorker;
 }
+
+// ⚠️ Retour terrain (deux postes, l'un mis en veille) : après une reprise,
+// des messages partaient dans un sens sans arriver dans l'autre, sans
+// aucune erreur affichée — une connexion WebSocket restée « ouverte » du
+// point de vue de l'objet JS peut être une prise zombie après une veille
+// (le réseau, y compris le loopback de l'hôte vers SON PROPRE salon, a
+// été coupé pendant la suspension), et rien ne le détecte avant le
+// prochain battement de cœur (jusqu'à ~20 s) — qui de toute façon
+// n'aurait fait qu'afficher une erreur, jamais reconnecté seul. On force
+// donc une reconnexion propre dès que Windows signale la reprise ; voir
+// le commentaire près de lastJoinMsg dans chat-module/src/worker.js.
+powerMonitor.on("resume", () => {
+  try { chatWorker?.send({ cmd: "network-resume" }); } catch { /* worker absent */ }
+});
 
 // D.2 : accepte soit une chaîne (compat : nom seul), soit un objet
 // { sessionName, adminPin?, roomId? } — roomId = réouverture d'un salon

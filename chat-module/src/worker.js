@@ -102,6 +102,31 @@ let hostHandle = null;      // dernier salon ouvert (compat interne)
 let clientHandle = null;    // { send, markRead, close } si on a rejoint un salon
 let stopDiscovery = null;   // fonction pour arrêter une découverte en cours
 
+// ═══════════════════════════════════════════════════════════════
+// Reconnexion après veille (retour terrain, deux postes)
+// ═══════════════════════════════════════════════════════════════
+// Aucun mécanisme ne détectait la reprise depuis la veille : seule la
+// page mobile réagit à visibilitychange. Sur un poste, une connexion
+// WebSocket restée « ouverte » du point de vue de l'objet JS peut être
+// une prise zombie après une veille (le réseau — y compris le loopback
+// de l'hôte vers son PROPRE salon — a été interrompu pendant la
+// suspension), sans qu'aucun événement "close" ne se déclenche pour le
+// signaler : ws.send() écrit dans le tampon local sans erreur, mais rien
+// n'arrive jamais en face. Symptôme observé : les messages continuent
+// de partir dans un sens sans qu'aucune erreur ne s'affiche.
+// L'unique filet de sécurité était le battement de cœur (10 s), qui finit
+// par détecter l'absence de pong — mais qui ne RECONNECTE jamais tout
+// seul, il ne fait qu'afficher une erreur à l'utilisateur.
+//
+// lastJoinMsg mémorise les paramètres du dernier "join" explicite : au
+// signal "network-resume" (envoyé par electron.js via powerMonitor), on
+// referme la connexion existante — vivante ou zombie, peu importe — et on
+// rejoint avec ces mêmes paramètres. Le serveur renvoie alors le backlog
+// depuis lastSeenTs ; la déduplication par id côté interface (ChatPanel)
+// absorbe sans dommage les messages déjà vus si l'horodatage est un peu
+// périmé.
+let lastJoinMsg = null;
+
 process.on("message", (msg) => {
   try {
     handleCommand(msg);
@@ -204,6 +229,10 @@ function handleCommand(msg) {
     }
 
     case "join": {
+      // Mémorisé AVANT la tentative : même une connexion qui échoue traduit
+      // une INTENTION de l'utilisateur d'être dans ce salon, que la
+      // reprise après veille doit honorer.
+      lastJoinMsg = msg;
       if (clientHandle) clientHandle.close(); // une seule connexion client à la fois
       const handle = joinSession({
         address: msg.address,
@@ -364,6 +393,19 @@ function handleCommand(msg) {
     case "leave": {
       clientHandle?.close();
       clientHandle = null;
+      lastJoinMsg = null; // départ volontaire : plus rien à reconnecter
+      break;
+    }
+
+    // Réveil de la machine (voir le commentaire près de lastJoinMsg) —
+    // envoyé par electron.js via powerMonitor.on("resume"). On ne peut
+    // pas savoir si la connexion courante est morte ou juste ralentie :
+    // fermer puis rejoindre est sans risque dans les deux cas (rejoindre
+    // une connexion déjà saine coûte juste un bref aller-retour), alors
+    // qu'attendre le seul battement de cœur peut laisser l'utilisateur
+    // des dizaines de secondes dans un salon silencieux sans le savoir.
+    case "network-resume": {
+      if (lastJoinMsg) handleCommand({ ...lastJoinMsg, cmd: "join" });
       break;
     }
 

@@ -74,7 +74,20 @@ export default function ChatServerSetup({ accent, muted, border, inputStyle, btn
       });
       if (r?.ok) { setDone(true); setLicence(null); setPin(""); setAdminPin(""); setName(""); await refresh(); }
       else if (r?.refused) setError(t("Chat.serverUacRefused"));
-      else setError(r?.error || t("Chat.genericError"));
+      else {
+        // ⚠️ Les codes courts ("pin", "task-missing"…) sont des clés
+        // internes, jamais du texte à montrer tel quel — un utilisateur a
+        // vu "task-missing" brut à l'écran avant ce correctif. Seules les
+        // valeurs vraiment IMPRÉVUES (l'exception d'un script élevé, par
+        // exemple) retombent sur le code brut, en dernier recours : mieux
+        // vaut un indice technique que rien du tout pour me le signaler.
+        const connues: Record<string, string> = {
+          pin: "serverErrPin", adminPin: "serverErrAdminPin", name: "serverErrName",
+          "task-missing": "serverErrTaskMissing", "windows-only": "serverErrWindowsOnly",
+        };
+        const cle = r?.error ? connues[r.error] : null;
+        setError(cle ? t(`Chat.${cle}`) : (r?.error || t("Chat.genericError")));
+      }
     } finally { setBusy(false); }
   };
 

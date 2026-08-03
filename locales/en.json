@@ -301,7 +301,12 @@
     "threadBack": "Back to the room",
     "threadPrivate": "Private",
     "threadEmpty": "No messages in this private conversation yet.",
-    "adminRolePlaceholder": "Role (HR director, CEO…)"
+    "adminRolePlaceholder": "Role (HR director, CEO…)",
+    "serverErrPin": "The access PIN must be 6 digits.",
+    "serverErrAdminPin": "The admin PIN must be 6 digits.",
+    "serverErrName": "The room name contains characters that are not allowed (Latin letters, digits, spaces, . _ - only).",
+    "serverErrTaskMissing": "The files were prepared, but the startup task could not be confirmed. A common cause: antivirus software (Kaspersky in particular) intercepting this step during a pending update — restart the computer and try again. The PIN and licence remain saved.",
+    "serverErrWindowsOnly": "The permanent server is available on Windows only for now."
   },
   "Privacy": {
     "title": "Privacy",
