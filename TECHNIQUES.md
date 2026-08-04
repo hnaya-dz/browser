@@ -502,3 +502,46 @@ Mécanique (pourquoi c'est fait comme ça) :
 localStorage est indexé par origine (voir §« port fixe ») et le main
 process n'y a pas accès au démarrage ; le fichier userData est la seule
 source fiable disponible avant la création de la fenêtre.
+
+---
+
+## 13. Montée de version d'Electron — `package.json`
+
+Le navigateur EST Electron : c'est le seul paquet vulnérable qui parte
+réellement chez l'utilisateur (les alertes Dependabot sur `next`,
+`postcss`, `tar`, `brace-expansion`… concernent l'outillage de build, qui
+ne quitte jamais la machine de développement — vérifiable par
+`npx asar list dist/win-unpacked/resources/app.asar`, qui ne contient que
+les `dependencies` de production).
+
+**Rester sur une majeure maintenue.** Electron ne corrige que les 3
+dernières majeures. La 35 traînait 17 CVE (dont plusieurs *high* :
+use-after-free dans PowerMonitor, dans les callbacks de permission, dans
+le rendu offscreen) sans aucun correctif possible sur sa branche.
+
+**Le piège du `postinstall` a disparu en 42.** Ce dépôt s'est fait avoir
+deux fois : le `postinstall` d'Electron annonçait un faux « Cache hit »
+et laissait `node_modules/electron/dist` vide, obligeant à télécharger le
+zip à la main. Depuis la 42, le binaire se télécharge au premier
+lancement, plus au `postinstall` — l'incident ne peut plus se produire.
+Il reste impératif de **tuer tout `electron.exe` avant `yarn add`**
+(corruption EPERM déjà vécue).
+
+**Points vérifiés lors du passage 35 → 43** (Chromium 134 → 150, Node
+22 → 24), à re-vérifier à chaque saut de majeure :
+
+| Point | Pourquoi | Résultat en 43.2.0 |
+|---|---|---|
+| `node:sqlite` (`DatabaseSync`) | Base du module de chat, API encore expérimentale côté Node | OK |
+| Casse des valeurs de `commandLine` | La 36 annonce une conversion en minuscules ; `enable-features=PlatformHEVCDecoderSupport` est sensible à la casse — le décodage HEVC casserait en silence | Casse préservée |
+| `safeStorage` | Coffre de mots de passe : un changement de dérivation rendrait les entrées existantes illisibles | OK |
+| `WebContentsView` | Toute la gestion d'onglets | OK |
+| `webRequest` | Filtre de traceurs | OK |
+| `powerMonitor` | Reconnexion de la messagerie après veille | OK |
+| Fork du worker + résolution de `ws` | Le module de chat tourne depuis `resources/chat-module` | OK |
+
+**Ne pas faire** : ne pas valider une montée d'Electron sur `yarn dev`
+seul. Les branches `app.isPackaged` (electron-serve, chemins de
+`chat-module`, de yt-dlp) ne sont exercées que dans l'application
+packagée — construire avec `electron-builder --dir` et piloter
+l'exécutable produit par CDP.
