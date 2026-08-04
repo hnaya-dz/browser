@@ -1383,6 +1383,15 @@ async function verifyLicenceFile(filePath) {
   return verifyLicence(contenu);
 }
 
+// Marqueur d'installation réussie, écrit par le script ÉLEVÉ seulement
+// après enregistrement et vérification de la tâche. Il existe parce que la
+// lecture du planificateur en session normale n'est pas fiable partout :
+// sans lui, un poste dont l'antivirus refuse cette lecture affichait
+// « pas installé » en boucle, obligeant à resélectionner la licence à
+// chaque tentative. Il n'est PAS une preuve que la tâche tourne — juste
+// qu'elle a été installée depuis ce poste.
+const chatServerMarker = join(chatServerDataDir, "installed.json");
+
 const chatServerTaskExists = async () => {
   // schtasks plutôt que Get-ScheduledTask : sortie stable, pas de CIM
   // (dont la lecture est parfois refusée en session normale — cf. pare-feu)
@@ -1401,7 +1410,14 @@ const chatServerPortAlive = () => new Promise((resolve) => {
 
 ipcMain.handle("chat-server-get-info", async () => {
   if (process.platform !== "win32") return { supported: false };
-  const installed = await chatServerTaskExists();
+  // Deux signaux indépendants : la lecture du planificateur (fiable quand
+  // elle passe) OU le marqueur posé par une installation vérifiée. Sans ce
+  // « ou », un poste qui refuse la lecture repartait à zéro à chaque fois.
+  const installed = (await chatServerTaskExists()) || existsSync(chatServerMarker);
+  // Le port n'est sondé que si l'on se sait installé : 4802 sert AUSSI aux
+  // salons ordinaires créés depuis le navigateur, un salon ouvert ferait
+  // donc passer le serveur pour démarré. Le garde-fou tient maintenant que
+  // « installé » ne dépend plus d'une seule lecture faillible.
   const running = installed ? await chatServerPortAlive() : false;
   let licence = null;
   if (installed) {
@@ -1448,6 +1464,7 @@ ipcMain.handle("chat-server-install", async (event, { licencePath, name, pin, ad
   const resultFile = join(dir, "result.txt");
   const q = (s) => String(s).replace(/'/g, "''");
   const wrapper = join(chatServerDataDir, "start-server.cmd");
+  const marqueurInstall = chatServerMarker;
   const exe = process.execPath;
 
   const cmdArgs = [`--data "${chatServerDataDir}"`, `--licence "${join(chatServerDataDir, "licence.hnaya-lic")}"`, `--pin ${pin}`];
@@ -1497,6 +1514,12 @@ ipcMain.handle("chat-server-install", async (event, { licencePath, name, pin, ad
     // Démarrage immédiat : un serveur n'a pas à être redémarré pour être
     // installé.
     "  Start-ScheduledTask -TaskName '" + q(CHAT_SERVER_TASK) + "'",
+    // Marqueur écrit UNIQUEMENT ici, après enregistrement ET vérification.
+    // Il permet à l'app de savoir qu'elle est installée sans dépendre d'une
+    // lecture du planificateur, parfois refusée en session normale — c'est
+    // ce qui obligeait à tout réinstaller à chaque ouverture du panneau.
+    // Volontairement APRÈS le contrôle : un échec ne doit rien marquer.
+    "  Set-Content -LiteralPath '" + q(marqueurInstall) + "' -Value ('{\"task\":\"' + '" + q(CHAT_SERVER_TASK) + "' + '\",\"date\":\"' + (Get-Date -Format s) + '\"}')",
     "  Set-Content -LiteralPath '" + q(resultFile) + "' -Value 'OK'",
     "} catch {",
     "  Set-Content -LiteralPath '" + q(resultFile) + "' -Value ('FAIL ' + $_.Exception.Message)",
@@ -1558,6 +1581,9 @@ ipcMain.handle("chat-server-uninstall", async () => {
     "    Unregister-ScheduledTask -TaskName '" + q(CHAT_SERVER_TASK) + "' -Confirm:$false",
     "  }",
     "  if (Get-ScheduledTask -TaskName '" + q(CHAT_SERVER_TASK) + "' -ErrorAction SilentlyContinue) { throw 'La tache est toujours presente apres suppression.' }",
+    // Le marqueur doit partir avec la tâche, sinon l'app continuerait de se
+    // croire installée. Les DONNÉES (historique, licence) restent, elles.
+    "  Remove-Item -LiteralPath '" + q(chatServerMarker) + "' -Force -ErrorAction SilentlyContinue",
     "  Set-Content -LiteralPath '" + q(resultFile) + "' -Value 'OK'",
     "} catch {",
     "  Set-Content -LiteralPath '" + q(resultFile) + "' -Value ('FAIL ' + $_.Exception.Message)",
