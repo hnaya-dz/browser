@@ -89,7 +89,7 @@ export default function ChatServerSetup({ accent, muted, border, inputStyle, btn
         };
         const cle = r?.error ? connues[r.error] : null;
         if (cle) setError(t(`Chat.${cle}`));
-        else if (r?.error) setError(`${t("Chat.serverErrWindows")} ${r.error}`);
+        else if (r?.error) setError(`${t("Chat.serverErrDetail")} ${r.error}`);
         else setError(t("Chat.genericError"));
       }
     } finally { setBusy(false); }
@@ -103,7 +103,7 @@ export default function ChatServerSetup({ accent, muted, border, inputStyle, btn
       else if (r?.refused) setError(t("Chat.serverUacRefused"));
       // Le message d'exception réel du script élevé, comme à l'installation :
       // « la tâche est toujours présente » en dit bien plus qu'un échec muet.
-      else if (r?.error) setError(`${t("Chat.serverErrWindows")} ${r.error}`);
+      else if (r?.error) setError(`${t("Chat.serverErrDetail")} ${r.error}`);
       else setError(t("Chat.genericError"));
     } finally { setBusy(false); }
   };

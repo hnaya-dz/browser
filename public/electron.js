@@ -1510,7 +1510,12 @@ ipcMain.handle("chat-server-install", async (event, { licencePath, name, pin, ad
     // Vérification ICI, dans le contexte élevé : c'est le seul endroit où la
     // lecture du planificateur est fiable (en session normale elle est
     // parfois refusée — même symptôme que pour les règles de pare-feu).
-    "  if (-not (Get-ScheduledTask -TaskName '" + q(CHAT_SERVER_TASK) + "' -ErrorAction SilentlyContinue)) { throw 'La tache de demarrage n a pas ete enregistree (creation refusee, probablement par un antivirus).' }",
+    // ⚠️ Message FACTUEL : décrire ce qui a été constaté, jamais supposer la
+    // cause. Une version antérieure accusait l'antivirus — hypothèse tirée
+    // d'un seul poste, démentie depuis par un second poste qui échoue dans
+    // des conditions toutes différentes. Un utilisateur à qui l'on désigne
+    // une fausse cause perd son temps à la traiter.
+    "  if (-not (Get-ScheduledTask -TaskName '" + q(CHAT_SERVER_TASK) + "' -ErrorAction SilentlyContinue)) { throw 'Le planificateur de taches Windows a accepte la creation sans erreur, mais la tache reste introuvable ensuite.' }",
     // Démarrage immédiat : un serveur n'a pas à être redémarré pour être
     // installé.
     "  Start-ScheduledTask -TaskName '" + q(CHAT_SERVER_TASK) + "'",

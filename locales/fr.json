@@ -269,7 +269,7 @@
     "serverUninstall": "Retirer le serveur de ce poste",
     "serverUninstallNote": "Les données (historique, appareils, licence) sont conservées : une réinstallation reprend le salon tel quel.",
     "serverUacNote": "Windows demandera une confirmation administrateur (une seule fois) : création de la tâche de démarrage et des règles de pare-feu.",
-    "serverUacRefused": "Autorisation administrateur refusée — rien n'a été modifié.",
+    "serverUacRefused": "Autorisation administrateur refusée ou interrompue — l'opération n'a pas abouti.",
     "mediaQuotaBytes": "Limite de volume atteinte pour cet appareil (200 Mo par heure). Réessayez plus tard.",
     "mediaQuotaFiles": "Trop de fichiers envoyés depuis cet appareil dans la dernière heure. Réessayez plus tard.",
     "mediaTooBig": "Fichier trop volumineux (25 Mo maximum).",
@@ -305,7 +305,7 @@
     "serverErrPin": "Le PIN d'accès doit compter 6 chiffres.",
     "serverErrAdminPin": "Le PIN administrateur doit compter 6 chiffres.",
     "serverErrName": "Le nom du salon contient des caractères non autorisés (lettres latines, chiffres, espaces, . _ - uniquement).",
-    "serverErrWindows": "L'installation du serveur a échoué. Windows a répondu :",
+    "serverErrDetail": "L'opération a échoué. Détail signalé :",
     "serverErrWindowsOnly": "Le serveur permanent est disponible sur Windows uniquement pour le moment.",
     "mediaConverting": "Conversion audio en cours…",
     "mediaDecodeFailed": "Ce fichier audio ne peut pas être lu ou converti — il est peut-être corrompu ou dans un format non pris en charge par le navigateur."

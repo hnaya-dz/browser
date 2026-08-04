@@ -269,7 +269,7 @@
     "serverUninstall": "Remove the server from this computer",
     "serverUninstallNote": "Data (history, devices, licence) is kept: reinstalling resumes the room as it was.",
     "serverUacNote": "Windows will ask for administrator confirmation (once): startup task and firewall rules.",
-    "serverUacRefused": "Administrator authorization refused — nothing was changed.",
+    "serverUacRefused": "Administrator authorization refused or interrupted — the operation did not complete.",
     "mediaQuotaBytes": "Upload limit reached for this device (200 MB per hour). Try again later.",
     "mediaQuotaFiles": "Too many files sent from this device in the past hour. Try again later.",
     "mediaTooBig": "File too large (25 MB maximum).",
@@ -305,7 +305,7 @@
     "serverErrPin": "The access PIN must be 6 digits.",
     "serverErrAdminPin": "The admin PIN must be 6 digits.",
     "serverErrName": "The room name contains characters that are not allowed (Latin letters, digits, spaces, . _ - only).",
-    "serverErrWindows": "Server installation failed. Windows replied:",
+    "serverErrDetail": "The operation failed. Reported detail:",
     "serverErrWindowsOnly": "The permanent server is available on Windows only for now.",
     "mediaConverting": "Converting audio…",
     "mediaDecodeFailed": "This audio file could not be read or converted — it may be corrupted or in a format the browser does not support."
