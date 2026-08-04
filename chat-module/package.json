@@ -7,7 +7,8 @@
   "main": "src/server.js",
   "scripts": {
     "host": "node src/server.js",
-    "serve": "node src/serve.js"
+    "serve": "node src/serve.js",
+    "test": "node test/run-all.mjs"
   },
   "dependencies": {
     "ws": "^8.18.0"

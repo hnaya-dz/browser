@@ -219,10 +219,27 @@ appareil signe ses messages (`src/identity.js`, pendant navigateur dans
 registre (pseudos utilisés, machine, IP, étiquette posée par l'admin).
 Panneau d'administration dans le dock (PIN admin distinct) : registre,
 recherche d'historique, exports JSON/CSV, rétention (90 j par défaut,
-0 = illimitée). Tests obligatoires après toute modification :
-`node test/crypto-interop.test.mjs` (8 assertions, interop bit-à-bit),
-`test/store.test.mjs`, `test/signed-protocol.test.mjs`,
-`test/admin-protocol.test.mjs`, `test/serve.test.mjs`.
+0 = illimitée).
+
+### Tests
+
+Obligatoires après toute modification — **une seule commande**, qui
+découvre et enchaîne toutes les suites de `test/` :
+
+```bash
+cd chat-module
+yarn test          # ou : node test/run-all.mjs (idem depuis la racine : yarn test)
+```
+
+Suites couvertes : `crypto-interop` (interop bit-à-bit Node ↔ navigateur),
+`store`, `signed-protocol`, `admin-protocol`, `rooms-protocol`, `serve`.
+Une suite peut sortir en **77** = ignorée volontairement, prérequis absent :
+c'est le cas de `serve.test.mjs`, dont les scénarios de PIN ont besoin
+d'émettre une licence de serveur permanent et donc de la clé privée de
+signature, conservée hors dépôt (`HNAYA_LICENCE_KEY` pour un autre
+chemin). Ses deux scénarios de barrière — refus de démarrer sans licence,
+refus d'une signature contrefaite — tournent partout, eux. Le bilan
+distingue ✅ / ⏭️ / ❌ ; seul un ❌ fait sortir en 1.
 
 ---
 
