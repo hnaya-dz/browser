@@ -75,18 +75,22 @@ export default function ChatServerSetup({ accent, muted, border, inputStyle, btn
       if (r?.ok) { setDone(true); setLicence(null); setPin(""); setAdminPin(""); setName(""); await refresh(); }
       else if (r?.refused) setError(t("Chat.serverUacRefused"));
       else {
-        // ⚠️ Les codes courts ("pin", "task-missing"…) sont des clés
+        // ⚠️ Les codes courts ("pin", "windows-only"…) sont des clés
         // internes, jamais du texte à montrer tel quel — un utilisateur a
-        // vu "task-missing" brut à l'écran avant ce correctif. Seules les
-        // valeurs vraiment IMPRÉVUES (l'exception d'un script élevé, par
-        // exemple) retombent sur le code brut, en dernier recours : mieux
-        // vaut un indice technique que rien du tout pour me le signaler.
+        // vu "task-missing" brut à l'écran avant ce correctif.
+        // Tout le reste est le message d'exception RÉEL remonté par le
+        // script élevé (« Accès refusé », etc.). On l'encadre d'une phrase
+        // au lieu de le jeter nu à l'écran : c'est précisément ce message
+        // qui permet de comprendre ce qui bloque, là où l'ancien
+        // « task-missing » ne disait rien à personne.
         const connues: Record<string, string> = {
           pin: "serverErrPin", adminPin: "serverErrAdminPin", name: "serverErrName",
-          "task-missing": "serverErrTaskMissing", "windows-only": "serverErrWindowsOnly",
+          "windows-only": "serverErrWindowsOnly",
         };
         const cle = r?.error ? connues[r.error] : null;
-        setError(cle ? t(`Chat.${cle}`) : (r?.error || t("Chat.genericError")));
+        if (cle) setError(t(`Chat.${cle}`));
+        else if (r?.error) setError(`${t("Chat.serverErrWindows")} ${r.error}`);
+        else setError(t("Chat.genericError"));
       }
     } finally { setBusy(false); }
   };
@@ -96,7 +100,11 @@ export default function ChatServerSetup({ accent, muted, border, inputStyle, btn
     try {
       const r = await getApi()?.invoke?.("chat-server-uninstall");
       if (r?.ok) await refresh();
-      else setError(r?.refused ? t("Chat.serverUacRefused") : t("Chat.genericError"));
+      else if (r?.refused) setError(t("Chat.serverUacRefused"));
+      // Le message d'exception réel du script élevé, comme à l'installation :
+      // « la tâche est toujours présente » en dit bien plus qu'un échec muet.
+      else if (r?.error) setError(`${t("Chat.serverErrWindows")} ${r.error}`);
+      else setError(t("Chat.genericError"));
     } finally { setBusy(false); }
   };
 

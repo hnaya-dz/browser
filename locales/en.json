@@ -305,7 +305,7 @@
     "serverErrPin": "The access PIN must be 6 digits.",
     "serverErrAdminPin": "The admin PIN must be 6 digits.",
     "serverErrName": "The room name contains characters that are not allowed (Latin letters, digits, spaces, . _ - only).",
-    "serverErrTaskMissing": "The files were prepared, but the startup task could not be confirmed. A common cause: antivirus software (Kaspersky in particular) intercepting this step during a pending update — restart the computer and try again. The PIN and licence remain saved.",
+    "serverErrWindows": "Server installation failed. Windows replied:",
     "serverErrWindowsOnly": "The permanent server is available on Windows only for now.",
     "mediaConverting": "Converting audio…",
     "mediaDecodeFailed": "This audio file could not be read or converted — it may be corrupted or in a format the browser does not support."

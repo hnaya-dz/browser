@@ -1470,8 +1470,33 @@ ipcMain.handle("chat-server-install", async (event, { licencePath, name, pin, ad
     "  $exe = '" + q(exe) + "'",
     "  if (-not (Get-NetFirewallRule -DisplayName '" + FIREWALL_RULE_TCP + "' -ErrorAction SilentlyContinue)) { New-NetFirewallRule -DisplayName '" + FIREWALL_RULE_TCP + "' -Direction Inbound -Action Allow -Protocol TCP -LocalPort 4802-4809 -Program $exe -RemoteAddress LocalSubnet -Profile Any | Out-Null }",
     "  if (-not (Get-NetFirewallRule -DisplayName '" + FIREWALL_RULE_UDP + "' -ErrorAction SilentlyContinue)) { New-NetFirewallRule -DisplayName '" + FIREWALL_RULE_UDP + "' -Direction Inbound -Action Allow -Protocol UDP -LocalPort 41234 -Program $exe -RemoteAddress LocalSubnet -Profile Any | Out-Null }",
-    "  schtasks /Create /F /TN '" + CHAT_SERVER_TASK + "' /TR '\\\"" + q(wrapper) + "\\\"' /SC ONSTART /RU SYSTEM /RL HIGHEST | Out-Null",
-    "  schtasks /Run /TN '" + CHAT_SERVER_TASK + "' | Out-Null",
+    // ⚠️ NE PAS revenir à `schtasks /Create` ici. Deux raisons, toutes deux
+    // constatées sur un poste réel :
+    // 1. schtasks est un EXÉCUTABLE, pas une cmdlet : $ErrorActionPreference
+    //    ne l'intercepte pas. Un échec passait donc inaperçu, le script
+    //    écrivait quand même 'OK', et l'utilisateur recevait un « task-missing »
+    //    sans jamais voir la vraie erreur — avalée par le `| Out-Null`.
+    // 2. Créer une tâche via schtasks.exe est un procédé de persistance
+    //    classique, que les antivirus surveillent de près (Kaspersky est
+    //    très répandu chez nos clients). Register-ScheduledTask passe par
+    //    l'API COM du planificateur, moins souvent bloquée.
+    // Les cmdlets lèvent une exception attrapée par le `catch` : le message
+    // exact remonte jusqu'à l'écran.
+    "  $action = New-ScheduledTaskAction -Execute '" + q(wrapper) + "'",
+    "  $trigger = New-ScheduledTaskTrigger -AtStartup",
+    // ExecutionTimeLimit à zéro = aucune limite. Sans cela le planificateur
+    // arrête la tâche au bout de son délai par défaut : un serveur permanent
+    // mourrait tout seul au bout de quelques jours.
+    "  $settings = New-ScheduledTaskSettingsSet -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit ([TimeSpan]::Zero) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable",
+    "  $principal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest",
+    "  Register-ScheduledTask -TaskName '" + q(CHAT_SERVER_TASK) + "' -Action $action -Trigger $trigger -Settings $settings -Principal $principal -Force | Out-Null",
+    // Vérification ICI, dans le contexte élevé : c'est le seul endroit où la
+    // lecture du planificateur est fiable (en session normale elle est
+    // parfois refusée — même symptôme que pour les règles de pare-feu).
+    "  if (-not (Get-ScheduledTask -TaskName '" + q(CHAT_SERVER_TASK) + "' -ErrorAction SilentlyContinue)) { throw 'La tache de demarrage n a pas ete enregistree (creation refusee, probablement par un antivirus).' }",
+    // Démarrage immédiat : un serveur n'a pas à être redémarré pour être
+    // installé.
+    "  Start-ScheduledTask -TaskName '" + q(CHAT_SERVER_TASK) + "'",
     "  Set-Content -LiteralPath '" + q(resultFile) + "' -Value 'OK'",
     "} catch {",
     "  Set-Content -LiteralPath '" + q(resultFile) + "' -Value ('FAIL ' + $_.Exception.Message)",
@@ -1485,21 +1510,26 @@ ipcMain.handle("chat-server-install", async (event, { licencePath, name, pin, ad
   ]);
 
   // Même doctrine que le pare-feu : le verdict vient du terrain, pas du
-  // code de sortie. 1) fichier écrit par le script élevé ; 2) la tâche
-  // existe-t-elle réellement ; 3) le port répond-il (jusqu'à ~6 s).
+  // code de sortie. Le script élevé a DÉJÀ vérifié l'enregistrement de la
+  // tâche là où la lecture est fiable ; s'il a écrit 'OK', elle existe.
   let verdict = "";
   try { verdict = readFileSync(resultFile, "utf8").trim(); } catch {}
   if (!verdict.startsWith("OK")) {
     if (code === 125 || !verdict) return { ok: false, refused: true };
     return { ok: false, error: verdict.replace(/^FAIL\s*/, "") };
   }
-  if (!(await chatServerTaskExists())) return { ok: false, error: "task-missing" };
+  // ⚠️ Cette relecture non élevée n'est PLUS un critère d'échec : sur les
+  // postes où l'antivirus refuse la lecture du planificateur en session
+  // normale, elle renvoyait false alors que la tâche existait — c'est ce
+  // qui produisait un « task-missing » trompeur après une installation
+  // pourtant réussie. Elle ne sert plus qu'à nuancer l'état affiché.
+  const tacheVisible = await chatServerTaskExists();
   let running = false;
   for (let i = 0; i < 6 && !running; i++) {
     await new Promise((r) => setTimeout(r, 1000));
     running = await chatServerPortAlive();
   }
-  return { ok: true, running, dataDir: chatServerDataDir };
+  return { ok: true, running, tacheVisible, dataDir: chatServerDataDir };
 });
 
 ipcMain.handle("chat-server-uninstall", async () => {
@@ -1512,10 +1542,26 @@ ipcMain.handle("chat-server-uninstall", async () => {
   const q = (s) => String(s).replace(/'/g, "''");
   // Les DONNÉES (historique, registre, licence) sont volontairement
   // conservées : une réinstallation reprend le salon là où il était.
+  // Mêmes cmdlets qu'à l'installation, et pour les mêmes raisons : un
+  // `schtasks /Delete` en échec n'aurait pas interrompu le script, qui
+  // aurait écrit 'OK' malgré tout. Pire ici : le contrôle final se faisait
+  // par une lecture NON élevée, or une lecture refusée se lit exactement
+  // comme « tâche absente » — l'app annonçait donc une désinstallation
+  // réussie sans rien avoir supprimé. Le verdict vient maintenant du
+  // contexte élevé, seul endroit où la lecture est fiable.
   const script = [
-    "schtasks /End /TN '" + CHAT_SERVER_TASK + "' 2>&1 | Out-Null",
-    "schtasks /Delete /F /TN '" + CHAT_SERVER_TASK + "' 2>&1 | Out-Null",
-    "Set-Content -LiteralPath '" + q(resultFile) + "' -Value 'OK'",
+    "$ErrorActionPreference = 'Stop'",
+    "try {",
+    "  $t = Get-ScheduledTask -TaskName '" + q(CHAT_SERVER_TASK) + "' -ErrorAction SilentlyContinue",
+    "  if ($t) {",
+    "    try { Stop-ScheduledTask -TaskName '" + q(CHAT_SERVER_TASK) + "' } catch { }",
+    "    Unregister-ScheduledTask -TaskName '" + q(CHAT_SERVER_TASK) + "' -Confirm:$false",
+    "  }",
+    "  if (Get-ScheduledTask -TaskName '" + q(CHAT_SERVER_TASK) + "' -ErrorAction SilentlyContinue) { throw 'La tache est toujours presente apres suppression.' }",
+    "  Set-Content -LiteralPath '" + q(resultFile) + "' -Value 'OK'",
+    "} catch {",
+    "  Set-Content -LiteralPath '" + q(resultFile) + "' -Value ('FAIL ' + $_.Exception.Message)",
+    "}",
     "exit 0",
   ].join("\r\n");
   writeFileSync(ps1, script, "utf8");
@@ -1524,8 +1570,11 @@ ipcMain.handle("chat-server-uninstall", async () => {
   ]);
   let verdict = "";
   try { verdict = readFileSync(resultFile, "utf8").trim(); } catch {}
-  if (verdict !== "OK") return { ok: false, refused: code === 125 };
-  return { ok: !(await chatServerTaskExists()) };
+  if (!verdict.startsWith("OK")) {
+    if (code === 125 || !verdict) return { ok: false, refused: true };
+    return { ok: false, error: verdict.replace(/^FAIL\s*/, "") };
+  }
+  return { ok: true };
 });
 
 // ✅ Fermeture propre : le worker reçoit "disconnect" (fork() le fait

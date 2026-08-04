@@ -545,3 +545,45 @@ seul. Les branches `app.isPackaged` (electron-serve, chemins de
 `chat-module`, de yt-dlp) ne sont exercées que dans l'application
 packagée — construire avec `electron-builder --dir` et piloter
 l'exécutable produit par CDP.
+
+---
+
+## 14. Installation du serveur permanent — `public/electron.js`
+
+### Le piège qui a coûté plusieurs soirées de test
+
+Un utilisateur voyait « la tâche de démarrage n'a pas pu être confirmée »
+à **chaque** tentative. Les traces relevées sur son poste :
+
+- `start-server.cmd` écrit à l'heure de la tentative ;
+- les deux règles de pare-feu créées **par le même script élevé** ;
+- aucune tâche planifiée, aucun `server.log`.
+
+Autrement dit, le script élevé s'est déroulé jusqu'au bout et a écrit son
+verdict `OK` — alors que la création de la tâche avait échoué.
+
+**Cause** : `schtasks` est un **exécutable**, pas une cmdlet.
+`$ErrorActionPreference = 'Stop'` ne l'intercepte pas ; un exécutable en
+échec positionne `$LASTEXITCODE` sans lever d'exception. Le `try/catch`
+n'a donc rien vu, et le `| Out-Null` a jeté le message d'erreur réel.
+
+**Règle générale** : dans un script élevé dont le verdict est écrit dans
+un fichier, ne jamais appeler un exécutable natif sans tester
+`$LASTEXITCODE`, ou préférer une cmdlet. Ici : `Register-ScheduledTask`,
+`Unregister-ScheduledTask`, `Start-ScheduledTask`.
+
+### Trois invariants à ne pas casser
+
+| Invariant | Pourquoi |
+|---|---|
+| La tâche est créée par **cmdlet**, jamais par `schtasks.exe` | Les échecs deviennent des exceptions attrapables — et créer une tâche via `schtasks.exe` est un procédé de persistance que les antivirus surveillent (Kaspersky est très répandu chez nos clients) |
+| La vérification de la tâche se fait **dans le script élevé** | En session normale, la lecture du planificateur est parfois refusée : elle renvoyait « absente » pour une tâche existante, d'où un faux échec après une installation réussie. Même symptôme que pour les règles de pare-feu (§11) |
+| `-ExecutionTimeLimit ([TimeSpan]::Zero)` | Sans cela le planificateur arrête la tâche au bout de son délai par défaut : un serveur *permanent* mourrait de lui-même au bout de quelques jours |
+
+### Ne pas faire
+
+- **Ne pas conseiller un redémarrage du poste** dans un message d'erreur :
+  la cible est un serveur, qui n'a pas à redémarrer pour une installation.
+  La tâche est démarrée immédiatement par `Start-ScheduledTask`.
+- **Ne pas afficher un code interne** (`task-missing`…) : c'est le message
+  d'exception réel remonté par le script élevé qui permet de comprendre.
