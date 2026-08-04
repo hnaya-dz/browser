@@ -46,7 +46,13 @@
         "to": "chat-module",
         "filter": [
           "**/*",
-          "!data/**"
+          "!data/**",
+          "!test/**",
+          "!tools/**",
+          "!yarn.lock",
+          "!node_modules/esbuild/**",
+          "!node_modules/@esbuild/**",
+          "!node_modules/@noble/**"
         ]
       }
     ],
