@@ -1210,6 +1210,16 @@ const LEGACY_RULE_HTTP = "Hnaya Messagerie locale (TCP 4803 mobile)";
 // demande d'autorisation, une seule fois.
 const NETWORK_SETUP_VERSION = 3;
 
+// ⚠️ Les scripts élevés sont exécutés par powershell.exe — Windows
+// PowerShell 5.1, PAS PowerShell 7. La 5.1 lit un fichier UTF-8 SANS BOM
+// comme de l'ANSI : le moindre accent y devient du charabia, et certains
+// octets ainsi produits (un tiret long donne un guillemet typographique)
+// sont interprétés comme des délimiteurs de chaîne. Le script entier
+// cesse alors d'être analysable et ne s'exécute JAMAIS — sans le moindre
+// message, puisque rien n'a démarré. Le BOM lève l'ambiguïté une fois
+// pour toutes ; les scripts n'ont plus à rester ASCII par discipline.
+const ecrirePs1 = (script) => "﻿" + script;
+
 function runPowerShell(args) {
   return new Promise((resolve) => {
     const proc = spawn("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", ...args], { windowsHide: true });
@@ -1321,7 +1331,7 @@ ipcMain.handle("chat-network-setup", async () => {
     "if ($t -and $u) { Set-Content -LiteralPath '" + resultEsc + "' -Value 'OK' } else { Set-Content -LiteralPath '" + resultEsc + "' -Value 'FAIL' }",
     "exit 0",
   ].join("\r\n");
-  writeFileSync(ps1, script, "utf8");
+  writeFileSync(ps1, ecrirePs1(script), "utf8");
 
   // -Verb RunAs → invite UAC : l'utilisateur (ou l'admin du poste, si le
   // compte courant n'est pas administrateur) accorde l'autorisation.
@@ -1499,6 +1509,12 @@ ipcMain.handle("chat-server-install", async (event, { licencePath, name, pin, ad
     //    l'API COM du planificateur, moins souvent bloquée.
     // Les cmdlets lèvent une exception attrapée par le `catch` : le message
     // exact remonte jusqu'à l'écran.
+    // Une réinstallation par-dessus un serveur qui tourne laisserait
+    // l'ancien processus tenir le port 4802 : le nouveau démarrerait dans
+    // le vide. Même filtre prudent qu'à la désinstallation — sur la ligne
+    // de commande, jamais sur le nom d'image (partagé avec le navigateur).
+    "  $anciens = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -and $_.CommandLine -like '*serve.js*' -and $_.CommandLine -like '*" + q(chatServerDataDir) + "*' }",
+    "  foreach ($v in $anciens) { try { Stop-Process -Id $v.ProcessId -Force -ErrorAction Stop } catch { } }",
     "  $action = New-ScheduledTaskAction -Execute '" + q(wrapper) + "'",
     "  $trigger = New-ScheduledTaskTrigger -AtStartup",
     // ExecutionTimeLimit à zéro = aucune limite. Sans cela le planificateur
@@ -1531,7 +1547,7 @@ ipcMain.handle("chat-server-install", async (event, { licencePath, name, pin, ad
     "}",
     "exit 0",
   ].join("\r\n");
-  writeFileSync(ps1, script, "utf8");
+  writeFileSync(ps1, ecrirePs1(script), "utf8");
 
   const { code } = await runPowerShell(["-Command",
     "try { $p = Start-Process powershell -Verb RunAs -Wait -WindowStyle Hidden -PassThru -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-File','\"" + ps1.replace(/'/g, "''") + "\"'; exit $p.ExitCode } catch { exit 125 }",
@@ -1585,6 +1601,15 @@ ipcMain.handle("chat-server-uninstall", async () => {
     "    try { Stop-ScheduledTask -TaskName '" + q(CHAT_SERVER_TASK) + "' } catch { }",
     "    Unregister-ScheduledTask -TaskName '" + q(CHAT_SERVER_TASK) + "' -Confirm:$false",
     "  }",
+    // ⚠️ Arrêter la tâche ne suffit PAS : elle lance un .cmd qui lance à son
+    // tour l'exécutable. Le planificateur tue le .cmd, le petit-fils survit —
+    // constaté sur un poste réel, où le serveur tenait toujours le port 4802
+    // après une désinstallation « réussie », jusqu'au redémarrage.
+    // Le filtre porte sur la ligne de commande (serve.js ET notre répertoire
+    // de données) et JAMAIS sur le seul nom d'image : celui-ci est aussi
+    // celui du navigateur de l'utilisateur, qu'on fermerait sous lui.
+    "  $miens = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -and $_.CommandLine -like '*serve.js*' -and $_.CommandLine -like '*" + q(chatServerDataDir) + "*' }",
+    "  foreach ($m in $miens) { try { Stop-Process -Id $m.ProcessId -Force -ErrorAction Stop } catch { } }",
     "  if (Get-ScheduledTask -TaskName '" + q(CHAT_SERVER_TASK) + "' -ErrorAction SilentlyContinue) { throw 'La tache est toujours presente apres suppression.' }",
     // Le marqueur doit partir avec la tâche, sinon l'app continuerait de se
     // croire installée. Les DONNÉES (historique, licence) restent, elles.
@@ -1595,7 +1620,7 @@ ipcMain.handle("chat-server-uninstall", async () => {
     "}",
     "exit 0",
   ].join("\r\n");
-  writeFileSync(ps1, script, "utf8");
+  writeFileSync(ps1, ecrirePs1(script), "utf8");
   const { code } = await runPowerShell(["-Command",
     "try { $p = Start-Process powershell -Verb RunAs -Wait -WindowStyle Hidden -PassThru -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-File','\"" + ps1.replace(/'/g, "''") + "\"'; exit $p.ExitCode } catch { exit 125 }",
   ]);

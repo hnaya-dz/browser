@@ -562,15 +562,54 @@ Un utilisateur voyait « la tâche de démarrage n'a pas pu être confirmée »
 Autrement dit, le script élevé s'est déroulé jusqu'au bout et a écrit son
 verdict `OK` — alors que la création de la tâche avait échoué.
 
-**Cause** : `schtasks` est un **exécutable**, pas une cmdlet.
-`$ErrorActionPreference = 'Stop'` ne l'intercepte pas ; un exécutable en
-échec positionne `$LASTEXITCODE` sans lever d'exception. Le `try/catch`
-n'a donc rien vu, et le `| Out-Null` a jeté le message d'erreur réel.
+**Cause exacte, établie en élevé** — l'argument était mal découpé :
+
+```
+schtasks /Create /TN 'Hnaya Chat Serveur' /TR '\"C:\ProgramData\Hnaya Chat Server\start-server.cmd\"' ...
+  -> Erreur : Argument ou option non valide - 'Chat'.
+```
+
+L'échappement `\"` NE SURVIT PAS au passage de PowerShell vers un
+exécutable natif : `schtasks` recevait le chemin coupé aux espaces et
+prenait `Chat` pour une option. Ni antivirus, ni stratégie de groupe, ni
+problème de droits — les trois avaient été soupçonnés à tort avant que le
+diagnostic élevé ne tranche.
+
+**Pourquoi personne ne l'a vu pendant des mois** : `schtasks` est un
+**exécutable**, pas une cmdlet. `$ErrorActionPreference = 'Stop'` ne
+l'intercepte pas ; un exécutable en échec positionne `$LASTEXITCODE` sans
+lever d'exception. Le `try/catch` n'a donc rien vu, et le `| Out-Null` a
+jeté le message ci-dessus. Le script écrivait `OK` par-dessus son propre
+échec.
 
 **Règle générale** : dans un script élevé dont le verdict est écrit dans
 un fichier, ne jamais appeler un exécutable natif sans tester
 `$LASTEXITCODE`, ou préférer une cmdlet. Ici : `Register-ScheduledTask`,
-`Unregister-ScheduledTask`, `Start-ScheduledTask`.
+`Unregister-ScheduledTask`, `Start-ScheduledTask` — qui reçoivent leurs
+arguments en objets et ne connaissent aucun problème de quoting.
+
+### Encodage des .ps1 élevés — le BOM n'est pas décoratif
+
+Les scripts sont exécutés par `powershell.exe`, c'est-à-dire **Windows
+PowerShell 5.1**, pas PowerShell 7. La 5.1 lit un fichier UTF-8 **sans
+BOM** comme de l'ANSI. Un simple tiret long y devient un guillemet
+typographique, que l'analyseur prend pour un délimiteur de chaîne : le
+script entier cesse d'être analysable et ne s'exécute **jamais**, sans
+produire le moindre message puisque rien n'a démarré.
+
+D'où `ecrirePs1()` dans `electron.js`, qui préfixe tout script d'un BOM.
+Vérifier une modification avec PowerShell 7 ne prouve donc rien : c'est
+la 5.1 qui exécutera le fichier.
+
+### Arrêter la tâche n'arrête pas le serveur
+
+La tâche lance un `.cmd`, qui lance l'exécutable. `Stop-ScheduledTask`
+tue le `.cmd` ; le petit-fils survit et garde le port 4802 jusqu'au
+redémarrage — constaté sur un poste réel après une désinstallation
+« réussie ». Installation et désinstallation terminent donc explicitement
+les processus dont la ligne de commande contient `serve.js` **et** le
+répertoire de données. Filtrer sur le seul nom d'image est interdit : il
+est partagé avec le navigateur de l'utilisateur.
 
 ### Trois invariants à ne pas casser
 
