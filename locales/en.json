@@ -278,6 +278,7 @@
     "mediaTypeRefused": "This file type is not allowed in messaging.",
     "mediaBusy": "Too many transfers at once — wait for the current uploads to finish.",
     "mediaFailed": "Sending the attachment failed.",
+    "mediaImageFailed": "This image could not be read. Its extension claims a format its contents do not match - commonly an iPhone photo saved as \".jpg\" while actually being HEIC. Open it and save it again as JPEG or PNG.",
     "mediaGone": "This attachment is no longer available on the host computer.",
     "mediaIntegrity": "The received file does not match what was announced — download aborted.",
     "mediaAttach": "Attach a file",

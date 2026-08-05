@@ -132,6 +132,26 @@ const drawTo = (img: HTMLImageElement, maxSide: number, quality: number, type = 
   return { dataUrl: canvas.toDataURL(type, quality), w, h };
 };
 
+// L'hôte refuse toute vignette dépassant MAX_THUMB_BYTES (24 Ko —
+// chat-module/src/media.js), et elle voyage en base64, donc gonflée d'un
+// tiers. Mesuré sur ce moteur : une photo carrée très détaillée atteint
+// 23,4 Ko pour 24 Ko autorisés. La marge est trop mince pour être laissée
+// au hasard — une seule photo un peu plus dense et l'envoi entier est
+// refusé, sans que l'utilisateur puisse comprendre pourquoi.
+// On redescend donc la qualité tant que nécessaire plutôt que d'échouer.
+const THUMB_MAX_BYTES = 24 * 1024;
+const vignetteSousPlafond = (img: HTMLImageElement) => {
+  let sortie = drawTo(img, THUMB_MAX_SIDE, THUMB_QUALITY);
+  for (const q of [0.45, 0.32, 0.2]) {
+    if (sortie.dataUrl.length <= THUMB_MAX_BYTES) break;
+    sortie = drawTo(img, THUMB_MAX_SIDE, q);
+  }
+  // Dernier recours : réduire aussi les dimensions. Une vignette laide
+  // vaut mieux qu'une pièce jointe refusée.
+  if (sortie.dataUrl.length > THUMB_MAX_BYTES) sortie = drawTo(img, 140, 0.4);
+  return sortie;
+};
+
 const dataUrlToBytes = (dataUrl: string) => {
   const b64 = dataUrl.split(",")[1] || "";
   const bin = atob(b64);
@@ -150,7 +170,7 @@ export async function prepareFile(
   if (file.type.startsWith("image/")) {
     const img = await loadImage(file);
     const full = drawTo(img, IMAGE_MAX_SIDE, IMAGE_QUALITY);
-    const thumb = drawTo(img, THUMB_MAX_SIDE, THUMB_QUALITY);
+    const thumb = vignetteSousPlafond(img);
     const bytes = dataUrlToBytes(full.dataUrl);
     return {
       kind: "image", mime: "image/jpeg",
@@ -241,7 +261,18 @@ export default function ChatComposerMedia({ accent, muted, border, disabled, onP
       const prepared = await prepareFile(file, vaConvertir ? (f) => onConverting?.(f) : undefined);
       onPrepared(prepared);
     } catch (err) {
-      onError((err as Error)?.message === "decode" ? t("Chat.mediaDecodeFailed") : t("Chat.mediaFailed"));
+      // Un échec de décodage d'IMAGE mérite son propre message. Chromium
+      // déduit le type d'un fichier de son EXTENSION, pas de son contenu :
+      // une photo iPhone (HEIC) enregistrée « .jpg » est donc annoncée
+      // image/jpeg, puis refuse de se décoder. L'ancien message unique
+      // (« l'envoi a échoué ») ne permettait à personne de comprendre —
+      // ni à l'utilisateur, ni à moi.
+      const motif = (err as Error)?.message;
+      onError(
+        motif === "decode" ? t("Chat.mediaDecodeFailed")
+        : motif === "image" ? t("Chat.mediaImageFailed")
+        : t("Chat.mediaFailed"),
+      );
     } finally {
       if (vaConvertir) onConverting?.(null);
     }

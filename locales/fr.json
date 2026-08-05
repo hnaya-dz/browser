@@ -278,6 +278,7 @@
     "mediaTypeRefused": "Ce type de fichier n'est pas autorisé dans la messagerie.",
     "mediaBusy": "Trop de transferts simultanés — attendez la fin des envois en cours.",
     "mediaFailed": "L'envoi de la pièce jointe a échoué.",
+    "mediaImageFailed": "Cette image n'a pas pu être lue. Son extension annonce un format que son contenu ne respecte pas — cas fréquent des photos d'iPhone enregistrées en « .jpg » alors qu'elles sont au format HEIC. Rouvrez-la puis réenregistrez-la en JPEG ou PNG.",
     "mediaGone": "Cette pièce jointe n'est plus disponible sur le poste hôte.",
     "mediaIntegrity": "Le fichier reçu ne correspond pas à ce qui était annoncé — téléchargement abandonné.",
     "mediaAttach": "Joindre un fichier",
