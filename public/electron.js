@@ -764,6 +764,29 @@ ipcMain.handle("get-app-version", async () => {
   return app.getVersion();
 });
 
+// Identification PRÉCISE du build installé.
+//
+// Le seul numéro de version ne suffit pas : plusieurs paquets successifs
+// portent le même (« 0.7.0 » a désigné quatre contenus différents en une
+// journée pendant la mise au point du serveur permanent), et il devient
+// alors impossible de dire quels correctifs tourne réellement un poste.
+// Un test de terrain sur le mauvais binaire fait chercher un défaut déjà
+// corrigé — c'est arrivé, et cela a coûté une nuit.
+//
+// La date vient de l'horodatage de l'exécutable lui-même : aucune étape
+// de génération, aucun fichier à produire ni à déclarer dans
+// build.files, donc rien qui puisse se désynchroniser en silence.
+ipcMain.handle("get-build-info", async () => {
+  let date = null;
+  try {
+    // En production, l'exécutable EST le paquet. En développement, ce
+    // chemin pointe l'electron.exe de node_modules : la date n'a alors
+    // aucun sens, on ne la renvoie pas plutôt que d'induire en erreur.
+    if (app.isPackaged) date = statSync(process.execPath).mtime.toISOString();
+  } catch { /* horodatage illisible : on renvoie null */ }
+  return { version: app.getVersion(), date, packaged: app.isPackaged };
+});
+
 ipcMain.handle("get-active-tab-url", async () => {
   if (activeTabId && browserViews.has(activeTabId)) {
     const url = browserViews.get(activeTabId).webContents.getURL();

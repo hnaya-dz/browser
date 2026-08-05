@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useTabContext } from "@/context/tabcontext";
 import { useLanguage } from "@/context/langcontext";
+import BuildStamp from "@/components/BuildStamp";
 
 const TR = {
   ar: {
@@ -532,6 +533,10 @@ export default function Home() {
         <button onClick={() => addTab("https://hnaya.dz")} className="discover-btn mt-8 px-6 py-2.5 rounded font-semibold text-sm">
           🇩🇿 {tr.discover}
         </button>
+
+        {/* Version + date de construction : discret, mais suffisant pour
+            savoir en un coup d'oeil quel binaire tourne sur ce poste. */}
+        <BuildStamp />
       </section>
     </>
   );

@@ -137,7 +137,9 @@
   },
   "Update": {
     "available": "Update available",
-    "download": "Download update"
+    "download": "Download update",
+    "buildDev": "development version",
+    "buildHint": "Installed version and the date it was built - compare across machines when testing."
   },
   "Chat": {
     "title": "Local Messaging",

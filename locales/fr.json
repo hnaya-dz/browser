@@ -137,7 +137,9 @@
   },
   "Update": {
     "available": "Mise à jour disponible",
-    "download": "Télécharger la mise à jour"
+    "download": "Télécharger la mise à jour",
+    "buildDev": "version de développement",
+    "buildHint": "Version installée et date de sa construction — à comparer entre postes lors d'un test."
   },
   "Chat": {
     "title": "Messagerie locale",

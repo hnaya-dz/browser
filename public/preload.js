@@ -21,6 +21,7 @@ const ALLOWED_INVOKE = [
   "chat-session-list",
   "chat-session-clear",
   "get-active-tab-url",
+  "get-build-info",
   "favorites-list",
   "favorites-is-saved",
   "favorites-add",
