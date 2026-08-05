@@ -49,7 +49,16 @@ const HEARTBEAT_MS = 10000;
  * @returns {{ pin: string, stop: () => void }}
  */
 export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, wsPort = WS_PORT, httpPort, onError, maxDevices = null } = {}) {
-  const clients = new Map(); // userId -> { ws, groups, device }
+  // ⚠️ Indexé par CONNEXION (l'objet ws), surtout pas par pseudo.
+  // « Ajouter mon mobile » fait rejoindre le téléphone sous le MÊME pseudo
+  // que le poste (paramètre ?u= du QR — c'est tout l'intérêt : ne pas
+  // inventer un second nom). Avec un index par pseudo, la connexion du
+  // téléphone écrasait celle du poste : le poste restait ouvert mais
+  // sortait de la table, donc de toute rediffusion. Il devenait sourd à
+  // TOUT — y compris aux messages des autres — et le restait même après
+  // le départ du téléphone, dont la fermeture supprimait l'entrée.
+  // Constaté en usage réel ; test de non-régression : test-meme-pseudo.
+  const clients = new Map(); // ws -> { ws, userId, groups, device }
   initStore(dataDir); // dataDir undefined → défaut du module (chat-module/data)
 
   // ✅ D.2 — le salon est une entité à part entière (historique, PINs et
@@ -219,7 +228,7 @@ export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, 
           return;
         }
         if (device) addRoomMember(activeRoomId, device.fingerprint);
-        clients.set(userId, { ws, groups: payload.groups || ["all"], device });
+        clients.set(ws, { ws, userId, groups: payload.groups || ["all"], device });
 
         // Renvoie les messages manqués depuis la dernière connexion
         const since = payload.lastSeenTs || 0;
@@ -247,7 +256,7 @@ export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, 
 
       if (payload.type === "message") {
         const now = Date.now();
-        const device = clients.get(userId)?.device || null;
+        const device = clients.get(ws)?.device || null;
         // ⚠️ Étape F — écrire dans un fil privé exige d'y appartenir. Sans
         // ce contrôle, un tiers pouvait déposer un message dans la
         // conversation de deux collègues (elle lui serait restée invisible,
@@ -343,10 +352,15 @@ export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, 
           },
         };
         if (payload.to) {
-          const target = clients.get(String(payload.to));
-          if (target) target.ws.send(encryptPayload(sessionKey, inv));
+          // Le destinataire est désigné par son PSEUDO, mais la table est
+          // indexée par connexion : une personne présente sur son poste ET
+          // son téléphone a deux entrées. On sert les deux — l'invitation
+          // doit arriver là où elle regarde, pas sur un seul de ses écrans.
+          const dest = String(payload.to);
+          const cibles = [...clients.values()].filter((c) => c.userId === dest);
+          for (const t of cibles) t.ws.send(encryptPayload(sessionKey, inv));
           // accusé à l'expéditeur (le destinataire peut être déconnecté)
-          ws.send(encryptPayload(sessionKey, { v: 1, type: "invite-sent", to: String(payload.to), delivered: !!target }));
+          ws.send(encryptPayload(sessionKey, { v: 1, type: "invite-sent", to: dest, delivered: cibles.length > 0 }));
         } else {
           if (!saveMessage(inv).inserted) return;
           broadcastToGroup(inv.groupId, inv);
@@ -381,7 +395,7 @@ export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, 
         // Quota horaire : contrôlé sur la taille ANNONCÉE, donc avant le
         // moindre octet écrit sur le disque. La clé est l'empreinte de
         // l'appareil quand elle existe (stable, contrairement au pseudo).
-        const quotaKey = clients.get(userId)?.device?.fingerprint || `user:${userId}`;
+        const quotaKey = clients.get(ws)?.device?.fingerprint || `user:${userId}`;
         const refus = uploadQuota.check(quotaKey, Number(payload.size) || 0);
         if (refus) {
           sendTo({ v: 1, type: "media-failed", uploadId: payload.uploadId, reason: refus });
@@ -421,7 +435,7 @@ export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, 
         try {
           const res = up.finish();
           uploadQuota.record(
-            clients.get(userId)?.device?.fingerprint || `user:${userId}`,
+            clients.get(ws)?.device?.fingerprint || `user:${userId}`,
             res.size,
           );
           // L'empreinte est celle CALCULÉE par l'hôte sur les octets reçus,
@@ -469,7 +483,7 @@ export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, 
         const enLigne = new Set(
           [...clients.values()].map((c) => c.device?.fingerprint).filter(Boolean),
         );
-        const moi = clients.get(userId)?.device?.fingerprint || null;
+        const moi = clients.get(ws)?.device?.fingerprint || null;
         const gens = listRoster(activeRoomId).map((d) => ({
           fingerprint: d.fingerprint,
           name: d.lastNickname || null,
@@ -528,10 +542,10 @@ export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, 
               // jusqu'à sa prochaine reconnexion)
               const fp = String(payload.fingerprint || "");
               banDevice(activeRoomId, fp);
-              for (const [uid, c] of clients) {
+              for (const [cle, c] of clients) {
                 if (c.device?.fingerprint === fp) {
                   try { c.ws.close(4004, "device-banned"); } catch {}
-                  clients.delete(uid);
+                  clients.delete(cle); // la clé est la connexion, pas le pseudo
                 }
               }
               broadcastPresence();
@@ -596,7 +610,9 @@ export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, 
     });
 
     ws.on("close", () => {
-      if (userId) clients.delete(userId);
+      // Supprimer par CONNEXION : fermer le téléphone ne doit pas retirer
+      // le poste, qui partage le même pseudo.
+      clients.delete(ws);
       broadcastPresence();
     });
   });
@@ -622,7 +638,10 @@ export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, 
   }
 
   function broadcastPresence() {
-    const online = [...clients.keys()];
+    // Une personne présente sur son poste ET sur son téléphone ne doit
+    // apparaître qu'une fois : la présence se raisonne en personnes, pas
+    // en connexions (l'index de la table, lui, est bien par connexion).
+    const online = [...new Set([...clients.values()].map((c) => c.userId).filter(Boolean))];
     for (const { ws } of clients.values()) {
       ws.send(encryptPayload(sessionKey, { v: 1, type: "presence", online }));
     }
