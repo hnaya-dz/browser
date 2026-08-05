@@ -1079,9 +1079,23 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
               </div>
             )}
 
+            {/* La présence est un ÉTAT, pas une action : elle occupe sa
+                propre ligne au lieu de disputer la place aux boutons. */}
             <div style={{ fontSize: 11, color: muted, display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
               <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#00c853", flexShrink: 0 }} />
               <span style={{ flex: 1 }}>{store.online.length} {t("Chat.online")}</span>
+            </div>
+
+            {/* ⚠️ flexWrap est INDISPENSABLE ici. Ces cinq boutons portent
+                tous flexShrink:0 (leur libellé ne doit pas être tronqué) et
+                le dock ne fait que ~340 px : sur une seule ligne, « Annuaire »,
+                « Inviter vers » et « Admin » sortaient de l'écran. Ils
+                n'étaient atteignables qu'en découvrant un défilement dont
+                rien ne signalait l'existence — un nouvel utilisateur pouvait
+                ignorer ces trois fonctions. Constaté en usage réel.
+                Ne pas revenir à une ligne unique sans rendre les libellés
+                rétractables. */}
+            <div style={{ fontSize: 11, color: muted, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6, flexShrink: 0 }}>
               {/* Inviter un téléphone : QR vers la page mobile servie par
                   l'hôte — visible pour tous les participants (l'URL pointe
                   toujours vers l'hôte), masqué si le poste n'a pas de LAN */}
