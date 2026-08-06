@@ -94,14 +94,17 @@ const SPKI_PREFIX = Uint8Array.from([0x30, 0x2a, 0x30, 0x05, 0x06, 0x03, 0x2b, 0
 // TOUJOURS écrit, vide au besoin : sans cela la citation occuperait le
 // rang de mediaSha et un message à pièce jointe pourrait être rejoué en
 // message citant, avec la même signature valide.
-function signablePayload({ id, from, text, ts, mediaSha, replyTo }) {
+// ⚠️ Les champs optionnels occupent des RANGS FIXES ; dès qu'un rang sert,
+// les précédents sont écrits, vides au besoin. Deux champs ne doivent
+// jamais pouvoir partager un rang, sinon un message se rejoue en un autre
+// avec la même signature valide.
+// Rangs : 5 = mediaSha, 6 = replyTo, 7 = voteSha.
+function signablePayload({ id, from, text, ts, mediaSha, replyTo, voteSha }) {
   const core = [String(id), String(from), String(text), Number(ts)];
-  if (replyTo) {
-    core.push(mediaSha ? String(mediaSha) : "");
-    core.push(String(replyTo));
-  } else if (mediaSha) {
-    core.push(String(mediaSha));
-  }
+  const optionnels = [mediaSha, replyTo, voteSha];
+  let dernier = -1;
+  optionnels.forEach((v, i) => { if (v) dernier = i; });
+  for (let i = 0; i <= dernier; i++) core.push(optionnels[i] ? String(optionnels[i]) : "");
   return new TextEncoder().encode(JSON.stringify(core));
 }
 

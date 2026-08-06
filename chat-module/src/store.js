@@ -95,6 +95,38 @@ export function initStore(dataDir = DEFAULT_DATA_DIR) {
       lastJoin    INTEGER NOT NULL,
       PRIMARY KEY (roomId, fingerprint)
     );
+
+    -- ── Étape H — votes ────────────────────────────────────────────
+    -- DEUX tables, et c'est tout l'enjeu du mode non nominatif : le
+    -- CHOIX d'un côté, la PARTICIPATION de l'autre, sans jointure
+    -- possible entre les deux. En mode non nominatif, vote_choices ne
+    -- porte ni empreinte ni pseudo : la base ne sait donc pas qui a
+    -- voté quoi, tout en sachant qui a voté — ce qui suffit à compter
+    -- les voix ET à relancer les absents.
+    --
+    -- ⚠️ Ne JAMAIS ajouter d'empreinte à vote_choices pour « faciliter »
+    -- la révision en mode non nominatif : cela rétablirait précisément
+    -- le lien que ce mode promet de ne pas conserver.
+    CREATE TABLE IF NOT EXISTS vote_choices (
+      voteId      TEXT NOT NULL,
+      choice      INTEGER NOT NULL,
+      comment     TEXT,
+      ts          INTEGER NOT NULL,
+      fingerprint TEXT,          -- renseigné en mode nominatif SEULEMENT
+      sender      TEXT           -- idem
+    );
+    CREATE INDEX IF NOT EXISTS idx_vote_choices ON vote_choices(voteId);
+
+    -- Qui a répondu, sans son choix. Sert aux absents et empêche un
+    -- second vote — y compris en mode non nominatif, où c'est la seule
+    -- trace de participation.
+    CREATE TABLE IF NOT EXISTS vote_voters (
+      voteId      TEXT NOT NULL,
+      fingerprint TEXT NOT NULL,
+      sender      TEXT,
+      ts          INTEGER NOT NULL,
+      PRIMARY KEY (voteId, fingerprint)
+    );
   `);
   // Verrou de salon (D.2) : composition figée par l'admin — les appareils
   // déjà membres circulent librement, aucun nouvel appareil n'entre
@@ -217,6 +249,71 @@ export function messageExists(id, roomId = "default") {
   return !!ensureDb()
     .prepare("SELECT 1 FROM messages WHERE id = ? AND roomId = ? LIMIT 1")
     .get(String(id), String(roomId));
+}
+
+// ── Étape H — votes ────────────────────────────────────────────────────
+
+/** Cette personne a-t-elle déjà répondu à ce vote ? Se lit toujours dans
+ *  vote_voters, jamais dans les choix : c'est la seule table qui porte
+ *  l'identité en mode non nominatif. */
+export function hasVoted(voteId, fingerprint) {
+  return !!ensureDb()
+    .prepare("SELECT 1 FROM vote_voters WHERE voteId = ? AND fingerprint = ? LIMIT 1")
+    .get(String(voteId), String(fingerprint));
+}
+
+/**
+ * Enregistre une réponse.
+ * - Mode NOMINATIF : le choix porte l'identité ; une nouvelle réponse
+ *   remplace la précédente (la dernière prévaut).
+ * - Mode NON NOMINATIF : le choix est anonyme et DÉFINITIF. Le rendre
+ *   révisable supposerait de retrouver la réponse antérieure de cette
+ *   personne, donc de conserver le lien que ce mode exclut. Un bulletin
+ *   déposé ne se reprend pas.
+ * Retourne false si la réponse est refusée (second vote non nominatif).
+ */
+export function saveVoteChoice({ voteId, choice, comment, fingerprint, sender, nominatif, ts }) {
+  const db = ensureDb();
+  const quand = Number(ts) || Date.now();
+  const dejaVote = hasVoted(voteId, fingerprint);
+  if (dejaVote && !nominatif) return false;
+
+  if (nominatif) {
+    db.prepare("DELETE FROM vote_choices WHERE voteId = ? AND fingerprint = ?")
+      .run(String(voteId), String(fingerprint));
+    db.prepare(`INSERT INTO vote_choices (voteId, choice, comment, ts, fingerprint, sender)
+                VALUES (?, ?, ?, ?, ?, ?)`)
+      .run(String(voteId), Number(choice), comment ? String(comment) : null, quand,
+           String(fingerprint), String(sender || ""));
+  } else {
+    db.prepare(`INSERT INTO vote_choices (voteId, choice, comment, ts, fingerprint, sender)
+                VALUES (?, ?, ?, ?, NULL, NULL)`)
+      .run(String(voteId), Number(choice), comment ? String(comment) : null, quand);
+  }
+  db.prepare(`INSERT INTO vote_voters (voteId, fingerprint, sender, ts) VALUES (?, ?, ?, ?)
+              ON CONFLICT(voteId, fingerprint) DO UPDATE SET ts = excluded.ts`)
+    .run(String(voteId), String(fingerprint), String(sender || ""), quand);
+  return true;
+}
+
+/** Dépouillement : décompte par option, et le détail nominatif seulement
+ *  quand le vote l'est. `voters` liste qui a répondu dans les deux modes —
+ *  c'est ce qui permet de relancer les absents sans trahir les choix. */
+export function getVoteTally(voteId) {
+  const db = ensureDb();
+  const lignes = db.prepare("SELECT choice, comment, ts, fingerprint, sender FROM vote_choices WHERE voteId = ? ORDER BY ts ASC")
+    .all(String(voteId));
+  const decompte = {};
+  for (const l of lignes) decompte[l.choice] = (decompte[l.choice] || 0) + 1;
+  const voters = db.prepare("SELECT fingerprint, sender, ts FROM vote_voters WHERE voteId = ? ORDER BY ts ASC")
+    .all(String(voteId));
+  return {
+    decompte,
+    total: lignes.length,
+    voters,
+    detail: lignes.filter((l) => l.fingerprint)
+      .map((l) => ({ sender: l.sender, fingerprint: l.fingerprint, choice: l.choice, comment: l.comment, ts: l.ts })),
+  };
 }
 
 function countMessages() {

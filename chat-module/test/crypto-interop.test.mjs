@@ -99,4 +99,37 @@ assert.notStrictEqual(
   "Un média peut être rejoué en citation : la forme signée est ambiguë",
 );
 
-console.log("✅ Interop crypto Node ↔ navigateur : 11/11 OK (AES-GCM + Ed25519 + citation)");
+// 10. Étape H — la RÈGLE DES RANGS. Les champs optionnels occupent des
+// rangs fixes (5 mediaSha, 6 replyTo, 7 voteSha) et tout rang précédent
+// est écrit, vide au besoin. C'est ce qui interdit qu'un message se
+// rejoue en un autre avec la même signature valide. Chaque combinaison
+// doit produire une forme DISTINCTE, et identique des deux côtés.
+const combinaisons = [
+  ["rien",              {}],
+  ["media",             { mediaSha: "X" }],
+  ["citation",          { replyTo: "X" }],
+  ["vote",              { voteSha: "X" }],
+  ["media+citation",    { mediaSha: "X", replyTo: "X" }],
+  ["media+vote",        { mediaSha: "X", voteSha: "X" }],
+  ["citation+vote",     { replyTo: "X", voteSha: "X" }],
+  ["les trois",         { mediaSha: "X", replyTo: "X", voteSha: "X" }],
+];
+const formes = new Map();
+for (const [nom, champs] of combinaisons) {
+  const msg = { ...core, ...champs };
+  const forme = signablePayload(msg);
+  assert.ok(!formes.has(forme),
+    `Collision de rangs : « ${nom} » signe les mêmes octets que « ${formes.get(forme)} »`);
+  formes.set(forme, nom);
+  assert.strictEqual(
+    nodeSign(null, Buffer.from(forme, "utf8"), nodePriv).toString("base64"),
+    browserId.signMessage(msg),
+    `Signatures Node/navigateur différentes pour « ${nom} »`,
+  );
+}
+// Compatibilité : la forme sans champ optionnel n'a pas bougé.
+assert.strictEqual(signablePayload(core),
+  JSON.stringify([core.id, core.from, core.text, core.ts]),
+  "La forme de base a changé — tout l'historique deviendrait invérifiable");
+
+console.log("✅ Interop crypto Node ↔ navigateur : 19/19 OK (AES-GCM + Ed25519 + rangs signés)");

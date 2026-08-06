@@ -50,14 +50,23 @@ import path from "node:path";
 // même signature valide). Quand une citation existe, l'emplacement du
 // média est donc TOUJOURS présent, vide s'il n'y a pas de pièce jointe.
 // Un message sans citation signe exactement les mêmes octets qu'avant.
-export function signablePayload({ id, from, text, ts, mediaSha, replyTo }) {
+// Étape H — vote : l'empreinte de la DÉFINITION du vote (ses options et
+// son mode) est signée elle aussi. Sans cela, on pourrait contester après
+// coup les choix réellement proposés, ou prétendre qu'un vote nominatif
+// ne l'était pas — ce qui viderait la traçabilité de son sens.
+//
+// ⚠️ RÈGLE GÉNÉRALE, à respecter pour tout champ ajouté ensuite : les
+// champs optionnels occupent des RANGS FIXES. Dès qu'un rang est utilisé,
+// tous ceux qui le précèdent sont écrits, vides au besoin. Sans cette
+// règle, deux champs différents partageraient un rang et un message
+// pourrait être rejoué en un autre AVEC LA MÊME SIGNATURE VALIDE.
+// Rangs : 5 = mediaSha, 6 = replyTo, 7 = voteSha.
+export function signablePayload({ id, from, text, ts, mediaSha, replyTo, voteSha }) {
   const core = [String(id), String(from), String(text), Number(ts)];
-  if (replyTo) {
-    core.push(mediaSha ? String(mediaSha) : "");
-    core.push(String(replyTo));
-  } else if (mediaSha) {
-    core.push(String(mediaSha));
-  }
+  const optionnels = [mediaSha, replyTo, voteSha];
+  let dernier = -1;
+  optionnels.forEach((v, i) => { if (v) dernier = i; });
+  for (let i = 0; i <= dernier; i++) core.push(optionnels[i] ? String(optionnels[i]) : "");
   return JSON.stringify(core);
 }
 
