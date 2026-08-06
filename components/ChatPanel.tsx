@@ -3,10 +3,18 @@ import { useEffect, useMemo, useRef, useState } from "react";
 // ✅ Icônes vectorielles (lucide, déjà dans les dépendances) plutôt
 // qu'emoji : les emoji sont rendus par la police du système et diffèrent
 // visuellement entre Windows 10 et 11 — incohérent d'un poste à l'autre.
-import { MessageSquare, Shield, Lock, Smartphone, KeyRound, Eye, EyeOff, Send, History, DoorOpen, Trash2, KeySquare, Users, ArrowLeft, CornerUpLeft, X } from "lucide-react";
+import { MessageSquare, Shield, Lock, Smartphone, KeyRound, Eye, EyeOff, Send, History, DoorOpen, Trash2, KeySquare, Users, ArrowLeft, CornerUpLeft, X, CheckCircle2 } from "lucide-react";
 import ChatAdminPanel from "./ChatAdminPanel";
 import ChatServerSetup from "./ChatServerSetup";
 import ChatComposerMedia, { MediaPreview, type PreparedMedia } from "./ChatComposerMedia";
+import ChatVoteCard from "./ChatVoteCard";
+import type { InviteExtra } from "@/context/chatstore";
+
+// Les trois issues d'un vote, dans le vocabulaire administratif validé
+// par l'utilisateur. Ce sont des CLÉS i18n : les libellés partent traduits
+// dans la langue de celui qui ouvre le vote, et voyagent tels quels — un
+// vote doit garder les mots exacts sous lesquels il a été soumis.
+const VOTE_OPTIONS = ["voteApprove", "voteReject", "voteReserve"] as const;
 import ChatMediaBubble from "./ChatMediaBubble";
 import ChatRoster from "./ChatRoster";
 import qrcode from "qrcode-generator";
@@ -143,6 +151,12 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
   // message cité est relu dans le fil au moment de l'affichage, de sorte
   // qu'une purge de rétention ne laisse pas une copie fantôme à l'écran.
   const [replyToId, setReplyToId] = useState<string | null>(null);
+  // Étape H — ouverture d'un vote. Les trois libellés sont ceux du
+  // vocabulaire administratif validé par l'utilisateur ; ils restent
+  // modifiables, mais ce sont les valeurs par défaut.
+  const [voteOuvert, setVoteOuvert] = useState(false);
+  const [voteQuestion, setVoteQuestion] = useState("");
+  const [voteNominatif, setVoteNominatif] = useState(true);
   const [mediaBusy, setMediaBusy] = useState(false);
   // Conversion audio en cours (formats hors liste : FLAC, AIFF…) — null =
   // aucune conversion, sinon avancement 0..1.
@@ -272,7 +286,7 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
 
   // Rejoindre depuis une carte d'invitation : coordonnées connues, PIN
   // prérempli s'il a été transmis — l'utilisateur confirme en un clic
-  const joinFromInvite = (extra: NonNullable<import("@/context/chatstore").ChatMessage["extra"]>) => {
+  const joinFromInvite = (extra: InviteExtra) => {
     setPinInput(extra.pin || "");
     handlePickSession({
       sessionName: extra.name,
@@ -1164,6 +1178,20 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
                   })()}
                 </button>
               )}
+              {/* Étape H — soumettre au vote */}
+              {!showAdmin && (
+                <button
+                  onClick={() => setVoteOuvert((v) => !v)}
+                  style={{
+                    ...btnStyle(voteOuvert), padding: "4px 8px", fontSize: 10,
+                    display: "flex", alignItems: "center", gap: 4, flexShrink: 0,
+                  }}
+                  title={voteOuvert ? t("Chat.inviteClose") : t("Chat.voteNew")}
+                >
+                  <CheckCircle2 size={12} />
+                  {voteOuvert ? t("Chat.inviteClose") : t("Chat.voteShort")}
+                </button>
+              )}
               {/* D.2 — inviter les membres vers un autre salon (sous-salon) */}
               {!showAdmin && (
                 <button
@@ -1367,6 +1395,10 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
                   // D.2 — carte d'invitation : cliquable, rejoint le salon
                   // invité avec le PIN prérempli s'il a été transmis
                   if (m.type === "invite" && m.extra) {
+                    // Même remarque que pour le vote : `extra` est construit
+                    // par l'hôte SELON le type, mais TypeScript ne sait pas
+                    // discriminer sur un `type` optionnel.
+                    const inv = m.extra as InviteExtra;
                     // L'expéditeur ne se voit PAS proposer de rejoindre son
                     // propre salon (retour terrain) — simple accusé discret
                     if (isMine) {
@@ -1375,7 +1407,7 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
                           alignSelf: "center", fontSize: 9.5, color: muted,
                           textAlign: "center", padding: "2px 0",
                         }}>
-                          {t("Chat.inviteSentTo")} <b>{m.extra.name}</b>
+                          {t("Chat.inviteSentTo")} <b>{inv.name}</b>
                         </div>
                       );
                     }
@@ -1389,18 +1421,34 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
                           <b>{m.from}</b> {t("Chat.inviteCardText")}
                         </div>
                         <div style={{ fontSize: 13, fontWeight: 700, margin: "3px 0", color: accent }}>
-                          {m.extra.name}
+                          {inv.name}
                         </div>
                         <div style={{ fontSize: 9.5, color: muted, direction: "ltr" }}>
-                          {m.extra.address}{m.extra.wsPort !== 4802 ? ":" + m.extra.wsPort : ""}
-                          {m.extra.pin ? " · PIN ✓" : ""}
+                          {inv.address}{inv.wsPort !== 4802 ? ":" + inv.wsPort : ""}
+                          {inv.pin ? " · PIN ✓" : ""}
                         </div>
                         <button
-                          onClick={() => joinFromInvite(m.extra!)}
+                          onClick={() => joinFromInvite(inv)}
                           style={{ ...btnStyle(true), padding: "5px 14px", fontSize: 11, marginTop: 5 }}
                         >
                           {t("Chat.inviteJoin")}
                         </button>
+                      </div>
+                    );
+                  }
+                  // Étape H — un vote occupe toute la largeur : c'est une
+                  // pièce de décision, pas une réplique dans la conversation.
+                  if (m.type === "vote") {
+                    return (
+                      <div key={m.id} id={"msg-" + m.id} style={{ alignSelf: "stretch", display: "flex" }}>
+                        <ChatVoteCard
+                          message={m}
+                          tally={store.voteTallies[m.id]}
+                          roster={store.roster}
+                          myFingerprint={store.myFingerprint}
+                          onAnswer={(choice) => getApi()?.send?.("chat-answer-vote", { voteId: m.id, choice })}
+                          accent={accent} muted={muted} border={border}
+                        />
                       </div>
                     );
                   }
@@ -1500,6 +1548,70 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
                       width: `${Math.round(converting * 100)}%`, height: "100%",
                       background: accent, transition: "width .2s linear",
                     }} />
+                  </div>
+                </div>
+              )}
+              {/* Étape H — ouvrir un vote. Le mode non nominatif est une
+                  case à cocher, décidée À L'ÉMISSION : c'est le choix de
+                  celui qui pose la question, pas un réglage du salon. */}
+              {voteOuvert && (
+                <div style={{
+                  border: `1px solid ${accent}55`, background: `${accent}10`,
+                  borderRadius: 6, padding: 8, marginBottom: 6,
+                  display: "flex", flexDirection: "column", gap: 6,
+                }}>
+                  <div style={{ fontSize: 10, color: accent, fontWeight: 700 }}>
+                    {t("Chat.voteNew")}
+                  </div>
+                  <input
+                    style={{ ...inputStyle, fontSize: 11.5 }}
+                    value={voteQuestion}
+                    onChange={(e) => setVoteQuestion(e.target.value)}
+                    placeholder={t("Chat.voteQuestionPlaceholder")}
+                    maxLength={200}
+                  />
+                  <div style={{ fontSize: 10, color: muted }}>
+                    {t("Chat.voteOptionsFixed")} : {VOTE_OPTIONS.map((k) => t(`Chat.${k}`)).join(" · ")}
+                  </div>
+                  <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 10.5, cursor: "pointer" }}>
+                    <input
+                      type="checkbox"
+                      checked={!voteNominatif}
+                      onChange={(e) => setVoteNominatif(!e.target.checked)}
+                    />
+                    <span>{t("Chat.voteNotNamedOption")}</span>
+                  </label>
+                  {/* Dire tout de suite ce que le mode implique : le
+                      découvrir après coup serait une mauvaise surprise. */}
+                  {!voteNominatif && (
+                    <div style={{ fontSize: 9.5, color: muted, lineHeight: 1.45 }}>
+                      {t("Chat.voteNotNamedHint")}
+                    </div>
+                  )}
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <button
+                      onClick={() => {
+                        const q = voteQuestion.trim();
+                        if (!q) return;
+                        getApi()?.send?.("chat-open-vote", {
+                          question: q,
+                          options: VOTE_OPTIONS.map((k) => t(`Chat.${k}`)),
+                          nominatif: voteNominatif,
+                          groupId: store.activeThread,
+                        });
+                        setVoteQuestion(""); setVoteOuvert(false); setVoteNominatif(true);
+                      }}
+                      disabled={!voteQuestion.trim()}
+                      style={{ ...btnStyle(true, !voteQuestion.trim()), flex: 1, fontSize: 11 }}
+                    >
+                      {t("Chat.voteSend")}
+                    </button>
+                    <button
+                      onClick={() => { setVoteOuvert(false); setVoteQuestion(""); setVoteNominatif(true); }}
+                      style={{ ...btnStyle(false), fontSize: 11 }}
+                    >
+                      {t("Chat.inviteClose")}
+                    </button>
                   </div>
                 </div>
               )}

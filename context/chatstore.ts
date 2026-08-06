@@ -19,13 +19,20 @@ export interface ChatMessage {
   ts: number;
   // D.2 — type "invite" : carte d'invitation vers un autre salon,
   // coordonnées dans extra {name, address, wsPort, httpPort, pin}
-  type?: "message" | "invite";
+  // Étape H — type "vote" : question soumise au vote, options et mode
+  // dans extra. Un vote EST un message (même table, même signature) ;
+  // seules les RÉPONSES vivent à part, dans le dépouillement.
+  type?: "message" | "invite" | "vote";
   // Étape G — citation : identifiant du message auquel celui-ci répond.
   // L'hôte n'accepte qu'un identifiant EXISTANT dans ce salon, et la
   // citation est couverte par la signature (voir signablePayload) : une
   // réponse ne peut pas être déplacée sous une autre demande.
   replyTo?: string | null;
-  extra?: { name: string; address: string; wsPort: number; httpPort: number; pin: string | null } | null;
+  // `extra` dépend du type : coordonnées de salon pour une invitation,
+  // définition du vote pour un vote. TypeScript ne sait pas discriminer
+  // sur un `type` optionnel — les deux points de lecture rétrécissent
+  // donc explicitement, après avoir testé `type`.
+  extra?: InviteExtra | VoteExtra | null;
   // Étape E — pièce jointe : MÉTADONNÉES seulement. Le fichier vit chez
   // l'hôte et n'est téléchargé qu'à l'ouverture ; `thumb` est une vignette
   // minuscule embarquée, qui permet un aperçu immédiat même dans
@@ -47,6 +54,19 @@ export interface ChatMessage {
 
 /** Une personne de l'annuaire du salon (étape F). Le serveur ne renvoie
  *  QUE ces champs : ni IP, ni machine, ni clé publique. */
+/** Coordonnées portées par une carte d'invitation (D.2). */
+export interface InviteExtra {
+  name: string; address: string; wsPort: number; httpPort: number; pin: string | null;
+}
+
+/** Définition d'un vote (étape H) : ses issues et son caractère nominatif.
+ *  Ces deux valeurs sont SCELLÉES dans la signature du vote — on ne peut
+ *  pas contester après coup ce qui était proposé. */
+export interface VoteExtra {
+  options: string[];
+  nominatif: boolean;
+}
+
 export interface RosterPerson {
   fingerprint: string;
   name: string | null;
@@ -104,6 +124,17 @@ export type ChatStatus =
   | "error"
   | "network-setup";
 
+/** Dépouillement d'un vote. `detail` ne porte des noms QUE si le vote est
+ *  nominatif — en non nominatif l'hôte ne l'envoie jamais, faute de savoir
+ *  lui-même qui a voté quoi. `voters` liste en revanche les répondants
+ *  dans les deux modes : c'est ce qui permet de relancer les absents. */
+export interface VoteTally {
+  decompte: Record<number, number>;
+  total: number;
+  voters: { fingerprint: string; sender: string; ts: number }[];
+  detail: { sender: string; fingerprint: string; choice: number; comment: string | null; ts: number }[];
+}
+
 export interface ChatStore {
   status: ChatStatus;
   isHost: boolean;
@@ -119,6 +150,15 @@ export interface ChatStore {
   // activeThread : "all" = le salon ; "dm:…" = un fil privé.
   roster: RosterPerson[];
   myFingerprint: string | null;
+  // Étape H — dépouillements, par identifiant de vote. Ils n'arrivent PAS
+  // avec les messages : l'hôte les rediffuse à chaque réponse, et le
+  // message de vote, lui, ne bouge plus une fois publié.
+  // `detail` est vide en mode non nominatif — par construction côté hôte,
+  // pas par filtrage ici.
+  voteTallies: Record<string, VoteTally>;
+  // Vote auquel on vient de se voir refuser un second bulletin : il faut
+  // le dire, sinon la personne croit avoir voté deux fois.
+  voteRefused: string | null;
   activeThread: string;
   discovered: Map<string, DiscoveredSession>;
   error: string | null;
@@ -197,6 +237,8 @@ export const store: ChatStore = {
   online: [],
   roster: [],
   myFingerprint: null,
+  voteTallies: {},
+  voteRefused: null,
   activeThread: "all",
   discovered: new Map(),
   error: null,
@@ -412,6 +454,22 @@ export function ensureListening() {
         patchStore(patch);
         break;
       }
+      // Étape H — dépouillement rafraîchi à chaque réponse
+      case "vote-tally": {
+        patchStore({
+          voteTallies: {
+            ...store.voteTallies,
+            [evt.voteId]: {
+              decompte: evt.decompte || {}, total: evt.total || 0,
+              voters: evt.voters || [], detail: evt.detail || [],
+            },
+          },
+        });
+        break;
+      }
+      case "vote-refused":
+        patchStore({ voteRefused: evt.voteId || null });
+        break;
       case "presence":
         patchStore({ online: evt.online || [] });
         // La présence vient de changer : l'annuaire affiché doit suivre,

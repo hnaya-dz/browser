@@ -1085,8 +1085,16 @@ ipcMain.on("chat-join", (event, joinParams) => {
   ensureChatWorker()?.send({ cmd: "join", ...joinParams });
 });
 
-ipcMain.on("chat-send-message", (event, { text, groupId, media }) => {
-  chatWorker?.send({ cmd: "send-message", text, groupId, media });
+ipcMain.on("chat-send-message", (event, { text, groupId, media, replyTo }) => {
+  chatWorker?.send({ cmd: "send-message", text, groupId, media, replyTo });
+});
+
+// ── Étape H — votes ────────────────────────────────────────────────────
+ipcMain.on("chat-open-vote", (event, { question, options, nominatif, groupId }) => {
+  chatWorker?.send({ cmd: "open-vote", question, options, nominatif, groupId });
+});
+ipcMain.on("chat-answer-vote", (event, { voteId, choice, comment }) => {
+  chatWorker?.send({ cmd: "answer-vote", voteId, choice, comment });
 });
 
 // ── Étape E — pièces jointes : pont renderer ↔ worker ──────────────────

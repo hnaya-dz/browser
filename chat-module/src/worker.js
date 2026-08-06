@@ -248,6 +248,14 @@ function handleCommand(msg) {
         onInviteSent: (r) => process.send({ event: "invite-sent", to: r.to, delivered: r.delivered }),
         // Étape F — annuaire du salon (pseudos, fonctions, présence)
         onRoster: (r) => process.send({ event: "roster", people: r.people, me: r.me }),
+        // Étape H — le dépouillement se rafraîchit à chaque réponse ; le
+        // refus signale un second bulletin en mode non nominatif, qu'il
+        // faut dire à l'intéressé plutôt que d'ignorer.
+        onVoteTally: (t) => process.send({
+          event: "vote-tally", voteId: t.voteId,
+          decompte: t.decompte, total: t.total, voters: t.voters, detail: t.detail,
+        }),
+        onVoteRefused: (r) => process.send({ event: "vote-refused", voteId: r.voteId, reason: r.reason }),
       });
       clientHandle = handle;
       handle.raw.on("open", () => process.send({ event: "joined" }));
@@ -292,6 +300,21 @@ function handleCommand(msg) {
       // silencieux dans le vide.
       if (!clientHandle) { process.send({ event: "disconnected" }); break; }
       clientHandle.send(msg.text, msg.groupId, msg.media || null, msg.replyTo || null);
+      break;
+    }
+
+    // ── Étape H — votes ───────────────────────────────────────────
+    case "open-vote": {
+      if (!clientHandle) { process.send({ event: "disconnected" }); break; }
+      clientHandle.openVote({
+        question: msg.question, options: msg.options,
+        nominatif: msg.nominatif !== false, groupId: msg.groupId,
+      });
+      break;
+    }
+    case "answer-vote": {
+      if (!clientHandle) { process.send({ event: "disconnected" }); break; }
+      clientHandle.answerVote({ voteId: msg.voteId, choice: msg.choice, comment: msg.comment || "" });
       break;
     }
 

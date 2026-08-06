@@ -315,7 +315,22 @@
     "reply": "Reply",
     "replyingTo": "Replying to",
     "replyCancel": "Cancel reply",
-    "replyGone": "Message deleted"
+    "replyGone": "Message deleted",
+    "voteLabel": "FOR APPROVAL",
+    "voteShort": "Vote",
+    "voteNew": "Put to a vote",
+    "voteQuestionPlaceholder": "Matter put to the vote…",
+    "voteOptionsFixed": "Available answers",
+    "voteApprove": "Approve",
+    "voteReject": "Reject",
+    "voteReserve": "Reservations",
+    "voteNotNamed": "not named",
+    "voteNotNamedOption": "Non-nominative vote",
+    "voteNotNamedHint": "The link between a person and their choice will not be stored. You will know who answered, not what each one answered. The ballot is final: a non-nominative vote cannot be changed. This is not a secret ballot — the room host sees the answers arrive.",
+    "voteSend": "Submit",
+    "voteAnswered": "answered",
+    "votePending": "pending",
+    "voteFinal": "Your ballot is final."
   },
   "Privacy": {
     "title": "Privacy",

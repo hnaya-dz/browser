@@ -315,7 +315,22 @@
     "reply": "رد",
     "replyingTo": "رداً على",
     "replyCancel": "إلغاء الرد",
-    "replyGone": "رسالة محذوفة"
+    "replyGone": "رسالة محذوفة",
+    "voteLabel": "للمصادقة",
+    "voteShort": "تصويت",
+    "voteNew": "طرح للتصويت",
+    "voteQuestionPlaceholder": "الموضوع المطروح للتصويت…",
+    "voteOptionsFixed": "الإجابات المقترحة",
+    "voteApprove": "مصادقة",
+    "voteReject": "رفض",
+    "voteReserve": "تحفّظات",
+    "voteNotNamed": "غير اسمي",
+    "voteNotNamedOption": "تصويت غير اسمي",
+    "voteNotNamedHint": "لن يُحفظ الرابط بين الشخص وخياره. ستعرف من أجاب، لا ما أجاب به كل واحد. الصوت نهائي: لا يمكن الرجوع عن تصويت غير اسمي. وهذا ليس اقتراعاً سرياً — مضيف الغرفة يرى الإجابات تصل.",
+    "voteSend": "إرسال",
+    "voteAnswered": "أجابوا",
+    "votePending": "في الانتظار",
+    "voteFinal": "صوتك نهائي."
   },
   "Privacy": {
     "title": "الخصوصية",

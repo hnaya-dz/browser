@@ -315,7 +315,22 @@
     "reply": "Répondre",
     "replyingTo": "En réponse à",
     "replyCancel": "Annuler la réponse",
-    "replyGone": "Message supprimé"
+    "replyGone": "Message supprimé",
+    "voteLabel": "POUR VALIDATION",
+    "voteShort": "Vote",
+    "voteNew": "Soumettre au vote",
+    "voteQuestionPlaceholder": "Objet soumis au vote…",
+    "voteOptionsFixed": "Réponses proposées",
+    "voteApprove": "Valider",
+    "voteReject": "Refuser",
+    "voteReserve": "Réserves",
+    "voteNotNamed": "non nominatif",
+    "voteNotNamedOption": "Vote non nominatif",
+    "voteNotNamedHint": "Le lien entre une personne et son choix ne sera pas enregistré. Vous saurez qui a répondu, pas ce que chacun a répondu. Le bulletin sera définitif : on ne peut pas revenir sur un vote non nominatif. Ce n'est pas un scrutin secret — l'hôte du salon voit les réponses arriver.",
+    "voteSend": "Soumettre",
+    "voteAnswered": "ont répondu",
+    "votePending": "en attente",
+    "voteFinal": "Votre bulletin est définitif."
   },
   "Privacy": {
     "title": "Confidentialité",
