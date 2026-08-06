@@ -90,9 +90,18 @@ const SPKI_PREFIX = Uint8Array.from([0x30, 0x2a, 0x30, 0x05, 0x06, 0x03, 0x2b, 0
 // Étape E : l'empreinte de la pièce jointe est ajoutée en 5e position
 // UNIQUEMENT quand il y en a une, de sorte qu'un message sans pièce
 // jointe signe exactement les mêmes octets qu'auparavant.
-function signablePayload({ id, from, text, ts, mediaSha }) {
+// Étape G — citation. Quand elle existe, l'emplacement du média est
+// TOUJOURS écrit, vide au besoin : sans cela la citation occuperait le
+// rang de mediaSha et un message à pièce jointe pourrait être rejoué en
+// message citant, avec la même signature valide.
+function signablePayload({ id, from, text, ts, mediaSha, replyTo }) {
   const core = [String(id), String(from), String(text), Number(ts)];
-  if (mediaSha) core.push(String(mediaSha));
+  if (replyTo) {
+    core.push(mediaSha ? String(mediaSha) : "");
+    core.push(String(replyTo));
+  } else if (mediaSha) {
+    core.push(String(mediaSha));
+  }
   return new TextEncoder().encode(JSON.stringify(core));
 }
 

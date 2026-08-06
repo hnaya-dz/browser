@@ -20,6 +20,11 @@ export interface ChatMessage {
   // D.2 — type "invite" : carte d'invitation vers un autre salon,
   // coordonnées dans extra {name, address, wsPort, httpPort, pin}
   type?: "message" | "invite";
+  // Étape G — citation : identifiant du message auquel celui-ci répond.
+  // L'hôte n'accepte qu'un identifiant EXISTANT dans ce salon, et la
+  // citation est couverte par la signature (voir signablePayload) : une
+  // réponse ne peut pas être déplacée sous une autre demande.
+  replyTo?: string | null;
   extra?: { name: string; address: string; wsPort: number; httpPort: number; pin: string | null } | null;
   // Étape E — pièce jointe : MÉTADONNÉES seulement. Le fichier vit chez
   // l'hôte et n'est téléchargé qu'à l'ouverture ; `thumb` est une vignette

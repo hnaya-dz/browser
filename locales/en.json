@@ -311,7 +311,11 @@
     "serverErrDetail": "The operation failed. Reported detail:",
     "serverErrWindowsOnly": "The permanent server is available on Windows only for now.",
     "mediaConverting": "Converting audio…",
-    "mediaDecodeFailed": "This audio file could not be read or converted — it may be corrupted or in a format the browser does not support."
+    "mediaDecodeFailed": "This audio file could not be read or converted — it may be corrupted or in a format the browser does not support.",
+    "reply": "Reply",
+    "replyingTo": "Replying to",
+    "replyCancel": "Cancel reply",
+    "replyGone": "Message deleted"
   },
   "Privacy": {
     "title": "Privacy",

@@ -153,7 +153,7 @@ export function joinSession({
     // "read" (accusés de lecture) : à relayer vers l'UI selon les besoins
   });
 
-  function send(text, groupId = "all", media = null) {
+  function send(text, groupId = "all", media = null, replyTo = null) {
     // Protocole v2 : id + horodatage générés ICI puis signés — le serveur
     // vérifie la signature avec la clé publique annoncée au join. Il ne
     // peut pas générer ces champs lui-même : la signature doit couvrir
@@ -164,6 +164,11 @@ export function joinSession({
     // casser la signature. Un message sans pièce jointe signe exactement
     // les mêmes octets qu'avant.
     if (media?.sha256) core.mediaSha = String(media.sha256);
+    // Étape G — la citation entre dans le périmètre signé, de sorte qu'une
+    // réponse (« je valide ») ne puisse pas être déplacée sous une autre
+    // demande. Voir signablePayload : quand une citation existe,
+    // l'emplacement du média est écrit même vide.
+    if (replyTo) core.replyTo = String(replyTo);
     ws.send(encryptPayload(sessionKey, {
       v: 2,
       type: "message",
@@ -172,6 +177,7 @@ export function joinSession({
       ts: core.ts,
       groupId,
       media,
+      replyTo: replyTo ? String(replyTo) : null,
       signature: identity.signMessage(core),
     }));
   }

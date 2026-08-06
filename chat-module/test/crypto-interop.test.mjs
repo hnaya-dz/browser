@@ -74,4 +74,29 @@ const tampered = { ...core, text: "texte modifié" };
 assert.strictEqual(nodeVerify(tampered, browserSig, browserId.publicKeySpki), false);
 assert.strictEqual(browserCrypto.verifyMessage(tampered, nodeId.signMessage(core), nodeId.publicKeySpki), false);
 
-console.log("✅ Interop crypto Node ↔ navigateur : 8/8 OK (AES-GCM + Ed25519)");
+// 9. Étape G — une CITATION doit signer les mêmes octets des deux côtés.
+// Sans cette vérification, l'hôte rejetterait silencieusement toutes les
+// réponses envoyées depuis un téléphone : elles arriveraient marquées non
+// signées, sans que rien ne l'explique.
+const avecCitation = { ...core, replyTo: "msg_cite_42" };
+assert.strictEqual(
+  nodeSign(null, Buffer.from(signablePayload(avecCitation), "utf8"), nodePriv).toString("base64"),
+  browserId.signMessage(avecCitation),
+  "Citation : signatures Node/navigateur différentes",
+);
+// Et avec une pièce jointe EN PLUS, les deux emplacements coexistant.
+const citationEtMedia = { ...core, mediaSha: "sha_media_1", replyTo: "msg_cite_42" };
+assert.strictEqual(
+  nodeSign(null, Buffer.from(signablePayload(citationEtMedia), "utf8"), nodePriv).toString("base64"),
+  browserId.signMessage(citationEtMedia),
+  "Citation + média : signatures Node/navigateur différentes",
+);
+// La substitution que la forme positionnelle doit empêcher : un message à
+// pièce jointe ne doit pas pouvoir être relu comme un message citant.
+assert.notStrictEqual(
+  browserId.signMessage({ ...core, mediaSha: "X" }),
+  browserId.signMessage({ ...core, replyTo: "X" }),
+  "Un média peut être rejoué en citation : la forme signée est ambiguë",
+);
+
+console.log("✅ Interop crypto Node ↔ navigateur : 11/11 OK (AES-GCM + Ed25519 + citation)");

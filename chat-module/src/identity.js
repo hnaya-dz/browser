@@ -40,9 +40,24 @@ import path from "node:path";
 // avec les clients et les historiques antérieurs), et une pièce jointe ne
 // peut plus être substituée après coup sans casser la signature — sans
 // cela, la signature ne couvrait que le texte.
-export function signablePayload({ id, from, text, ts, mediaSha }) {
+// Étape G — citation : le message cité fait partie de ce qui est attesté.
+// Sans cela, on pourrait déplacer un « je valide » signé sous une autre
+// demande — exactement ce qu'une administration ne peut pas se permettre.
+//
+// ⚠️ La citation N'EST PAS simplement ajoutée à la suite : elle occuperait
+// alors le même rang que mediaSha, et un message signé portant une pièce
+// jointe pourrait être rejoué comme un message citant (mêmes octets, donc
+// même signature valide). Quand une citation existe, l'emplacement du
+// média est donc TOUJOURS présent, vide s'il n'y a pas de pièce jointe.
+// Un message sans citation signe exactement les mêmes octets qu'avant.
+export function signablePayload({ id, from, text, ts, mediaSha, replyTo }) {
   const core = [String(id), String(from), String(text), Number(ts)];
-  if (mediaSha) core.push(String(mediaSha));
+  if (replyTo) {
+    core.push(mediaSha ? String(mediaSha) : "");
+    core.push(String(replyTo));
+  } else if (mediaSha) {
+    core.push(String(mediaSha));
+  }
   return JSON.stringify(core);
 }
 

@@ -133,6 +133,16 @@ export function initStore(dataDir = DEFAULT_DATA_DIR) {
     db.exec("ALTER TABLE messages ADD COLUMN media TEXT");
   }
 
+  // Étape G — citation : identifiant du message auquel celui-ci répond.
+  // Volontairement SANS clé étrangère : la purge de rétention efface les
+  // anciens messages, et une contrainte ferait alors échouer la purge ou
+  // supprimerait en cascade des réponses qu'il faut conserver. Une
+  // citation dont la cible a disparu s'affiche simplement « message
+  // supprimé » — voir le rendu du dock.
+  if (!db.prepare("PRAGMA table_info(messages)").all().some((c) => c.name === "replyTo")) {
+    db.exec("ALTER TABLE messages ADD COLUMN replyTo TEXT");
+  }
+
   const legacyAdminPin = db.prepare("SELECT value FROM config WHERE key = 'admin_pin'").get()?.value;
   const hasDefault = db.prepare("SELECT roomId FROM rooms WHERE roomId = 'default'").get();
   if (legacyAdminPin && !hasDefault) {
@@ -162,8 +172,8 @@ export function closeStore() {
 export function saveMessage(msg) {
   const res = ensureDb()
     .prepare(`INSERT OR IGNORE INTO messages
-      (id, roomId, groupId, sender, text, ts, deviceFp, signature, signatureValid, type, extra, media)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      (id, roomId, groupId, sender, text, ts, deviceFp, signature, signatureValid, type, extra, media, replyTo)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
     .run(
       String(msg.id),
       String(msg.roomId || "default"),
@@ -177,6 +187,7 @@ export function saveMessage(msg) {
       msg.type === "invite" ? "invite" : "message",
       msg.extra ? JSON.stringify(msg.extra) : null,
       msg.media ? JSON.stringify(msg.media) : null,
+      msg.replyTo ? String(msg.replyTo) : null,
     );
   // inserted=false ⇒ id déjà en base (doublon/rejeu) — le serveur s'en sert
   // pour ne pas rediffuser
@@ -198,6 +209,16 @@ export function purgeOldMessages() {
   return countMessages();
 }
 
+/** Le message cité existe-t-il DANS CE SALON ? Le contrôle est cantonné au
+ *  salon à dessein : accepter une citation vers un message d'ailleurs
+ *  révélerait son existence — et son identifiant — à quelqu'un qui n'y a
+ *  pas accès. */
+export function messageExists(id, roomId = "default") {
+  return !!ensureDb()
+    .prepare("SELECT 1 FROM messages WHERE id = ? AND roomId = ? LIMIT 1")
+    .get(String(id), String(roomId));
+}
+
 function countMessages() {
   return Number(ensureDb().prepare("SELECT COUNT(*) AS n FROM messages").get().n);
 }
@@ -216,6 +237,7 @@ function rowToMessage(r) {
     type: r.type || "message",
     extra: r.extra ? safeJson(r.extra, null) : null,
     media: r.media ? safeJson(r.media, null) : null,
+    replyTo: r.replyTo || null,
   };
 }
 

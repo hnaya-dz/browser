@@ -11,7 +11,7 @@ import { pathToFileURL } from "node:url";
 import { deriveKeyFromPin, encryptPayload, decryptPayload, generatePin } from "./crypto.js";
 import { startBeacon } from "./discovery.js";
 import {
-  initStore, saveMessage, getMessagesSince, purgeOldMessages, upsertDeviceSeen,
+  initStore, saveMessage, getMessagesSince, purgeOldMessages, upsertDeviceSeen, messageExists,
   listDevices, setDeviceLabel, searchMessages, getConfig, setConfig,
   createRoom, getRoom, touchRoom, setRoomAdminPin, setRoomPin,
   banDevice, unbanDevice, isBanned, listBans,
@@ -278,6 +278,13 @@ export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, 
           // Sans cela, la signature ne couvrait que le texte et une image
           // pouvait être substituée après coup sans la casser.
           if (payload.media?.sha256) core.mediaSha = String(payload.media.sha256);
+          // Étape G — la citation entre elle aussi dans le périmètre signé :
+          // déplacer un « je valide » sous une autre demande doit casser la
+          // signature. On n'accepte qu'un identifiant de message existant
+          // DANS CE SALON : citer un message d'un autre salon révélerait
+          // son existence à qui n'y a pas accès.
+          const cite = payload.replyTo ? String(payload.replyTo) : null;
+          if (cite && messageExists(cite, activeRoomId)) core.replyTo = cite;
           const verified = verifyMessage(core, payload.signature, device.publicKeySpki);
           const driftOk = Math.abs(now - core.ts) <= MAX_CLOCK_DRIFT_MS;
           msg = {
@@ -289,6 +296,7 @@ export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, 
             from: userId,
             text: core.text,
             media: sanitizeMedia(payload.media),
+            replyTo: core.replyTo || null,
             ts: driftOk ? core.ts : now,
             deviceFp: device.fingerprint,
             signature: payload.signature,

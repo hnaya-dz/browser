@@ -311,7 +311,11 @@
     "serverErrDetail": "L'opération a échoué. Détail signalé :",
     "serverErrWindowsOnly": "Le serveur permanent est disponible sur Windows uniquement pour le moment.",
     "mediaConverting": "Conversion audio en cours…",
-    "mediaDecodeFailed": "Ce fichier audio ne peut pas être lu ou converti — il est peut-être corrompu ou dans un format non pris en charge par le navigateur."
+    "mediaDecodeFailed": "Ce fichier audio ne peut pas être lu ou converti — il est peut-être corrompu ou dans un format non pris en charge par le navigateur.",
+    "reply": "Répondre",
+    "replyingTo": "En réponse à",
+    "replyCancel": "Annuler la réponse",
+    "replyGone": "Message supprimé"
   },
   "Privacy": {
     "title": "Confidentialité",

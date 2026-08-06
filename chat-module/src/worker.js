@@ -17,7 +17,7 @@
 //   { cmd: "stop-host" }
 //   { cmd: "discover" }
 //   { cmd: "join", address, wsPort, pin, userId, groups, lastSeenTs }
-//   { cmd: "send-message", text, groupId, media }
+//   { cmd: "send-message", text, groupId, media, replyTo }
 //   { cmd: "mark-read", messageId, groupId }
 //   { cmd: "admin", adminPin, action, reqId, ... }   (étape D)
 //   { cmd: "media-upload", reqId, path, kind, mime, thumb }   (étape E)
@@ -291,7 +291,7 @@ function handleCommand(msg) {
       // être connectée alors que la connexion est morte — évite l'envoi
       // silencieux dans le vide.
       if (!clientHandle) { process.send({ event: "disconnected" }); break; }
-      clientHandle.send(msg.text, msg.groupId, msg.media || null);
+      clientHandle.send(msg.text, msg.groupId, msg.media || null, msg.replyTo || null);
       break;
     }
 

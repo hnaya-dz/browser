@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 // ✅ Icônes vectorielles (lucide, déjà dans les dépendances) plutôt
 // qu'emoji : les emoji sont rendus par la police du système et diffèrent
 // visuellement entre Windows 10 et 11 — incohérent d'un poste à l'autre.
-import { MessageSquare, Shield, Lock, Smartphone, KeyRound, Eye, EyeOff, Send, History, DoorOpen, Trash2, KeySquare, Users, ArrowLeft } from "lucide-react";
+import { MessageSquare, Shield, Lock, Smartphone, KeyRound, Eye, EyeOff, Send, History, DoorOpen, Trash2, KeySquare, Users, ArrowLeft, CornerUpLeft, X } from "lucide-react";
 import ChatAdminPanel from "./ChatAdminPanel";
 import ChatServerSetup from "./ChatServerSetup";
 import ChatComposerMedia, { MediaPreview, type PreparedMedia } from "./ChatComposerMedia";
@@ -139,6 +139,10 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
   // Non-lus par fil privé : remis à zéro à l'ouverture du fil concerné.
   const [unreadByThread, setUnreadByThread] = useState<Record<string, number>>({});
   const [pendingMedia, setPendingMedia] = useState<PreparedMedia | null>(null);
+  // Étape G — message auquel on répond. On garde l'identifiant SEUL : le
+  // message cité est relu dans le fil au moment de l'affichage, de sorte
+  // qu'une purge de rétention ne laisse pas une copie fantôme à l'écran.
+  const [replyToId, setReplyToId] = useState<string | null>(null);
   const [mediaBusy, setMediaBusy] = useState(false);
   // Conversion audio en cours (formats hors liste : FLAC, AIFF…) — null =
   // aucune conversion, sinon avancement 0..1.
@@ -548,8 +552,9 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
     if (!pendingMedia) {
       // Le message part dans le fil OUVERT : le salon, ou la conversation
       // privée en cours.
-      api.send("chat-send-message", { text, groupId: store.activeThread, media: null });
+      api.send("chat-send-message", { text, groupId: store.activeThread, media: null, replyTo: replyToId });
       setMessageInput("");
+      setReplyToId(null);
       return;
     }
 
@@ -573,7 +578,7 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
         return;
       }
       api.send("chat-send-message", {
-        text, groupId: store.activeThread,
+        text, groupId: store.activeThread, replyTo: replyToId,
         media: {
           kind: pendingMedia.kind, mime: pendingMedia.mime,
           sha256: up.sha256, size: up.size,
@@ -585,6 +590,7 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
       });
       setMessageInput("");
       setPendingMedia(null);
+      setReplyToId(null);
     } finally {
       setMediaBusy(false);
     }
@@ -1399,14 +1405,64 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
                     );
                   }
                   return (
-                    <div key={m.id} style={{
+                    <div key={m.id} id={"msg-" + m.id} style={{
                       alignSelf: isMine ? (isRTL ? "flex-start" : "flex-end") : (isRTL ? "flex-end" : "flex-start"),
                       maxWidth: "85%",
                       background: isMine ? `${accent}30` : "rgba(255,255,255,0.06)",
                       border: `1px solid ${isMine ? accent + "40" : border}`,
                       borderRadius: 8, padding: "6px 10px",
+                      position: "relative",
                     }}>
+                      {/* Répondre : bouton discret, toujours présent. Pas au
+                          survol seulement — une action invisible n'existe
+                          pas, c'est la leçon des trois boutons cachés. */}
+                      <button
+                        onClick={() => setReplyToId(m.id)}
+                        title={t("Chat.reply")}
+                        aria-label={t("Chat.reply")}
+                        style={{
+                          position: "absolute", top: 2,
+                          [isRTL ? "left" : "right"]: 2,
+                          background: "transparent", border: "none", cursor: "pointer",
+                          color: muted, padding: 2, opacity: 0.55, lineHeight: 0,
+                        }}
+                      >
+                        <CornerUpLeft size={11} />
+                      </button>
                       {!isMine && <div style={{ fontSize: 10, color: muted, fontWeight: 700 }}>{m.from}</div>}
+                      {/* Étape G — message cité. On le relit dans le fil
+                          plutôt que d'en avoir gardé une copie : après une
+                          purge de rétention, la cible a pu disparaître, et
+                          il vaut mieux le dire que d'afficher un fantôme. */}
+                      {m.replyTo && (() => {
+                        const cible = store.messages.find((x) => x.id === m.replyTo);
+                        return (
+                          <div
+                            onClick={() => {
+                              if (!cible) return;
+                              document.getElementById("msg-" + cible.id)
+                                ?.scrollIntoView({ block: "center", behavior: "smooth" });
+                            }}
+                            style={{
+                              borderInlineStart: `2px solid ${accent}`,
+                              paddingInlineStart: 6, marginBottom: 4,
+                              opacity: 0.75, cursor: cible ? "pointer" : "default",
+                            }}
+                          >
+                            <div style={{ fontSize: 9.5, color: accent, fontWeight: 700 }}>
+                              {cible ? cible.from : t("Chat.replyGone")}
+                            </div>
+                            {cible && (
+                              <div style={{
+                                fontSize: 10, color: muted, overflow: "hidden",
+                                textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 220,
+                              }}>
+                                {cible.text || (cible.media ? t("Chat.mediaAttachment") : "")}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
                       {/* Texte facultatif : un vocal ou une image peut
                           partir seul, sans un mot */}
                       {m.text ? (
@@ -1447,6 +1503,41 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
                   </div>
                 </div>
               )}
+              {/* Étape G — ce que l'on s'apprête à citer. Sans cet aperçu,
+                  on écrit une réponse sans plus savoir à quoi elle répond. */}
+              {replyToId && (() => {
+                const cible = store.messages.find((x) => x.id === replyToId);
+                if (!cible) return null;
+                return (
+                  <div style={{
+                    display: "flex", alignItems: "center", gap: 6, marginBottom: 6,
+                    borderInlineStart: `2px solid ${accent}`, paddingInlineStart: 7,
+                  }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 9.5, color: accent, fontWeight: 700 }}>
+                        {t("Chat.replyingTo")} {cible.from}
+                      </div>
+                      <div style={{
+                        fontSize: 10.5, color: muted, overflow: "hidden",
+                        textOverflow: "ellipsis", whiteSpace: "nowrap",
+                      }}>
+                        {cible.text || (cible.media ? t("Chat.mediaAttachment") : "")}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setReplyToId(null)}
+                      title={t("Chat.replyCancel")}
+                      aria-label={t("Chat.replyCancel")}
+                      style={{
+                        background: "transparent", border: "none", color: muted,
+                        cursor: "pointer", padding: 3, flexShrink: 0, lineHeight: 0,
+                      }}
+                    >
+                      <X size={13} />
+                    </button>
+                  </div>
+                );
+              })()}
               {pendingMedia && (
                 <MediaPreview
                   media={pendingMedia}
