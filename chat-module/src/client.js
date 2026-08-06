@@ -13,7 +13,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { deriveKeyFromPin, encryptPayload, decryptPayload } from "./crypto.js";
 import { listenForSessions } from "./discovery.js";
-import { loadOrCreateIdentity } from "./identity.js";
+import { loadOrCreateIdentity, voteDefinitionSeal, voteAnswerSeal } from "./identity.js";
 import { CHUNK_BYTES } from "./media.js";
 
 // Répertoire par défaut de l'identité d'appareil (même défaut que store.js) ;
@@ -52,6 +52,8 @@ export function joinSession({
   lastSeenTs = 0,
   dataDir = DEFAULT_DATA_DIR,
   onMessage,
+  onVoteTally,
+  onVoteRefused,
   onPresence,
   onAdminResult,
   onInviteSent,
@@ -112,6 +114,11 @@ export function joinSession({
     // from, ts) + type "invite" et extra {name, address, pin…} — l'UI en
     // fait une carte cliquable
     else if (payload.type === "invite") onMessage?.(payload);
+    // Étape H — un vote EST un message dans le fil ; son dépouillement,
+    // lui, arrive à part et se rafraîchit à chaque réponse.
+    else if (payload.type === "vote") onMessage?.(payload);
+    else if (payload.type === "vote-tally") onVoteTally?.(payload);
+    else if (payload.type === "vote-refused") onVoteRefused?.(payload);
     else if (payload.type === "invite-sent") onInviteSent?.(payload);
     else if (payload.type === "admin-result") onAdminResult?.(payload);
     // Étape F — annuaire : qui est inscrit, sa fonction, sa présence
@@ -182,6 +189,38 @@ export function joinSession({
     }));
   }
 
+  // ── Étape H — votes ─────────────────────────────────────────────────
+  /** Ouvre un vote. Sa définition (options + mode) est SCELLÉE dans la
+   *  signature : on ne pourra pas contester après coup ce qui était
+   *  proposé, ni prétendre qu'un vote nominatif ne l'était pas. */
+  function openVote({ question, options, nominatif = true, groupId = "all" }) {
+    const core = {
+      id: "vote_" + crypto.randomUUID(), from: userId,
+      text: question ?? "", ts: Date.now(),
+      voteSha: voteDefinitionSeal(options, nominatif),
+    };
+    ws.send(encryptPayload(sessionKey, {
+      v: 2, type: "vote", id: core.id, text: core.text, ts: core.ts,
+      groupId, options, nominatif, signature: identity.signMessage(core),
+    }));
+    return core.id;
+  }
+
+  /** Répond à un vote. La réponse est signée : c'est ce qui rend une
+   *  validation opposable. En mode non nominatif elle est définitive —
+   *  l'hôte répond "vote-refused" à une seconde tentative. */
+  function answerVote({ voteId, choice, comment = "" }) {
+    const core = {
+      id: "ans_" + crypto.randomUUID(), from: userId,
+      text: comment ?? "", ts: Date.now(),
+      voteSha: voteAnswerSeal(voteId, choice),
+    };
+    ws.send(encryptPayload(sessionKey, {
+      v: 2, type: "vote-response", id: core.id, voteId, choice,
+      comment: core.text, ts: core.ts, signature: identity.signMessage(core),
+    }));
+  }
+
   // ── Étape E — pièces jointes ────────────────────────────────────────
   // Transferts en cours, par identifiant : la réponse de l'hôte arrive de
   // façon asynchrone sur le même canal, il faut savoir à qui la rendre.
@@ -249,6 +288,8 @@ export function joinSession({
 
   return {
     send,
+    openVote,
+    answerVote,
     markRead,
     requestRoster,
     sendAdmin,

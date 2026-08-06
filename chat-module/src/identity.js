@@ -70,6 +70,20 @@ export function signablePayload({ id, from, text, ts, mediaSha, replyTo, voteSha
   return JSON.stringify(core);
 }
 
+// ── Étape H — attestations de vote ─────────────────────────────────────────
+// Le rang 7 (voteSha) sert à DEUX choses : sceller la définition d'un vote,
+// et sceller une réponse. Les deux sont donc PRÉFIXÉES, sinon une réponse
+// pourrait être rejouée comme une définition (ou l'inverse) dès lors que
+// les chaînes coïncideraient. Ne jamais retirer ces préfixes.
+export function voteDefinitionSeal(options, nominatif) {
+  const canonique = JSON.stringify([options.map(String), !!nominatif]);
+  return "def:" + createHash("sha256").update(canonique).digest("hex").slice(0, 32);
+}
+
+export function voteAnswerSeal(voteId, choice) {
+  return "ans:" + String(voteId) + ":" + Number(choice);
+}
+
 // ── Empreinte d'appareil ───────────────────────────────────────────────────
 // sha256 de la clé publique BRUTE (32 octets), tronqué à 16 hex — court,
 // affichable dans le panneau admin, collision improbable à cette échelle.

@@ -110,6 +110,20 @@ function signablePayload({ id, from, text, ts, mediaSha, replyTo, voteSha }) {
 
 /** Recharge une identité depuis sa clé privée (32 octets base64, stockée
  *  en localStorage — elle ne quitte JAMAIS l'appareil). */
+// ── Étape H — attestations de vote ───────────────────────────────────
+// ⚠️ DOIVENT rester identiques à identity.js côté serveur. Le rang 7 sert
+// à la fois aux définitions et aux réponses : les préfixes « def: » et
+// « ans: » empêchent qu'une réponse soit rejouée en définition.
+export function voteDefinitionSeal(options, nominatif) {
+  const canonique = JSON.stringify([options.map(String), !!nominatif]);
+  const h = sha256(new TextEncoder().encode(canonique));
+  return "def:" + Array.from(h.subarray(0, 16)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+export function voteAnswerSeal(voteId, choice) {
+  return "ans:" + String(voteId) + ":" + Number(choice);
+}
+
 export function identityFromPrivate(privateKeyB64) {
   const priv = b64decode(privateKeyB64);
   if (priv.length !== 32) throw new Error("Clé privée Ed25519 invalide");

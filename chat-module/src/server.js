@@ -12,6 +12,7 @@ import { deriveKeyFromPin, encryptPayload, decryptPayload, generatePin } from ".
 import { startBeacon } from "./discovery.js";
 import {
   initStore, saveMessage, getMessagesSince, purgeOldMessages, upsertDeviceSeen, messageExists,
+  getMessage, saveVoteChoice, getVoteTally,
   listDevices, setDeviceLabel, searchMessages, getConfig, setConfig,
   createRoom, getRoom, touchRoom, setRoomAdminPin, setRoomPin,
   banDevice, unbanDevice, isBanned, listBans,
@@ -19,7 +20,8 @@ import {
   getDevice, countDevices, getDataDir, listReferencedMedia,
   setDeviceRole, listRoster, listDirectThreads,
 } from "./store.js";
-import { fingerprintFromRawPublicKey, rawFromSpkiBase64, verifyMessage } from "./identity.js";
+import { fingerprintFromRawPublicKey, rawFromSpkiBase64, verifyMessage,
+         voteDefinitionSeal, voteAnswerSeal } from "./identity.js";
 import { startMobileServer } from "./mobile-server.js";
 import { existsSync } from "node:fs";
 import {
@@ -373,6 +375,87 @@ export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, 
           if (!saveMessage(inv).inserted) return;
           broadcastToGroup(inv.groupId, inv);
         }
+        return;
+      }
+
+      // ── Étape H — ouverture d'un vote ────────────────────────────
+      // Un vote EST un message (même table, même historique, même
+      // signature) : il porte simplement type "vote" et sa définition
+      // dans extra. Sa définition est scellée dans la signature, sinon
+      // on pourrait contester après coup les options proposées ou
+      // prétendre qu'un vote nominatif ne l'était pas.
+      if (payload.type === "vote") {
+        // `device` est local à chaque branche (voir la branche "message") :
+        // on le relit depuis la table des clients, indexée par connexion.
+        const device = clients.get(ws)?.device || null;
+        if (!userId || !device) return;
+        const options = Array.isArray(payload.options)
+          ? payload.options.slice(0, 6).map((o) => String(o).slice(0, 40)).filter(Boolean)
+          : [];
+        if (options.length < 2) return; // un vote à une seule issue n'en est pas un
+        const nominatif = payload.nominatif !== false;
+        const core = {
+          id: String(payload.id), from: userId,
+          text: String(payload.text ?? "").slice(0, 500), ts: Number(payload.ts),
+          voteSha: voteDefinitionSeal(options, nominatif),
+        };
+        const verified = verifyMessage(core, payload.signature, device.publicKeySpki);
+        const driftOk = Math.abs(Date.now() - core.ts) <= MAX_CLOCK_DRIFT_MS;
+        const msg = {
+          v: 1, type: "vote", id: core.id, roomId: activeRoomId,
+          groupId: payload.groupId || "all", from: userId, text: core.text,
+          extra: { options, nominatif },
+          ts: driftOk ? core.ts : Date.now(),
+          deviceFp: device.fingerprint,
+          signature: payload.signature,
+          signatureValid: verified && driftOk,
+        };
+        if (!saveMessage(msg).inserted) return;
+        broadcastToGroup(msg.groupId, msg);
+        return;
+      }
+
+      // ── Étape H — réponse à un vote ──────────────────────────────
+      // La réponse n'est PAS un message : elle ne s'affiche pas dans le
+      // fil, elle alimente un dépouillement. Elle est néanmoins signée —
+      // c'est ce qui rend une validation opposable.
+      if (payload.type === "vote-response") {
+        const device = clients.get(ws)?.device || null;
+        if (!userId || !device) return;
+        const voteId = String(payload.voteId || "");
+        const choice = Number(payload.choice);
+        const vote = getMessage(voteId, activeRoomId);
+        // Le vote doit exister DANS CE SALON : répondre à un vote d'un
+        // autre salon en révélerait l'existence.
+        if (!vote || vote.type !== "vote") return;
+        const options = vote.extra?.options || [];
+        if (!Number.isInteger(choice) || choice < 0 || choice >= options.length) return;
+
+        const core = {
+          id: String(payload.id), from: userId,
+          text: String(payload.comment ?? "").slice(0, 300), ts: Number(payload.ts),
+          voteSha: voteAnswerSeal(voteId, choice),
+        };
+        if (!verifyMessage(core, payload.signature, device.publicKeySpki)) return;
+
+        const accepte = saveVoteChoice({
+          voteId, choice, comment: core.text || null,
+          fingerprint: device.fingerprint, sender: userId,
+          nominatif: vote.extra?.nominatif !== false, ts: Date.now(),
+        });
+        // Refus = second vote non nominatif. On le dit à l'intéressé
+        // plutôt que de l'ignorer : sinon il croit avoir voté deux fois.
+        if (!accepte) {
+          ws.send(encryptPayload(sessionKey, {
+            v: 1, type: "vote-refused", voteId, reason: "deja-vote",
+          }));
+          return;
+        }
+        broadcastToGroup(vote.groupId, {
+          v: 1, type: "vote-tally", voteId,
+          groupId: vote.groupId,
+          ...getVoteTally(voteId),
+        });
         return;
       }
 

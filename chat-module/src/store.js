@@ -216,7 +216,11 @@ export function saveMessage(msg) {
       msg.deviceFp || null,
       msg.signature || null,
       msg.signatureValid ? 1 : 0,
-      msg.type === "invite" ? "invite" : "message",
+      // ⚠️ Liste blanche : tout type inconnu retombe sur "message". Ne pas
+      // oublier d'y ajouter un nouveau type — un vote enregistré comme
+      // simple message perdrait sa nature, et l'hôte refuserait ensuite
+      // TOUTES les réponses (il vérifie que la cible est bien un vote).
+      ["invite", "vote"].includes(msg.type) ? msg.type : "message",
       msg.extra ? JSON.stringify(msg.extra) : null,
       msg.media ? JSON.stringify(msg.media) : null,
       msg.replyTo ? String(msg.replyTo) : null,
@@ -249,6 +253,15 @@ export function messageExists(id, roomId = "default") {
   return !!ensureDb()
     .prepare("SELECT 1 FROM messages WHERE id = ? AND roomId = ? LIMIT 1")
     .get(String(id), String(roomId));
+}
+
+/** Relit UN message de CE salon — sert au vote, qui doit vérifier que la
+ *  cible existe ici avant d'accepter une réponse. */
+export function getMessage(id, roomId = "default") {
+  const r = ensureDb()
+    .prepare("SELECT * FROM messages WHERE id = ? AND roomId = ? LIMIT 1")
+    .get(String(id), String(roomId));
+  return r ? rowToMessage(r) : null;
 }
 
 // ── Étape H — votes ────────────────────────────────────────────────────
