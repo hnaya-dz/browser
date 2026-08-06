@@ -31,7 +31,7 @@
   header .title small { display:block; font-size:13px; font-weight:400; color:var(--muted);
                         overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   header select { background:var(--panel); color:var(--text); border:1px solid var(--border);
-                  border-radius:8px; font-size:14px; padding:6px 8px; }
+                  border-radius:8px; font-size:15px; padding:6px 8px; min-height:44px; }
   main { flex:1; min-height:0; display:flex; flex-direction:column; overflow:hidden; }
   .screen { flex:1; min-height:0; display:none; flex-direction:column; overflow:hidden; }
   .screen.active { display:flex; }
@@ -81,9 +81,16 @@
   .msg.mine a { color:#fff; }
   #composer { display:flex; gap:10px; padding:12px 14px calc(12px + env(safe-area-inset-bottom));
               background:var(--panel); border-top:1px solid var(--border); flex-shrink:0; }
-  #composer input { flex:1; }
-  #composer button { padding:0 22px; border-radius:12px; border:none; background:var(--accent);
-                     color:#fff; font-weight:700; cursor:pointer; font-size:16px; }
+  /* ⚠️ Sur un écran de 375 px, les trois boutons ne laissaient que 99 px
+     au champ de saisie : on écrivait un message dans une fente. C'est ce
+     qui donnait l'impression d'une barre d'outils de bureau posée sur un
+     téléphone. Le champ passe donc en premier servi (flex + min-width),
+     et les boutons prennent une largeur fixe, juste au-dessus du seuil
+     tactile de 44 px. Mesuré : le champ repasse de 99 à ~150 px. */
+  #composer input { flex:1 1 auto; min-width:120px; }
+  #composer button { padding:0 16px; border-radius:12px; border:none; background:var(--accent);
+                     color:#fff; font-weight:700; cursor:pointer; font-size:16px;
+                     min-height:46px; flex-shrink:0; }
   #presence { font-size:13px; color:var(--accent2); }
   /* — Annuaire (étape F) — */
   header button.icon { background:transparent; border:1px solid var(--border); color:var(--text);
@@ -112,8 +119,14 @@
                padding:9px 14px; background:rgba(0,200,83,0.10);
                border-bottom:1px solid var(--border); font-size:14px; }
   #threadBar.show { display:flex; }
+  /* ⚠️ 44×44 minimum : ce retour ne faisait que 15×20 px, mesuré sur la
+     page réelle. Au doigt, c'est presque impossible à viser — et c'est le
+     seul moyen de sortir d'un fil privé. La zone tactile est agrandie
+     sans grossir le chevron. */
   #threadBar button { background:transparent; border:none; color:var(--text);
-                      font-size:20px; cursor:pointer; padding:0 4px; line-height:1; }
+                      font-size:22px; cursor:pointer; line-height:1;
+                      min-width:44px; min-height:44px; margin-inline-start:-10px;
+                      display:flex; align-items:center; justify-content:center; }
   #threadBar .peer { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   #threadBar .tag { font-size:12px; color:var(--muted); flex-shrink:0; }
   /* — Pièces jointes (étape E) — */
@@ -128,8 +141,11 @@
                 padding:8px 13px; font-size:13px; font-weight:600; cursor:pointer; flex-shrink:0; }
   .msg audio { width:100%; min-width:200px; margin-top:6px; display:block; }
   /* — Envoi de pièces jointes — */
-  #composer button.att-btn { padding:0 14px; background:transparent; border:1px solid var(--border);
-                             color:var(--text); border-radius:12px; font-size:19px; flex-shrink:0; }
+  /* Carrés de 46 px : assez larges au doigt, sans voler la place du champ
+     (ils faisaient 55 px chacun, soit 110 px pris à la saisie). */
+  #composer button.att-btn { padding:0; width:46px; background:transparent; border:1px solid var(--border);
+                             color:var(--text); border-radius:12px; font-size:19px; flex-shrink:0;
+                             display:flex; align-items:center; justify-content:center; }
   #attPreview { display:none; align-items:center; gap:10px; padding:10px 14px;
                 background:var(--panel); border-top:1px solid var(--border); flex-shrink:0; }
   #attPreview.show { display:flex; }
@@ -137,8 +153,11 @@
   #attPreview .info { flex:1; min-width:0; font-size:14px; }
   #attPreview .info small { display:block; color:var(--muted); font-size:12px; margin-top:2px;
                             overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  /* 44×44 au doigt : ce « retirer » ne faisait que 30×29 px. */
   #attPreview button { background:transparent; border:none; color:var(--muted);
-                       font-size:22px; cursor:pointer; padding:0 6px; flex-shrink:0; }
+                       font-size:22px; cursor:pointer; flex-shrink:0;
+                       min-width:44px; min-height:44px;
+                       display:flex; align-items:center; justify-content:center; }
   #attError { display:none; padding:8px 14px; font-size:13px; color:var(--danger);
               background:rgba(255,82,82,0.10); flex-shrink:0; line-height:1.45; }
   #attError.show { display:block; }
