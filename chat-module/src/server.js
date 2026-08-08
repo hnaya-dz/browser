@@ -252,6 +252,19 @@ export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, 
         const missed = demandes.flatMap((g) => getMessagesSince(g, since, activeRoomId));
         ws.send(encryptPayload(sessionKey, { v: 1, type: "backlog", messages: missed }));
 
+        // ⚠️ Le dépouillement ne voyage PAS avec les messages : il est
+        // rediffusé à chaque réponse, et un arrivant n'en avait donc reçu
+        // aucun — il voyait tous les votes à zéro jusqu'à ce que quelqu'un
+        // vote à nouveau. Constaté en test réel. On les envoie ici, une
+        // fois, pour chaque vote que ce client vient de recevoir.
+        for (const m of missed) {
+          if (m.type !== "vote") continue;
+          ws.send(encryptPayload(sessionKey, {
+            v: 1, type: "vote-tally", voteId: m.id, groupId: m.groupId,
+            ...getVoteTally(m.id),
+          }));
+        }
+
         broadcastPresence();
         return;
       }

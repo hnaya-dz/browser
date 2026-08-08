@@ -269,10 +269,31 @@ export function getMessage(id, roomId = "default") {
 /** Cette personne a-t-elle déjà répondu à ce vote ? Se lit toujours dans
  *  vote_voters, jamais dans les choix : c'est la seule table qui porte
  *  l'identité en mode non nominatif. */
-export function hasVoted(voteId, fingerprint) {
-  return !!ensureDb()
-    .prepare("SELECT 1 FROM vote_voters WHERE voteId = ? AND fingerprint = ? LIMIT 1")
-    .get(String(voteId), String(fingerprint));
+/**
+ * Retrouve la PERSONNE qui a déjà répondu à ce vote, par son appareil OU
+ * par son pseudo.
+ *
+ * ⚠️ Une voix par PERSONNE, pas par appareil. « Ajouter mon mobile » fait
+ * rejoindre le téléphone sous le même pseudo mais avec sa PROPRE clé :
+ * sans ce rapprochement, une personne équipée d'un téléphone pesait DEUX
+ * voix dans une validation. Constaté en test réel.
+ *
+ * Le pseudo est libre, donc imparfait : quelqu'un qui en changerait
+ * pourrait voter une seconde fois. L'empreinte ferme cette porte pour un
+ * même appareil ; les deux critères ensemble couvrent les cas réels.
+ * Un vrai appairage d'appareils reste la solution complète — le QR ne
+ * transmet aujourd'hui que le pseudo, aucun lien n'est enregistré.
+ */
+export function findVoter(voteId, fingerprint, sender) {
+  return ensureDb().prepare(
+    `SELECT * FROM vote_voters
+      WHERE voteId = ? AND (fingerprint = ? OR (sender <> '' AND sender = ?))
+      LIMIT 1`,
+  ).get(String(voteId), String(fingerprint), String(sender || ""));
+}
+
+export function hasVoted(voteId, fingerprint, sender) {
+  return !!findVoter(voteId, fingerprint, sender);
 }
 
 /**
@@ -288,24 +309,38 @@ export function hasVoted(voteId, fingerprint) {
 export function saveVoteChoice({ voteId, choice, comment, fingerprint, sender, nominatif, ts }) {
   const db = ensureDb();
   const quand = Number(ts) || Date.now();
-  const dejaVote = hasVoted(voteId, fingerprint);
-  if (dejaVote && !nominatif) return false;
+  const nom = String(sender || "");
+  // La personne, pas l'appareil : on la retrouve par son empreinte OU son
+  // pseudo, de sorte qu'un second appareil remplace son vote au lieu d'en
+  // ajouter un.
+  const dejaLa = findVoter(voteId, fingerprint, nom);
+  if (dejaLa && !nominatif) return false;
 
   if (nominatif) {
-    db.prepare("DELETE FROM vote_choices WHERE voteId = ? AND fingerprint = ?")
-      .run(String(voteId), String(fingerprint));
+    // Effacer le choix PRÉCÉDENT DE CETTE PERSONNE, quel que soit
+    // l'appareil depuis lequel il avait été émis.
+    db.prepare(`DELETE FROM vote_choices
+                 WHERE voteId = ? AND (fingerprint = ? OR (sender <> '' AND sender = ?))`)
+      .run(String(voteId), String(fingerprint), nom);
     db.prepare(`INSERT INTO vote_choices (voteId, choice, comment, ts, fingerprint, sender)
                 VALUES (?, ?, ?, ?, ?, ?)`)
       .run(String(voteId), Number(choice), comment ? String(comment) : null, quand,
-           String(fingerprint), String(sender || ""));
+           String(fingerprint), nom);
   } else {
     db.prepare(`INSERT INTO vote_choices (voteId, choice, comment, ts, fingerprint, sender)
                 VALUES (?, ?, ?, ?, NULL, NULL)`)
       .run(String(voteId), Number(choice), comment ? String(comment) : null, quand);
   }
-  db.prepare(`INSERT INTO vote_voters (voteId, fingerprint, sender, ts) VALUES (?, ?, ?, ?)
-              ON CONFLICT(voteId, fingerprint) DO UPDATE SET ts = excluded.ts`)
-    .run(String(voteId), String(fingerprint), String(sender || ""), quand);
+
+  // Une SEULE ligne de participation par personne : sinon « 3 ont répondu »
+  // compterait des appareils, et « en attente » deviendrait faux.
+  if (dejaLa) {
+    db.prepare("UPDATE vote_voters SET fingerprint = ?, sender = ?, ts = ? WHERE voteId = ? AND fingerprint = ?")
+      .run(String(fingerprint), nom, quand, String(voteId), dejaLa.fingerprint);
+  } else {
+    db.prepare("INSERT INTO vote_voters (voteId, fingerprint, sender, ts) VALUES (?, ?, ?, ?)")
+      .run(String(voteId), String(fingerprint), nom, quand);
+  }
   return true;
 }
 
