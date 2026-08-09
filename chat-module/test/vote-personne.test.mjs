@@ -77,10 +77,31 @@ assert.equal(Object.values(dernier.decompte).reduce((a, b) => a + b, 0), 2,
 assert.equal(dernier.voters.length, 2,
   "« ont répondu » compte des personnes, pas des appareils — sinon « en attente » ment");
 
+// ── 3. Une RECONNEXION voit aussi le score ───────────────────────────
+// Cas laissé passer par le premier correctif : un client qui revient ne
+// redemande que les messages postérieurs à sa dernière lecture, donc le
+// vote n'est PAS rejoué — et son dépouillement ne l'était pas non plus.
+// C'est ce que vivait un mobile qui se reconnecte.
+let auRetour = null;
+const revenant = joinSession({
+  address: "127.0.0.1", wsPort: PORT, pin: PIN, userId: "Amina",
+  dataDir: path.join(dataDir, "id-amina"), groups: ["all"],
+  lastSeenTs: Date.now() + 60000,   // « j'ai déjà tout lu »
+  onMessage: () => {}, onPresence: () => {},
+  onVoteTally: (t) => { if (!auRetour) auRetour = t; },
+});
+await new Promise((r) => revenant.raw.on("open", r));
+await dodo(1800);
+assert.ok(auRetour,
+  "une reconnexion doit recevoir le dépouillement, même sans rattrapage de messages");
+assert.equal(Object.values(auRetour.decompte).reduce((a, b) => a + b, 0), 2,
+  "elle doit voir le score réel, pas un vote à zéro");
+revenant.close();
+
 poste.close(); amina.close(); mobile.close(); sonde.close();
 await dodo(300);
 await host.stop();
 closeStore();
 fs.rmSync(dataDir, { recursive: true, force: true });
-console.log("✅ vote-personne.test.mjs : 6 assertions PASSÉES (une voix par personne, score à l'arrivée)");
+console.log("✅ vote-personne.test.mjs : 8 assertions PASSÉES (une voix par personne, score à l'arrivée et au retour)");
 process.exit(0);

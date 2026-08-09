@@ -330,7 +330,9 @@
     "voteSend": "Soumettre",
     "voteAnswered": "ont répondu",
     "votePending": "en attente",
-    "voteFinal": "Votre bulletin est définitif."
+    "voteFinal": "Votre bulletin est définitif.",
+    "serverLicenceReuse": "Utiliser la licence déjà sur ce poste",
+    "serverLicenceGone": "Aucune licence n'est présente sur ce poste."
   },
   "Privacy": {
     "title": "Confidentialité",

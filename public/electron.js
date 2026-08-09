@@ -1468,12 +1468,27 @@ ipcMain.handle("chat-server-get-info", async () => {
         maxDevices: res.licence.maxDevices, daysLeft: res.daysLeft ?? -1, valid: !!res.ok };
     }
   }
-  return { supported: true, installed, running, dataDir: chatServerDataDir, licence };
+  // Une licence déjà déposée sur ce poste (retirer le serveur ne l'efface
+  // pas, c'est voulu) : l'interface peut alors proposer de la réutiliser
+  // au lieu d'obliger à retrouver le fichier d'origine.
+  const licenceSurDisque = existsSync(join(chatServerDataDir, "licence.hnaya-lic"));
+  return { supported: true, installed, running, dataDir: chatServerDataDir, licence, licenceSurDisque };
 });
 
 ipcMain.handle("chat-server-pick-licence", async () => {
+  // ⚠️ defaultPath OBLIGATOIRE. Depuis Electron 43, un showOpenDialog sans
+  // chemin de départ s'ouvre dans « Téléchargements » — pas dans le dernier
+  // dossier utilisé. Avec le filtre .hnaya-lic, l'utilisateur tombait sur un
+  // dossier vide et croyait sa licence perdue. Constaté en usage réel après
+  // la montée de version.
+  // On part de la licence déjà installée si elle existe, sinon des Documents.
+  const licenceInstallee = join(chatServerDataDir, "licence.hnaya-lic");
+  const depart = existsSync(licenceInstallee)
+    ? licenceInstallee
+    : app.getPath("documents");
   const { filePaths, canceled } = await dialog.showOpenDialog(mainWindow, {
     title: "Licence Hnaya Chat Serveur",
+    defaultPath: depart,
     filters: [{ name: "Licence Hnaya", extensions: ["hnaya-lic"] }],
     properties: ["openFile"],
   });
@@ -1481,6 +1496,19 @@ ipcMain.handle("chat-server-pick-licence", async () => {
   const res = await verifyLicenceFile(filePaths[0]);
   if (!res.ok) return { ok: false, error: res.error };
   return { ok: true, path: filePaths[0], org: res.licence.org,
+    maxDevices: res.licence.maxDevices, expires: res.licence.expires, daysLeft: res.daysLeft };
+});
+
+// Réutiliser la licence déjà déposée sur ce poste, sans repasser par le
+// sélecteur de fichier. Elle est relue et REVÉRIFIÉE à chaque fois : une
+// licence expirée depuis son installation doit être refusée comme une
+// autre, jamais acceptée au motif qu'elle était déjà là.
+ipcMain.handle("chat-server-installed-licence", async () => {
+  const chemin = join(chatServerDataDir, "licence.hnaya-lic");
+  if (!existsSync(chemin)) return { ok: false, error: "absente" };
+  const res = await verifyLicenceFile(chemin);
+  if (!res.ok) return { ok: false, error: res.error };
+  return { ok: true, path: chemin, org: res.licence.org,
     maxDevices: res.licence.maxDevices, expires: res.licence.expires, daysLeft: res.daysLeft };
 });
 
@@ -1520,7 +1548,11 @@ ipcMain.handle("chat-server-install", async (event, { licencePath, name, pin, ad
     "$ErrorActionPreference = 'Stop'",
     "try {",
     "  New-Item -ItemType Directory -Force -Path '" + q(chatServerDataDir) + "' | Out-Null",
-    "  Copy-Item -LiteralPath '" + q(licencePath) + "' -Destination '" + q(join(chatServerDataDir, "licence.hnaya-lic")) + "' -Force",
+    // Copier SAUF si la source est déjà le fichier de destination : on
+    // réinstalle souvent avec la licence déjà présente sur le poste, et
+    // Copy-Item échouerait sur une source identique à la destination.
+    "  $src = '" + q(licencePath) + "'; $dst = '" + q(join(chatServerDataDir, "licence.hnaya-lic")) + "'",
+    "  if ($src -ne $dst) { Copy-Item -LiteralPath $src -Destination $dst -Force }",
     // Le wrapper est ecrit en OEM : c'est la page de codes dans laquelle
     // cmd.exe relira le fichier au demarrage de la tache.
     "  $lines = @('@echo off', 'set ELECTRON_RUN_AS_NODE=1', '" + q(cmdLine) + "')",

@@ -24,6 +24,9 @@ interface Props {
 }
 
 interface ServerInfo {
+  // Une licence est deja deposee dans le repertoire du serveur : retirer
+  // le serveur ne l'efface pas.
+  licenceSurDisque?: boolean;
   supported: boolean;
   installed: boolean;
   running: boolean;
@@ -63,6 +66,16 @@ export default function ChatServerSetup({ accent, muted, border, inputStyle, btn
     const r = await getApi()?.invoke?.("chat-server-pick-licence");
     if (r?.ok) setLicence(r);
     else if (r?.error && r.error !== "canceled") setError(r.error);
+  };
+
+  // Retirer le serveur ne supprime pas la licence — c'est voulu. Sans ce
+  // raccourci, il fallait retrouver le fichier d'origine pour réinstaller,
+  // ce qui a fait croire à un utilisateur que sa licence avait été effacée.
+  const useInstalledLicence = async () => {
+    setError("");
+    const r = await getApi()?.invoke?.("chat-server-installed-licence");
+    if (r?.ok) setLicence(r);
+    else setError(r?.error === "absente" ? t("Chat.serverLicenceGone") : (r?.error || t("Chat.genericError")));
   };
 
   const install = async () => {
@@ -169,6 +182,13 @@ export default function ChatServerSetup({ accent, muted, border, inputStyle, btn
               <div style={{ fontSize: 10.5, color: muted, lineHeight: 1.55 }}>
                 {t("Chat.serverIntro")}
               </div>
+              {/* Une licence déjà sur ce poste : la réutiliser d'un clic
+                  plutôt que d'aller la rechercher dans l'explorateur. */}
+              {info.licenceSurDisque && !licence && (
+                <button onClick={useInstalledLicence} disabled={busy} style={{ ...btnStyle(true, busy), fontSize: 10.5, display: "flex", alignItems: "center", gap: 5, justifyContent: "center" }}>
+                  <FileKey2 size={11} /> {t("Chat.serverLicenceReuse")}
+                </button>
+              )}
               <button onClick={pickLicence} disabled={busy} style={{ ...btnStyle(false, busy), fontSize: 10.5, display: "flex", alignItems: "center", gap: 5, justifyContent: "center" }}>
                 <FileKey2 size={11} /> {licence ? t("Chat.serverLicenceChange") : t("Chat.serverLicencePick")}
               </button>

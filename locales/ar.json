@@ -330,7 +330,9 @@
     "voteSend": "إرسال",
     "voteAnswered": "أجابوا",
     "votePending": "في الانتظار",
-    "voteFinal": "صوتك نهائي."
+    "voteFinal": "صوتك نهائي.",
+    "serverLicenceReuse": "استخدام الرخصة الموجودة على هذا الجهاز",
+    "serverLicenceGone": "لا توجد رخصة على هذا الجهاز."
   },
   "Privacy": {
     "title": "الخصوصية",

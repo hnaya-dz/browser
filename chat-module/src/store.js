@@ -264,6 +264,24 @@ export function getMessage(id, roomId = "default") {
   return r ? rowToMessage(r) : null;
 }
 
+/** Les votes d'un salon, du plus récent au plus ancien.
+ *
+ *  ⚠️ Indépendant de `lastSeenTs`. Un client qui se RECONNECTE ne redemande
+ *  que les messages postérieurs à sa dernière lecture : le vote n'est donc
+ *  pas rejoué, et il restait affiché à zéro jusqu'à ce que quelqu'un vote.
+ *  Les dépouillements doivent être envoyés pour TOUS les votes visibles,
+ *  pas seulement pour ceux du rattrapage. */
+export function listVotes(roomId = "default", groupIds = ["all"], limite = 50) {
+  if (!groupIds.length) return [];
+  const trous = groupIds.map(() => "?").join(",");
+  return ensureDb()
+    .prepare(`SELECT * FROM messages
+               WHERE roomId = ? AND type = 'vote' AND groupId IN (${trous})
+               ORDER BY ts DESC LIMIT ?`)
+    .all(String(roomId), ...groupIds.map(String), Number(limite))
+    .map(rowToMessage);
+}
+
 // ── Étape H — votes ────────────────────────────────────────────────────
 
 /** Cette personne a-t-elle déjà répondu à ce vote ? Se lit toujours dans

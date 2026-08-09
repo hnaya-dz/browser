@@ -330,7 +330,9 @@
     "voteSend": "Submit",
     "voteAnswered": "answered",
     "votePending": "pending",
-    "voteFinal": "Your ballot is final."
+    "voteFinal": "Your ballot is final.",
+    "serverLicenceReuse": "Use the licence already on this machine",
+    "serverLicenceGone": "No licence is present on this machine."
   },
   "Privacy": {
     "title": "Privacy",

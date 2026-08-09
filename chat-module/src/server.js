@@ -12,7 +12,7 @@ import { deriveKeyFromPin, encryptPayload, decryptPayload, generatePin } from ".
 import { startBeacon } from "./discovery.js";
 import {
   initStore, saveMessage, getMessagesSince, purgeOldMessages, upsertDeviceSeen, messageExists,
-  getMessage, saveVoteChoice, getVoteTally,
+  getMessage, saveVoteChoice, getVoteTally, listVotes,
   listDevices, setDeviceLabel, searchMessages, getConfig, setConfig,
   createRoom, getRoom, touchRoom, setRoomAdminPin, setRoomPin,
   banDevice, unbanDevice, isBanned, listBans,
@@ -252,16 +252,21 @@ export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, 
         const missed = demandes.flatMap((g) => getMessagesSince(g, since, activeRoomId));
         ws.send(encryptPayload(sessionKey, { v: 1, type: "backlog", messages: missed }));
 
-        // ⚠️ Le dépouillement ne voyage PAS avec les messages : il est
-        // rediffusé à chaque réponse, et un arrivant n'en avait donc reçu
-        // aucun — il voyait tous les votes à zéro jusqu'à ce que quelqu'un
-        // vote à nouveau. Constaté en test réel. On les envoie ici, une
-        // fois, pour chaque vote que ce client vient de recevoir.
-        for (const m of missed) {
-          if (m.type !== "vote") continue;
+        // ⚠️ Le dépouillement ne voyage PAS avec les messages : il n'est
+        // rediffusé qu'à chaque réponse. Un client n'en recevait donc aucun
+        // en arrivant et voyait tous les votes à zéro jusqu'à ce que
+        // quelqu'un vote à nouveau.
+        //
+        // On les envoie ici pour TOUS les votes du salon, et surtout PAS
+        // seulement pour ceux du rattrapage : une RECONNEXION ne redemande
+        // que les messages postérieurs à `lastSeenTs`, donc le vote n'y
+        // figure plus alors que sa carte est toujours à l'écran. C'est le
+        // cas que le premier correctif laissait passer — constaté en test
+        // réel sur un mobile qui se reconnecte.
+        for (const v of listVotes(activeRoomId, demandes)) {
           ws.send(encryptPayload(sessionKey, {
-            v: 1, type: "vote-tally", voteId: m.id, groupId: m.groupId,
-            ...getVoteTally(m.id),
+            v: 1, type: "vote-tally", voteId: v.id, groupId: v.groupId,
+            ...getVoteTally(v.id),
           }));
         }
 
