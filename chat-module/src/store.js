@@ -158,6 +158,22 @@ export function initStore(dataDir = DEFAULT_DATA_DIR) {
     db.exec("ALTER TABLE devices ADD COLUMN role TEXT");
   }
 
+  // ── Étape I — retirer un appareil sans effacer sa trace ───────────────
+  // Une place de licence était consommée À VIE : poste réinstallé, téléphone
+  // changé, identité régénérée — chaque fois une empreinte nouvelle, jamais
+  // libérée. Un client à 50 places butait sur le plafond bien avant d'avoir
+  // 50 utilisateurs.
+  //
+  // On MARQUE l'appareil retiré au lieu de supprimer sa ligne. Supprimer
+  // ferait disparaître sa clé publique, seul exemplaire conservé : les
+  // messages déjà reçus gardent leur verdict de signature enregistré, mais
+  // plus rien ne permettrait de le recontrôler. Pour une administration,
+  // c'est l'auditabilité de l'historique qu'on perdrait pour gagner une
+  // place. Le marquage libère la place ET garde la preuve.
+  if (!db.prepare("PRAGMA table_info(devices)").all().some((c) => c.name === "retiredAt")) {
+    db.exec("ALTER TABLE devices ADD COLUMN retiredAt INTEGER");
+  }
+
   // ── Migration E : pièces jointes ──────────────────────────────────────
   // `media` = métadonnées JSON (empreinte, type, dimensions, vignette).
   // Le fichier lui-même vit sous dataDir/media/ — voir src/media.js.
@@ -431,9 +447,12 @@ export function upsertDeviceSeen({ fingerprint, publicKeySpki, nickname, hostnam
       nicknames.push(nickname);
       if (nicknames.length > NICKNAME_HISTORY_MAX) nicknames = nicknames.slice(-NICKNAME_HISTORY_MAX);
     }
+    // retiredAt remis à NULL : un appareil retiré qui revient reprend du
+    // service, donc une place. Le contrôle de plafond a déjà eu lieu au
+    // join (server.js) — il traite un appareil retiré comme un nouveau.
     d.prepare(`UPDATE devices SET lastSeen = ?, lastNickname = ?, nicknames = ?,
                hostname = COALESCE(?, hostname), platform = COALESCE(?, platform),
-               lastIp = COALESCE(?, lastIp) WHERE fingerprint = ?`)
+               lastIp = COALESCE(?, lastIp), retiredAt = NULL WHERE fingerprint = ?`)
       .run(now, nickname || null, JSON.stringify(nicknames),
            hostname || null, platform || null, ip || null, fingerprint);
   } else {
@@ -496,11 +515,28 @@ export function listDevices(roomId) {
   return rows.map((r) => ({ ...r, nicknames: safeJson(r.nicknames, []) }));
 }
 
-/** Nombre total d'appareils connus de CETTE machine serveur — sert au
- *  plafond de licence (maxDevices). Tous salons confondus : la licence
- *  couvre l'organisation, pas un salon. */
+/** Nombre d'appareils OCCUPANT une place de licence sur cette machine.
+ *  Tous salons confondus : la licence couvre l'organisation, pas un salon.
+ *  Les appareils retirés par l'admin sont exclus — c'est tout l'objet du
+ *  retrait (voir retireDevice). */
 export function countDevices() {
-  return ensureDb().prepare("SELECT COUNT(*) AS n FROM devices").get().n;
+  return ensureDb().prepare("SELECT COUNT(*) AS n FROM devices WHERE retiredAt IS NULL").get().n;
+}
+
+/** Libère la place de licence de cet appareil. Sa fiche, sa clé publique et
+ *  ses messages sont conservés : il devient simplement « retiré ».
+ *  S'il se reconnecte, il reprend une place comme un appareil neuf (et se
+ *  heurtera au plafond si celui-ci est atteint) — c'est le comportement
+ *  voulu : on retire un appareil qui ne sert plus, pas un appareil actif. */
+export function retireDevice(fingerprint) {
+  ensureDb().prepare("UPDATE devices SET retiredAt = ? WHERE fingerprint = ? AND retiredAt IS NULL")
+    .run(Date.now(), String(fingerprint));
+}
+
+/** Annule un retrait (l'admin s'est trompé d'appareil). Reprend une place. */
+export function restoreDevice(fingerprint) {
+  ensureDb().prepare("UPDATE devices SET retiredAt = NULL WHERE fingerprint = ?")
+    .run(String(fingerprint));
 }
 
 export function getDevice(fingerprint) {

@@ -1464,8 +1464,13 @@ ipcMain.handle("chat-server-get-info", async () => {
   if (installed) {
     const res = await verifyLicenceFile(join(chatServerDataDir, "licence.hnaya-lic"));
     if (res.licence) {
+      // ⚠️ `valid` = EN COURS DE VALIDITÉ, pas « bien signée ». Depuis
+      // l'étape I, verifyLicence retourne ok:true même pour une licence
+      // échue (elle démarre en lecture seule) : c'est `mode` qui tranche.
       licence = { org: res.licence.org, expires: res.licence.expires,
-        maxDevices: res.licence.maxDevices, daysLeft: res.daysLeft ?? -1, valid: !!res.ok };
+        maxDevices: res.licence.maxDevices, daysLeft: res.daysLeft ?? -1,
+        mode: res.mode || null, graceDaysLeft: res.graceDaysLeft ?? null,
+        notice: res.notice || null, valid: res.mode === "active" };
     }
   }
   // Une licence déjà déposée sur ce poste (retirer le serveur ne l'efface
@@ -1496,7 +1501,8 @@ ipcMain.handle("chat-server-pick-licence", async () => {
   const res = await verifyLicenceFile(filePaths[0]);
   if (!res.ok) return { ok: false, error: res.error };
   return { ok: true, path: filePaths[0], org: res.licence.org,
-    maxDevices: res.licence.maxDevices, expires: res.licence.expires, daysLeft: res.daysLeft };
+    maxDevices: res.licence.maxDevices, expires: res.licence.expires, daysLeft: res.daysLeft,
+    mode: res.mode, graceDaysLeft: res.graceDaysLeft ?? null, notice: res.notice || null };
 });
 
 // Réutiliser la licence déjà déposée sur ce poste, sans repasser par le
@@ -1509,7 +1515,8 @@ ipcMain.handle("chat-server-installed-licence", async () => {
   const res = await verifyLicenceFile(chemin);
   if (!res.ok) return { ok: false, error: res.error };
   return { ok: true, path: chemin, org: res.licence.org,
-    maxDevices: res.licence.maxDevices, expires: res.licence.expires, daysLeft: res.daysLeft };
+    maxDevices: res.licence.maxDevices, expires: res.licence.expires, daysLeft: res.daysLeft,
+    mode: res.mode, graceDaysLeft: res.graceDaysLeft ?? null, notice: res.notice || null };
 });
 
 ipcMain.handle("chat-server-install", async (event, { licencePath, name, pin, adminPin } = {}) => {
@@ -1518,6 +1525,14 @@ ipcMain.handle("chat-server-install", async (event, { licencePath, name, pin, ad
   // ensuite garanti inoffensif pour cmd/PowerShell.
   const licCheck = await verifyLicenceFile(licencePath || "");
   if (!licCheck.ok) return { ok: false, error: licCheck.error || "licence" };
+  // Une licence échue de plus de 30 jours démarre en LECTURE SEULE : on
+  // laisse ce mode à un serveur déjà en place (l'historique doit rester
+  // joignable), mais on refuse d'en INSTALLER un neuf. Installer un
+  // serveur incapable d'envoyer un message est un piège, pas un service.
+  // Le délai de grâce, lui, passe : un renouvellement est en cours.
+  if (licCheck.mode === "readonly") {
+    return { ok: false, error: licCheck.notice || "Licence expirée" };
+  }
   if (!/^\d{6}$/.test(String(pin || ""))) return { ok: false, error: "pin" };
   if (adminPin !== undefined && adminPin !== "" && !/^\d{6}$/.test(String(adminPin))) return { ok: false, error: "adminPin" };
   // Nom : ASCII sûr uniquement — un .cmd est lu dans la page de codes OEM,

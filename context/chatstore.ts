@@ -159,6 +159,12 @@ export interface ChatStore {
   // Vote auquel on vient de se voir refuser un second bulletin : il faut
   // le dire, sinon la personne croit avoir voté deux fois.
   voteRefused: string | null;
+  // Étape I — échéance de licence du serveur permanent. `licenceReadOnly`
+  // coupe la composition côté interface ; l'hôte refuse de toute façon, mais
+  // laisser taper un message pour le voir rejeté serait cruel.
+  // Reste null en mode poste (salon éphémère, sans licence).
+  licenceNotice: string | null;
+  licenceReadOnly: boolean;
   activeThread: string;
   discovered: Map<string, DiscoveredSession>;
   error: string | null;
@@ -189,6 +195,9 @@ export interface ChatStore {
   // ── D.2 ──
   // Empreintes bloquées dans le salon courant (boutons Bloquer/Débloquer)
   adminBans: string[];
+  // Étape I — places de licence : occupées / plafond. `maximum: null` en
+  // mode poste (salon éphémère, sans licence ni plafond).
+  adminPlaces: { occupees: number; maximum: number | null } | null;
   // Verrou du salon courant (null = pas encore lu)
   adminLocked: boolean | null;
   // Salon hébergé correspondant à celui qu'on a REJOINT (null sinon)
@@ -225,6 +234,10 @@ export interface AdminDevice {
   // Étape F — fonction de la PERSONNE dans l'organisation (DRH, DGA…),
   // affichée dans l'annuaire ; `label` nomme l'APPAREIL.
   role: string | null;
+  // Étape I — appareil retiré par l'admin : sa place de licence est rendue,
+  // sa fiche et ses messages sont conservés. Il redevient comptable s'il
+  // se reconnecte.
+  retiredAt: number | null;
 }
 
 export const store: ChatStore = {
@@ -239,6 +252,8 @@ export const store: ChatStore = {
   myFingerprint: null,
   voteTallies: {},
   voteRefused: null,
+  licenceNotice: null,
+  licenceReadOnly: false,
   activeThread: "all",
   discovered: new Map(),
   error: null,
@@ -254,6 +269,7 @@ export const store: ChatStore = {
   adminSearch: [],
   adminRetention: null,
   adminBans: [],
+  adminPlaces: null,
   adminLocked: null,
   hosting: null,
   hostings: [],
@@ -273,7 +289,11 @@ export function sendAdminCommand(params: {
   adminPin?: string;
   vaultRoomKey?: string;
   action: "devices" | "label" | "search" | "config-get" | "config-set"
-    | "ban" | "unban" | "bans" | "set-locked" | "room-info" | "set-admin-pin";
+    | "ban" | "unban" | "bans" | "set-locked" | "room-info" | "set-admin-pin"
+    // Étape I — places de licence : « retirer » rend la place d'un appareil
+    // qui n'existe plus, sans effacer sa fiche ni ses messages. À ne pas
+    // confondre avec « bloquer », qui exclut une personne.
+    | "retire-device" | "restore-device" | "licence-places";
   reqId?: string;
   fingerprint?: string;
   label?: string | null;
@@ -290,7 +310,8 @@ export function sendAdminCommand(params: {
 export function resetAdminState() {
   patchStore({
     adminAuthed: false, adminError: null, adminDevices: [], adminSearch: [],
-    adminRetention: null, adminBans: [], adminLocked: null, adminPinChanged: false,
+    adminRetention: null, adminBans: [], adminPlaces: null, adminLocked: null,
+    adminPinChanged: false,
   });
 }
 
@@ -332,7 +353,10 @@ export function clearConnectTimer() {
 
 export function startConnecting() {
   clearConnectTimer();
-  patchStore({ status: "connecting", error: null });
+  // L'état de licence appartient au salon qu'on rejoint, pas au précédent.
+  // Sans cette remise à zéro, quitter un serveur en lecture seule pour
+  // créer un salon local laissait le bandeau — et la saisie bloquée.
+  patchStore({ status: "connecting", error: null, licenceNotice: null, licenceReadOnly: false });
   connectTimer = setTimeout(() => {
     connectTimer = null;
     if (store.status === "connecting") {
@@ -470,6 +494,15 @@ export function ensureListening() {
       case "vote-refused":
         patchStore({ voteRefused: evt.voteId || null });
         break;
+      // Étape I — préavis d'échéance, puis lecture seule. L'hôte l'envoie
+      // à la connexion ET au franchissement d'un palier : le bandeau
+      // apparaît sur un salon ouvert depuis des jours, sans rien relancer.
+      case "licence-notice":
+        patchStore({
+          licenceNotice: evt.notice || null,
+          licenceReadOnly: !!evt.readOnly,
+        });
+        break;
       case "presence":
         patchStore({ online: evt.online || [] });
         // La présence vient de changer : l'annuaire affiché doit suivre,
@@ -502,6 +535,12 @@ export function ensureListening() {
           patch.adminBans = (r.data?.bans || []).map((b: any) => b.fingerprint);
         }
         else if (r.action === "bans") patch.adminBans = (r.data || []).map((b: any) => b.fingerprint);
+        // Étape I — retrait/reprise d'une place de licence
+        else if (r.action === "retire-device" || r.action === "restore-device") {
+          patch.adminDevices = r.data?.devices || [];
+          patch.adminPlaces = r.data?.places || null;
+        }
+        else if (r.action === "licence-places") patch.adminPlaces = r.data || null;
         else if (r.action === "set-locked") patch.adminLocked = !!r.data?.locked;
         else if (r.action === "set-admin-pin") patch.adminPinChanged = true;
         else if (r.action === "room-info") {

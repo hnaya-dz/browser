@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 // ✅ Icônes vectorielles (lucide, déjà dans les dépendances) plutôt
 // qu'emoji : les emoji sont rendus par la police du système et diffèrent
 // visuellement entre Windows 10 et 11 — incohérent d'un poste à l'autre.
-import { MessageSquare, Shield, Lock, Smartphone, KeyRound, Eye, EyeOff, Send, History, DoorOpen, Trash2, KeySquare, Users, ArrowLeft, CornerUpLeft, X, CheckCircle2 } from "lucide-react";
+import { MessageSquare, Shield, Lock, Smartphone, KeyRound, Eye, EyeOff, Send, History, DoorOpen, Trash2, KeySquare, Users, ArrowLeft, CornerUpLeft, X, CheckCircle2, AlertTriangle } from "lucide-react";
 import ChatAdminPanel from "./ChatAdminPanel";
 import ChatServerSetup from "./ChatServerSetup";
 import ChatComposerMedia, { MediaPreview, type PreparedMedia } from "./ChatComposerMedia";
@@ -1601,8 +1601,8 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
                         });
                         setVoteQuestion(""); setVoteOuvert(false); setVoteNominatif(true);
                       }}
-                      disabled={!voteQuestion.trim()}
-                      style={{ ...btnStyle(true, !voteQuestion.trim()), flex: 1, fontSize: 11 }}
+                      disabled={store.licenceReadOnly || !voteQuestion.trim()}
+                      style={{ ...btnStyle(true, store.licenceReadOnly || !voteQuestion.trim()), flex: 1, fontSize: 11 }}
                     >
                       {t("Chat.voteSend")}
                     </button>
@@ -1660,10 +1660,27 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
               {mediaError && (
                 <div style={{ fontSize: 10.5, color: "#ff8080", marginBottom: 5, lineHeight: 1.45 }}>{mediaError}</div>
               )}
+              {/* Étape I — échéance de licence. Le texte vient de l'hôte
+                  (nom de l'organisme, date, coordonnées de renouvellement) :
+                  une seule formulation pour le poste, le mobile et le
+                  journal du serveur. Ambre = préavis, rouge = envoi suspendu. */}
+              {store.licenceNotice && (
+                <div style={{
+                  display: "flex", gap: 6, alignItems: "flex-start",
+                  fontSize: 10.5, lineHeight: 1.45, marginBottom: 6,
+                  padding: "6px 8px", borderRadius: 6,
+                  color: store.licenceReadOnly ? "#ff9d9d" : "#ffcf8a",
+                  background: store.licenceReadOnly ? "rgba(255,80,80,0.10)" : "rgba(255,180,60,0.10)",
+                  border: `1px solid ${store.licenceReadOnly ? "rgba(255,80,80,0.35)" : "rgba(255,180,60,0.30)"}`,
+                }}>
+                  <AlertTriangle size={13} style={{ flexShrink: 0, marginTop: 1 }} />
+                  <span>{store.licenceNotice}</span>
+                </div>
+              )}
               <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                 <ChatComposerMedia
                   accent={accent} muted={muted} border={border}
-                  disabled={mediaBusy || !!pendingMedia || converting !== null}
+                  disabled={store.licenceReadOnly || mediaBusy || !!pendingMedia || converting !== null}
                   onPrepared={(m) => { setPendingMedia(m); setMediaError(""); }}
                   onError={(msg) => setMediaError(msg)}
                   onConverting={setConverting}
@@ -1673,12 +1690,14 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
                   value={messageInput}
                   onChange={(e) => setMessageInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleSend()}
-                  placeholder={pendingMedia ? t("Chat.mediaCaptionPlaceholder") : t("Chat.messagePlaceholder")}
+                  disabled={store.licenceReadOnly}
+                  placeholder={store.licenceReadOnly ? t("Chat.licenceSuspended")
+                    : pendingMedia ? t("Chat.mediaCaptionPlaceholder") : t("Chat.messagePlaceholder")}
                 />
                 <button
                   onClick={handleSend}
-                  disabled={mediaBusy || (!messageInput.trim() && !pendingMedia)}
-                  style={{ ...btnStyle(true, mediaBusy || (!messageInput.trim() && !pendingMedia)), flexShrink: 0 }}
+                  disabled={store.licenceReadOnly || mediaBusy || (!messageInput.trim() && !pendingMedia)}
+                  style={{ ...btnStyle(true, store.licenceReadOnly || mediaBusy || (!messageInput.trim() && !pendingMedia)), flexShrink: 0 }}
                 >
                   {mediaBusy ? "…" : t("Chat.send")}
                 </button>

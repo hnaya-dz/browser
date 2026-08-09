@@ -12,7 +12,7 @@
 
 import { useEffect, useState } from "react";
 import { useTranslation } from "@/hooks/useTranslation";
-import { Laptop, Smartphone as PhoneIcon, BadgeCheck, BadgeX, Download, Lock, LockOpen, Ban, Undo2, KeySquare } from "lucide-react";
+import { Laptop, Smartphone as PhoneIcon, BadgeCheck, BadgeX, Download, Lock, LockOpen, Ban, Undo2, KeySquare, UserMinus } from "lucide-react";
 import { store, patchStore, sendAdminCommand, resetAdminState, getApi, type AdminDevice } from "@/context/chatstore";
 
 interface Props {
@@ -87,6 +87,9 @@ export default function ChatAdminPanel({ accent, muted, border, inputBg, inputSt
     sendAdminCommand({ adminPin, action: "devices" });
     sendAdminCommand({ adminPin, action: "room-info" });
     sendAdminCommand({ adminPin, action: "bans" });
+    // Étape I — places de licence occupées. Sans ce chiffre, l'admin ne
+    // sait pas s'il lui reste de la marge avant d'atteindre le plafond.
+    sendAdminCommand({ adminPin, action: "licence-places" });
   };
 
 
@@ -187,11 +190,31 @@ export default function ChatAdminPanel({ accent, muted, border, inputBg, inputSt
       </div>
 
       {store.adminError && store.adminError !== "admin-pin" && (
-        <div style={{ fontSize: 10.5, color: "#ff5252", flexShrink: 0 }}>{store.adminError}</div>
+        <div style={{ fontSize: 10.5, color: "#ff5252", flexShrink: 0, lineHeight: 1.45 }}>
+          {/* Les codes de l'hôte sont traduits ici ; ceux qu'on ne connaît
+              pas sont affichés bruts plutôt qu'avalés. */}
+          {store.adminError === "device-online" ? t("Chat.adminErrDeviceOnline")
+            : store.adminError === "device-unknown" ? t("Chat.adminErrDeviceUnknown")
+            : store.adminError === "licence-device-limit" ? t("Chat.adminErrLicenceFull")
+            : store.adminError}
+        </div>
       )}
 
       <div style={{ flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
         {/* ── Registre des appareils ── */}
+        {/* Étape I — marge restante sur le plafond de licence. Affiché
+            uniquement quand il y a un plafond : le salon éphémère du
+            navigateur n'en a pas. */}
+        {tab === "devices" && store.adminPlaces?.maximum != null && (
+          <div style={{
+            fontSize: 10.5, color: muted, padding: "6px 8px", borderRadius: 6,
+            border: `1px solid ${border}`, background: inputBg, flexShrink: 0,
+          }}>
+            {t("Chat.adminLicencePlaces")} : <strong style={{ color: "inherit" }}>
+              {store.adminPlaces.occupees} / {store.adminPlaces.maximum}
+            </strong>
+          </div>
+        )}
         {tab === "devices" && (
           store.adminDevices.length === 0 ? (
             <div style={{ fontSize: 11, color: muted, textAlign: "center", padding: 12 }}>{t("Chat.adminNoResults")}</div>
@@ -264,6 +287,33 @@ export default function ChatAdminPanel({ accent, muted, border, inputBg, inputSt
               {store.adminBans.includes(d.fingerprint) && (
                 <div style={{ fontSize: 9.5, color: "#ff5252", marginTop: 3 }}>{t("Chat.adminBannedTag")}</div>
               )}
+              {/* Étape I — place de licence. « Retirer » n'exclut personne :
+                  il rend la place d'un appareil qui n'existe plus (poste
+                  réinstallé, téléphone remplacé). Pour écarter quelqu'un,
+                  c'est « Bloquer », juste au-dessus. */}
+              <div style={{ display: "flex", gap: 6, marginTop: 6, alignItems: "center" }}>
+                {d.retiredAt ? (
+                  <>
+                    <span style={{ fontSize: 9.5, color: muted, flex: 1 }}>
+                      {t("Chat.adminRetiredTag")} — {new Date(d.retiredAt).toLocaleDateString()}
+                    </span>
+                    <button
+                      onClick={() => admin({ action: "restore-device", fingerprint: d.fingerprint })}
+                      style={{ ...btnStyle(), padding: "5px 8px", fontSize: 10.5, display: "flex", alignItems: "center", gap: 3 }}
+                    >
+                      <Undo2 size={11} /> {t("Chat.adminRestoreDevice")}
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => admin({ action: "retire-device", fingerprint: d.fingerprint })}
+                    style={{ ...btnStyle(), padding: "5px 8px", fontSize: 10.5, display: "flex", alignItems: "center", gap: 3 }}
+                    title={t("Chat.adminRetireDeviceHelp")}
+                  >
+                    <UserMinus size={11} /> {t("Chat.adminRetireDevice")}
+                  </button>
+                )}
+              </div>
             </div>
           ))
         )}

@@ -118,6 +118,13 @@
   #replyBar button { background:transparent; border:none; color:var(--muted); font-size:22px;
                      cursor:pointer; flex-shrink:0; min-width:44px; min-height:44px;
                      display:flex; align-items:center; justify-content:center; }
+  /* — Étape I : échéance de licence — */
+  #licenceBar { padding:10px 14px; font-size:12.5px; line-height:1.45; flex-shrink:0;
+                border-top:1px solid rgba(255,180,60,0.30); color:#ffcf8a;
+                background:rgba(255,180,60,0.10); }
+  #licenceBar[hidden] { display:none; }
+  #licenceBar.stop { color:#ff9d9d; background:rgba(255,80,80,0.10);
+                     border-top-color:rgba(255,80,80,0.35); }
   /* — Étape H : vote — */
   .vote { align-self:stretch; background:rgba(0,99,65,0.16); border:1px solid rgba(0,200,83,0.4);
           border-radius:14px; padding:12px 14px; }
@@ -266,6 +273,10 @@
       <span class="info"><span id="replyWho"></span><small id="replyTxt"></small></span>
       <button id="replyCancel" aria-label="Annuler la réponse">✕</button>
     </div>
+    <!-- Étape I — échéance de licence : préavis, puis envoi suspendu. Le
+         texte est celui envoyé par l'hôte (organisme, date, coordonnées de
+         renouvellement) : même formulation que sur le poste. -->
+    <div id="licenceBar" hidden><span id="licenceTxt"></span></div>
     <div id="composer">
       <!-- Photo, image ou document. `capture` fait proposer l'appareil
            photo sur téléphone, sans exiger de contexte sécurisé. -->
@@ -971,6 +982,10 @@ async function connect() {
       renderMessages();
     }
     else if (payload.type === "vote-refused") showAttError(t("voteAlready"));
+    // Étape I — échéance de licence. Le bandeau reprend mot pour mot le
+    // texte de l'hôte ; passé le délai de grâce, la saisie est coupée
+    // plutôt que de laisser écrire un message qui sera refusé.
+    else if (payload.type === "licence-notice") appliquerLicence(payload);
     else if (payload.type === "presence") {
       presenceEl.textContent = `● ${payload.online.length} ${t("online")}`;
       // La présence a changé : l'annuaire affiché doit suivre, sinon la
@@ -1141,6 +1156,25 @@ async function sendDraft() {
     sendBtn.textContent = libelle;
   }
 }
+// Étape I — état de la licence du serveur. Reçu à la connexion, puis à
+// chaque changement de palier sans que le téléphone ait à se reconnecter.
+function appliquerLicence(p) {
+  const bar = document.getElementById("licenceBar");
+  const txt = document.getElementById("licenceTxt");
+  const stop = !!p.readOnly;
+  if (!p.notice) { bar.hidden = true; }
+  else {
+    txt.textContent = p.notice;
+    bar.classList.toggle("stop", stop);
+    bar.hidden = false;
+  }
+  // Couper la saisie plutôt que d'accepter un texte qui sera rejeté.
+  for (const id of ["draft", "sendBtn", "attBtn", "micBtn"]) {
+    const el = document.getElementById(id);
+    if (el) el.disabled = stop;
+  }
+}
+
 sendBtn.onclick = sendDraft;
 draft.addEventListener("keydown", (e) => { if (e.key === "Enter") sendDraft(); });
 </script>

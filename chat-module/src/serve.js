@@ -25,7 +25,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { startHost } from "./server.js";
 import { initStore, getConfig, setConfig, closeStore, getRoom } from "./store.js";
-import { verifyLicence } from "./licence.js";
+import { verifyLicence, CONTACT_TEXTE } from "./licence.js";
 
 const MODULE_DATA_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "data");
 
@@ -43,15 +43,52 @@ function requireLicence(licencePath, dataDir) {
 Le serveur permanent est réservé aux organisations disposant d'une licence
 Hnaya DZ. Placez le fichier .hnaya-lic remis à l'installation dans le
 répertoire de données, ou indiquez son chemin avec --licence.
-Le mode poste (salon créé depuis le navigateur) reste libre et sans licence.`);
+Le mode poste (salon créé depuis le navigateur) reste libre et sans licence.
+${CONTACT_TEXTE}`);
   }
   const res = verifyLicence(contenu);
-  if (!res.ok) throw new Error(`Licence refusée : ${res.error}`);
+  // Refus UNIQUEMENT sur une licence illisible, incomplète ou mal signée.
+  // Une licence ÉCHUE démarre : elle passe en lecture seule (voir
+  // licence.js). Refuser de démarrer rendrait l'historique du client
+  // inaccessible et la panne muette — la tâche tourne sans écran.
+  if (!res.ok) throw new Error(`Licence refusée : ${res.error}\n${CONTACT_TEXTE}`);
   console.log(`[hnaya-serve] Licence « ${res.licence.org} » — ${res.licence.maxDevices} appareils, échéance ${new Date(Date.parse(res.licence.expires)).toLocaleDateString("fr-FR")}`);
-  if (res.daysLeft <= 30) {
-    console.warn(`[hnaya-serve] ⚠️ Licence expirant dans ${res.daysLeft} jour(s) — contactez Hnaya DZ pour le renouvellement.`);
-  }
-  return res.licence;
+  if (res.notice) console.warn(`[hnaya-serve] ⚠️ ${res.notice}`);
+  return res;
+}
+
+// ── Surveillance de l'échéance pendant que le serveur tourne ───────────
+// Le défaut corrigé ici : la licence n'était lue qu'AU DÉMARRAGE. Une
+// tâche planifiée démarrée une fois pouvait tourner des mois après
+// l'échéance sans que rien ne s'y oppose — une licence de 6 mois n'était
+// opposable qu'à celui qui redémarrait son serveur.
+//
+// Le fichier est RELU à chaque contrôle, pas seulement réévalué : le
+// client qui renouvelle dépose le nouveau .hnaya-lic par-dessus et
+// retrouve l'écriture à l'heure suivante, sans redémarrer un service
+// auquel il n'a peut-être pas accès.
+const CONTROLE_LICENCE_MS = 60 * 60 * 1000; // toutes les heures
+
+function surveillerLicence({ chemin, initial, onChange }) {
+  let etat = initial;
+  const relire = () => {
+    let res;
+    try { res = verifyLicence(readFileSync(chemin, "utf8")); }
+    catch { return; } // fichier momentanément absent : on garde le dernier état connu
+    // Une licence devenue illisible ou mal signée ne DÉGRADE rien en cours
+    // de route : on conserve le dernier état valide. Sinon un fichier
+    // à moitié réécrit pendant un renouvellement couperait le salon.
+    if (!res.ok) return;
+    const avant = etat.mode;
+    etat = res;
+    if (res.mode !== avant) {
+      console.warn(`[hnaya-serve] ⚠️ Licence : ${avant} → ${res.mode}. ${res.notice || ""}`);
+      onChange(res);
+    }
+  };
+  const timer = setInterval(relire, CONTROLE_LICENCE_MS);
+  timer.unref?.(); // ne retient pas le process
+  return { etat: () => etat, relire, stop: () => clearInterval(timer) };
 }
 
 function parseArgs(argv) {
@@ -73,7 +110,9 @@ export function startPermanentServer({ name, pin, data, adminPin, wsPort, httpPo
   const dataDir = data ? path.resolve(data) : undefined;
   // La licence est contrôlée AVANT d'ouvrir quoi que ce soit (ni base, ni
   // port) : un serveur sans licence ne laisse aucune trace de démarrage.
-  const lic = requireLicence(licence, dataDir);
+  const verdict = requireLicence(licence, dataDir);
+  const lic = verdict.licence;
+  const cheminLicence = licence || path.join(dataDir || MODULE_DATA_DIR, "licence.hnaya-lic");
   initStore(dataDir);
 
   if (pin !== undefined && !/^\d{6}$/.test(String(pin))) {
@@ -86,6 +125,16 @@ export function startPermanentServer({ name, pin, data, adminPin, wsPort, httpPo
   // reprennent ce salon-là — continuité totale.
   let roomId = getConfig("current_room_id");
   if (!roomId && getRoom("default")) roomId = "default";
+
+  // Le hôte n'existe pas encore quand la veille démarre, et la veille doit
+  // pouvoir le prévenir : un porteur mutable les relie sans dépendance
+  // circulaire à la construction.
+  let hote = null;
+  const veille = surveillerLicence({
+    chemin: cheminLicence,
+    initial: verdict,
+    onChange: () => { try { hote?.notifyLicence(); } catch { /* hôte déjà arrêté */ } },
+  });
 
   const host = startHost({
     sessionName: name ?? undefined,
@@ -100,11 +149,18 @@ export function startPermanentServer({ name, pin, data, adminPin, wsPort, httpPo
     httpPort: httpPort || undefined,
     // Plafond d'appareils de la licence — appliqué par server.js au join
     maxDevices: lic.maxDevices,
+    // Réévalué à CHAQUE envoi : c'est ce qui rend l'échéance opposable
+    // sans redémarrage (voir surveillerLicence).
+    licenceState: () => {
+      const e = veille.etat();
+      return { mode: e.mode, notice: e.notice };
+    },
     onError: (friendly) => {
       console.error(`[hnaya-serve] ${friendly}`);
       process.exit(1);
     },
   });
+  hote = host;
   setConfig("current_room_id", host.roomId);
   const sessionName = getRoom(host.roomId).name;
 
@@ -112,9 +168,13 @@ export function startPermanentServer({ name, pin, data, adminPin, wsPort, httpPo
   console.log(`[hnaya-serve] Données : ${dataDir || "(répertoire du module)"}`);
   console.log(`[hnaya-serve] PIN d'accès (stable) : ${host.pin} — PIN admin : ${host.adminPin}`);
   console.log(`[hnaya-serve] Postes : découverte automatique ou « Rejoindre par IP » ; mobiles : http://<ip>:${host.httpPort}`);
+  if (verdict.mode === "readonly") {
+    console.warn("[hnaya-serve] ⚠️ LECTURE SEULE : licence échue depuis plus de 30 jours. L'historique reste consultable, l'envoi est suspendu.");
+  }
 
   const shutdown = (signal) => {
     console.log(`[hnaya-serve] ${signal} reçu — arrêt propre.`);
+    veille.stop();
     try { host.stop(); } catch { /* déjà arrêté */ }
     closeStore();
     process.exit(0);

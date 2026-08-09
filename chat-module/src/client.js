@@ -54,6 +54,7 @@ export function joinSession({
   onMessage,
   onVoteTally,
   onVoteRefused,
+  onLicenceNotice,
   onPresence,
   onAdminResult,
   onInviteSent,
@@ -119,6 +120,10 @@ export function joinSession({
     else if (payload.type === "vote") onMessage?.(payload);
     else if (payload.type === "vote-tally") onVoteTally?.(payload);
     else if (payload.type === "vote-refused") onVoteRefused?.(payload);
+    // Étape I — échéance de licence : préavis, délai de grâce, puis
+    // lecture seule. Arrive à la connexion et à chaque changement de
+    // palier, sans redémarrage du serveur.
+    else if (payload.type === "licence-notice") onLicenceNotice?.(payload);
     else if (payload.type === "invite-sent") onInviteSent?.(payload);
     else if (payload.type === "admin-result") onAdminResult?.(payload);
     // Étape F — annuaire : qui est inscrit, sa fonction, sa présence

@@ -256,6 +256,11 @@ function handleCommand(msg) {
           decompte: t.decompte, total: t.total, voters: t.voters, detail: t.detail,
         }),
         onVoteRefused: (r) => process.send({ event: "vote-refused", voteId: r.voteId, reason: r.reason }),
+        // Étape I — état de la licence du serveur permanent
+        onLicenceNotice: (n) => process.send({
+          event: "licence-notice", mode: n.mode, readOnly: !!n.readOnly,
+          notice: n.notice || null, refused: n.refused || null,
+        }),
       });
       clientHandle = handle;
       handle.raw.on("open", () => process.send({ event: "joined" }));

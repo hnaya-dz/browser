@@ -31,11 +31,18 @@ interface ServerInfo {
   installed: boolean;
   running: boolean;
   dataDir: string;
-  licence: { org: string; expires: string; maxDevices: number; daysLeft: number; valid: boolean } | null;
+  licence: {
+    org: string; expires: string; maxDevices: number; daysLeft: number;
+    // `valid` = EN COURS DE VALIDITÉ (mode "active"), pas « bien signée ».
+    valid: boolean; mode?: string | null; graceDaysLeft?: number | null; notice?: string | null;
+  } | null;
 }
 
 interface PickedLicence {
   path: string; org: string; maxDevices: number; expires: string; daysLeft: number;
+  // Étape I — "active" | "grace" | "readonly". Une licence échue reste
+  // correctement signée : c'est `mode` qui dit ce qu'elle autorise encore.
+  mode?: string; graceDaysLeft?: number | null; notice?: string | null;
 }
 
 export default function ChatServerSetup({ accent, muted, border, inputStyle, btnStyle }: Props) {
@@ -166,9 +173,20 @@ export default function ChatServerSetup({ accent, muted, border, inputStyle, btn
                 {info.licence && (
                   <div style={{ color: muted, marginTop: 3 }}>
                     {info.licence.org} — {info.licence.maxDevices} {t("Chat.serverDevices")} ·{" "}
-                    {info.licence.valid
+                    {/* Une licence ÉCHUE n'est pas une licence INVALIDE : dire
+                        « invalide » ferait chercher un fichier corrompu là où
+                        il n'y a qu'un renouvellement à faire. Le message de
+                        l'hôte distingue les deux. */}
+                    {info.licence.mode
                       ? `${t("Chat.serverExpires")} ${new Date(info.licence.expires).toLocaleDateString()}`
                       : <span style={{ color: "#ff8080" }}>{t("Chat.serverLicenceInvalid")}</span>}
+                    {info.licence.notice && (
+                      <div style={{
+                        marginTop: 3, color: info.licence.mode === "readonly" ? "#ff8080" : "#ffcf8a",
+                      }}>
+                        {info.licence.notice}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -200,6 +218,16 @@ export default function ChatServerSetup({ accent, muted, border, inputStyle, btn
                   }}>
                     <b>{licence.org}</b> — {licence.maxDevices} {t("Chat.serverDevices")} ·{" "}
                     {t("Chat.serverExpires")} {new Date(licence.expires).toLocaleDateString()}
+                    {/* Étape I — préavis ou échéance dépassée : le dire ICI,
+                        avant de saisir les PINs, plutôt qu'au moment où
+                        l'installation échoue. */}
+                    {licence.notice && (
+                      <div style={{
+                        marginTop: 5, color: licence.mode === "readonly" ? "#ff8080" : "#ffcf8a",
+                      }}>
+                        {licence.notice}
+                      </div>
+                    )}
                   </div>
                   <input
                     style={{ ...inputStyle, direction: "ltr", textAlign: "start" }}

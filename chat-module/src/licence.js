@@ -22,6 +22,31 @@ import { createPublicKey, verify as cryptoVerify } from "node:crypto";
 export const LICENCE_FORMAT = "hnaya-chat-server-licence";
 export const LICENCE_VERSION = 1;
 
+// Coordonnées de renouvellement — affichées dans TOUS les avertissements
+// d'échéance, sur le poste comme sur le mobile. Un client dont la licence
+// arrive à terme doit savoir qui appeler sans chercher.
+export const CONTACT_HNAYA = { tel: "+213558303030", email: "contact@hnaya.dz" };
+export const CONTACT_TEXTE = `Hnaya DZ — ${CONTACT_HNAYA.tel} — ${CONTACT_HNAYA.email}`;
+
+// ── Ce qui se passe à l'échéance ───────────────────────────────────────
+// Une licence expirée n'éteint PAS le serveur : elle le fait taire.
+//
+//   active   │ échéance non atteinte           │ tout fonctionne
+//   grace    │ 0 à 29 jours après l'échéance   │ tout fonctionne + avertissement
+//   readonly │ 30 jours après l'échéance       │ lecture seule : plus d'envoi
+//
+// Trois raisons de ne jamais couper le serveur :
+//  1. L'historique d'une administration est un document de travail. Le
+//     retenir en otage pour une facture n'est pas défendable, et serait
+//     probablement contraire aux règles d'archivage du client.
+//  2. Le serveur tourne en tâche SYSTEM sur une machine sans écran : un
+//     refus de démarrage est invisible, personne ne saurait pourquoi la
+//     messagerie a disparu.
+//  3. Le mode lecture seule est PARLANT. L'utilisateur voit le bandeau,
+//     ne peut plus écrire, et sait qui appeler — c'est ce qui déclenche
+//     le renouvellement, pas une panne muette.
+export const GRACE_DAYS = 30;
+
 // Clé publique de Hnaya DZ (SPKI DER, base64) — remplacée uniquement si la
 // clé privée est compromise (les licences déjà émises devront être réémises).
 export const HNAYA_PUBLIC_KEY_B64 =
@@ -41,8 +66,17 @@ function publicKeyFromB64(b64) {
 
 /**
  * Vérifie un fichier de licence (contenu texte).
- * Ne lève JAMAIS : retourne toujours { ok, error?, licence?, daysLeft? }
- * avec un message d'erreur en français destiné à l'écran/au journal.
+ * Ne lève JAMAIS. Retourne :
+ *   { ok: false, error }                      fichier illisible, incomplet,
+ *                                             ou signature invalide
+ *   { ok: true, licence, daysLeft, mode,      signature valide ; `mode` dit
+ *     graceDaysLeft?, notice? }               ce que le serveur a le droit
+ *                                             de faire (voir GRACE_DAYS)
+ *
+ * ⚠️ `ok` signifie « signée par Hnaya DZ », PAS « en cours de validité ».
+ * Une licence échue reste `ok` — c'est `mode` qui devient "grace" puis
+ * "readonly". Tout appelant qui décide d'une AUTORISATION doit lire `mode` ;
+ * se contenter de `ok` rendrait l'échéance de nouveau inopposable.
  * `now` et `publicKeyB64` ne servent qu'aux tests.
  */
 export function verifyLicence(fileContent, { now = Date.now(), publicKeyB64 = HNAYA_PUBLIC_KEY_B64 } = {}) {
@@ -83,8 +117,32 @@ export function verifyLicence(fileContent, { now = Date.now(), publicKeyB64 = HN
     return { ok: false, error: "Licence incomplète (échéance illisible)" };
   }
   const daysLeft = Math.floor((expiresTs - now) / 86400000);
-  if (daysLeft < 0) {
-    return { ok: false, expired: true, licence: p, error: `Licence expirée depuis le ${new Date(expiresTs).toLocaleDateString("fr-FR")} — contactez Hnaya DZ pour la renouveler` };
+  const echeance = dateFr(expiresTs);
+
+  if (daysLeft >= 0) {
+    // Préavis dans le dernier mois : l'avertissement doit arriver AVANT la
+    // coupure, pas le jour où elle tombe.
+    const notice = daysLeft <= GRACE_DAYS
+      ? `Licence Hnaya « ${p.org} » : échéance le ${echeance}, dans ${daysLeft} jour(s). Pensez au renouvellement — ${CONTACT_TEXTE}`
+      : null;
+    return { ok: true, licence: p, daysLeft, mode: "active", notice };
   }
-  return { ok: true, licence: p, daysLeft };
+
+  // Au-delà de l'échéance : jours de dépassement, et non « jours restants ».
+  const depasse = -daysLeft;
+  if (depasse < GRACE_DAYS) {
+    const reste = GRACE_DAYS - depasse;
+    return {
+      ok: true, licence: p, daysLeft, mode: "grace", graceDaysLeft: reste,
+      notice: `Licence Hnaya « ${p.org} » expirée le ${echeance}. L'envoi de messages sera suspendu dans ${reste} jour(s) ; l'historique restera consultable. Renouvellement : ${CONTACT_TEXTE}`,
+    };
+  }
+  return {
+    ok: true, licence: p, daysLeft, mode: "readonly", graceDaysLeft: 0, expired: true,
+    notice: `Licence Hnaya « ${p.org} » expirée le ${echeance}. L'envoi de messages est suspendu ; l'historique reste consultable et rien n'a été effacé. Renouvellement : ${CONTACT_TEXTE}`,
+  };
+}
+
+function dateFr(ts) {
+  return new Date(ts).toLocaleDateString("fr-FR");
 }

@@ -19,6 +19,7 @@ import {
   addRoomMember, isRoomMember, setRoomLocked,
   getDevice, countDevices, getDataDir, listReferencedMedia,
   setDeviceRole, listRoster, listDirectThreads,
+  retireDevice, restoreDevice,
 } from "./store.js";
 import { fingerprintFromRawPublicKey, rawFromSpkiBase64, verifyMessage,
          voteDefinitionSeal, voteAnswerSeal } from "./identity.js";
@@ -50,7 +51,23 @@ const HEARTBEAT_MS = 10000;
  * @param {string} [opts.pin] PIN à 6 chiffres ; généré aléatoirement si absent
  * @returns {{ pin: string, stop: () => void }}
  */
-export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, wsPort = WS_PORT, httpPort, onError, maxDevices = null } = {}) {
+// ── Étape I — ce que la licence autorise, à tout instant ───────────────
+// Le salon éphémère du navigateur n'a pas de licence : `licenceState` est
+// absent et TOUT est permis. Le serveur permanent (serve.js) passe une
+// fonction, réévaluée à chaque envoi — c'est ce qui rend l'échéance
+// opposable à un serveur qui tourne depuis des mois sans redémarrer.
+//
+// En lecture seule, on ne bloque pas type par type mais par LISTE BLANCHE :
+// un type d'envoi ajouté plus tard sera refusé par défaut au lieu de passer
+// silencieusement. Lire, chercher et administrer restent toujours possibles.
+const TYPES_EN_LECTURE_SEULE = new Set(["join", "read", "media-get", "roster", "admin"]);
+
+export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, wsPort = WS_PORT, httpPort, onError, maxDevices = null, licenceState = null } = {}) {
+  const etatLicence = () => {
+    if (!licenceState) return { mode: "active", notice: null };
+    try { return licenceState() || { mode: "active", notice: null }; }
+    catch { return { mode: "active", notice: null }; } // jamais de panne de licence
+  };
   // ⚠️ Indexé par CONNEXION (l'objet ws), surtout pas par pseudo.
   // « Ajouter mon mobile » fait rejoindre le téléphone sous le MÊME pseudo
   // que le poste (paramètre ?u= du QR — c'est tout l'intérêt : ne pas
@@ -195,7 +212,13 @@ export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, 
             // (Les clients v1 sans identité ne sont pas comptables ; un
             // déploiement sous licence utilise des salons verrouillés,
             // qui les refusent déjà — voir code 4005.)
-            if (maxDevices !== null && !getDevice(fingerprint) && countDevices() >= maxDevices) {
+            //
+            // ⚠️ Un appareil RETIRÉ par l'admin compte comme nouveau : sa
+            // fiche existe encore (on garde sa clé publique) mais sa place
+            // a été rendue. Tester la seule présence de la fiche le
+            // laisserait rentrer gratuitement, plafond atteint ou non.
+            const connu = getDevice(fingerprint);
+            if (maxDevices !== null && (!connu || connu.retiredAt) && countDevices() >= maxDevices) {
               ws.close(4006, "licence-device-limit");
               return;
             }
@@ -270,8 +293,28 @@ export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, 
           }));
         }
 
+        // État de la licence dès l'arrivée : un utilisateur doit voir le
+        // bandeau AVANT de composer un message, pas découvrir le refus
+        // après avoir tapé.
+        envoyerEtatLicence(ws);
+
         broadcastPresence();
         return;
+      }
+
+      // ── Étape I — échéance de licence opposable ──────────────────────
+      // Passé le délai de grâce, le salon devient muet : on refuse l'envoi
+      // et on RÉPOND pourquoi. Un refus silencieux laisserait croire à une
+      // panne réseau et ferait appeler l'informaticien, pas Hnaya DZ.
+      if (!TYPES_EN_LECTURE_SEULE.has(payload.type)) {
+        const etat = etatLicence();
+        if (etat.mode === "readonly") {
+          ws.send(encryptPayload(sessionKey, {
+            v: 1, type: "licence-notice", mode: "readonly",
+            readOnly: true, notice: etat.notice, refused: payload.type,
+          }));
+          return;
+        }
       }
 
       if (payload.type === "message") {
@@ -668,6 +711,39 @@ export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, 
             case "bans":
               reply({ ok: true, data: listBans(activeRoomId) });
               break;
+
+            // ── Étape I — libérer une place de licence ────────────────
+            // « Retirer » n'est PAS « bloquer ». Bloquer exclut quelqu'un
+            // qu'on ne veut plus voir ; retirer rend la place d'un appareil
+            // qui n'existe plus (poste réinstallé, téléphone remplacé).
+            // La fiche, la clé publique et les messages sont conservés :
+            // l'historique reste vérifiable.
+            case "retire-device": {
+              const fp = String(payload.fingerprint || "");
+              // Un appareil CONNECTÉ ne se retire pas : la place serait
+              // reprise à sa prochaine reconnexion, et l'admin croirait
+              // l'avoir libérée. Pour écarter quelqu'un, c'est « bloquer ».
+              const enLigne = [...clients.values()].some((c) => c.device?.fingerprint === fp);
+              if (enLigne) { reply({ ok: false, error: "device-online" }); break; }
+              if (!getDevice(fp)) { reply({ ok: false, error: "device-unknown" }); break; }
+              retireDevice(fp);
+              reply({ ok: true, data: { devices: listDevices(activeRoomId), places: placesLicence() } });
+              break;
+            }
+            case "restore-device": {
+              const fp = String(payload.fingerprint || "");
+              if (!getDevice(fp)) { reply({ ok: false, error: "device-unknown" }); break; }
+              // Reprendre une place ne doit pas pouvoir dépasser le plafond
+              if (maxDevices !== null && countDevices() >= maxDevices) {
+                reply({ ok: false, error: "licence-device-limit" }); break;
+              }
+              restoreDevice(fp);
+              reply({ ok: true, data: { devices: listDevices(activeRoomId), places: placesLicence() } });
+              break;
+            }
+            case "licence-places":
+              reply({ ok: true, data: placesLicence() });
+              break;
             case "set-locked": {
               // Verrouillage/déverrouillage du salon par l'admin — voir
               // le contrôle au join (code 4005). Les membres CONNECTÉS ne
@@ -725,6 +801,27 @@ export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, 
       broadcastPresence();
     });
   });
+
+  // Places de licence : occupées / plafond. `null` en mode poste (salon
+  // éphémère du navigateur), qui n'a pas de plafond du tout.
+  function placesLicence() {
+    return { occupees: countDevices(), maximum: maxDevices };
+  }
+
+  // État de licence : envoyé à l'arrivée de chaque client, puis rediffusé
+  // par serve.js au passage d'un palier (préavis → grâce → lecture seule).
+  // Rien n'est envoyé quand tout va bien et qu'il n'y a rien à dire : un
+  // bandeau permanent finit par ne plus être lu.
+  function envoyerEtatLicence(ws) {
+    const etat = etatLicence();
+    if (etat.mode === "active" && !etat.notice) return;
+    try {
+      ws.send(encryptPayload(sessionKey, {
+        v: 1, type: "licence-notice", mode: etat.mode,
+        readOnly: etat.mode === "readonly", notice: etat.notice || null,
+      }));
+    } catch { /* connexion partie entre-temps */ }
+  }
 
   function broadcastToGroup(groupId, data) {
     // ⚠️ Étape F — un fil privé se route par APPARTENANCE, jamais par le
@@ -789,6 +886,11 @@ export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, 
     roomId: activeRoomId,
     wsPort,
     httpPort: mobileServer.httpPort,
+    /** Rediffuse l'état de licence à tout le monde — appelé par serve.js
+     *  quand le palier change pendant que le serveur tourne. */
+    notifyLicence() {
+      for (const { ws } of clients.values()) envoyerEtatLicence(ws);
+    },
     stop() {
       // Retourne une promesse résolue quand les DEUX ports (4802/4803)
       // sont réellement libérés — un stop puis un start immédiat (changer
