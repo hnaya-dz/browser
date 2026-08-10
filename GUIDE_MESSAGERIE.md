@@ -111,19 +111,19 @@ seul mode praticable.
 ### Depuis un poste
 
 Le bouton **microphone**, à gauche de la zone de saisie. On enregistre, on
-arrête, et l'aperçu affiche la durée obtenue. On peut renoncer d'un clic
-avant d'envoyer. Le message part comme pièce jointe et s'écoute d'un clic
-chez le destinataire.
+arrête, et l'aperçu affiche un **lecteur** : on se réécoute avant
+d'envoyer, et l'on renonce d'un clic si l'enregistrement est raté. Un
+vocal parti ne se rattrape pas.
 
-> Dans cette version, l'aperçu **ne permet pas de se réécouter** avant
-> l'envoi : il indique la durée, pas plus. Un enregistrement raté se
-> supprime et se refait.
+Le message part ensuite comme pièce jointe et s'écoute d'un clic chez le
+destinataire.
 
 ### Depuis un téléphone
 
 Le bouton **🎤** ouvre le **magnétophone du téléphone**, pas un
 enregistreur maison. On enregistre avec l'application que l'on connaît
-déjà, on valide, et le fichier est joint.
+déjà, on valide, et le fichier est joint — avec le même **lecteur** que
+sur le poste pour se réécouter avant l'envoi.
 
 > **Pourquoi ce détour, et pourquoi il est préférable.** La page mobile est
 > servie en `http` sur une adresse privée : le navigateur refuse alors

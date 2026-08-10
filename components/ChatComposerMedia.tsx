@@ -9,7 +9,7 @@
 // sharp, pas de binaire natif (ces 19 Mio venaient justement d'être
 // retirés du paquet). Chromium sait déjà tout faire.
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/hooks/useTranslation";
 import { Paperclip, Mic, Square, X } from "lucide-react";
 
@@ -201,6 +201,9 @@ export async function prepareFile(
       return {
         kind: "voice", mime: file.type,
         bytes: buf, size: buf.byteLength, name: file.name, thumb: null,
+        // previewUrl sur les OCTETS retenus, pas sur le fichier d'origine :
+        // c'est ce qui part réellement qu'on doit pouvoir réécouter.
+        previewUrl: URL.createObjectURL(new Blob([buf], { type: file.type })),
       };
     }
     const { bytes, size, duration } = await convertToOpus(file, onConvertProgress);
@@ -209,6 +212,9 @@ export async function prepareFile(
       bytes, size, duration: Math.round(duration),
       name: file.name.replace(/\.[^.\\/]{1,8}$/, "") + ".webm",
       thumb: null,
+      // Après conversion, réécouter est encore plus utile : c'est le seul
+      // moyen de constater qu'un format exotique a été correctement décodé.
+      previewUrl: URL.createObjectURL(new Blob([bytes], { type: "audio/webm" })),
     };
   }
 
@@ -364,9 +370,21 @@ export function MediaPreview({ media, onCancel, muted, border, accent }: {
   const ko = media.size < 1024 * 1024
     ? `${Math.max(1, Math.round(media.size / 1024))} Ko`
     : `${(media.size / 1024 / 1024).toFixed(1)} Mo`;
+
+  // Une URL d'objet retient les octets en mémoire tant qu'elle n'est pas
+  // révoquée. Un vocal de plusieurs mégaoctets abandonné puis refait
+  // dix fois de suite finirait par peser lourd dans une session longue.
+  // On la libère quand l'aperçu disparaît — envoi ou annulation.
+  // ⚠️ Uniquement les URL d'OBJET : les images passent par une URL de
+  // données (data:), que revokeObjectURL ne concerne pas.
+  useEffect(() => {
+    const url = media.previewUrl;
+    if (!url || !url.startsWith("blob:")) return;
+    return () => URL.revokeObjectURL(url);
+  }, [media.previewUrl]);
   return (
     <div style={{
-      display: "flex", alignItems: "center", gap: 8, padding: 7,
+      display: "flex", alignItems: "center", gap: 8, padding: 7, flexWrap: "wrap",
       border: `1px solid ${border}`, borderRadius: 4, marginBottom: 6,
     }}>
       {media.kind === "image" && media.previewUrl ? (
@@ -390,6 +408,21 @@ export function MediaPreview({ media, onCancel, muted, border, accent }: {
       >
         <X size={14} />
       </button>
+      {/* Se réécouter AVANT d'envoyer. Sans cela, on dicte une consigne de
+          deux minutes sans savoir si le micro a capté — et un vocal, une
+          fois parti, ne se rattrape pas. Après une conversion de format,
+          c'est en outre le seul moyen de constater que le décodage a
+          réellement abouti.
+          Sur toute la largeur, sous la ligne : un lecteur comprimé entre
+          l'icône et le bouton de suppression serait inutilisable. */}
+      {media.kind === "voice" && media.previewUrl && (
+        <audio
+          controls
+          src={media.previewUrl}
+          preload="metadata"
+          style={{ width: "100%", height: 32, marginTop: 2 }}
+        />
+      )}
     </div>
   );
 }

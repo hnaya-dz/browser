@@ -266,7 +266,11 @@
                              display:flex; align-items:center; justify-content:center; }
   #attPreview { display:none; align-items:center; gap:10px; padding:10px 14px;
                 background:var(--panel); border-top:1px solid var(--border); flex-shrink:0; }
-  #attPreview.show { display:flex; }
+  #attPreview.show { display:flex; flex-wrap:wrap; }
+  /* Le lecteur d'un vocal prend sa propre ligne : comprimé entre l'icône
+     et la croix, il serait inutilisable au pouce. */
+  #attAudio { flex:1 0 100%; width:100%; height:36px; margin-top:2px; }
+  #attAudio[hidden] { display:none; }
   #attPreview img { width:44px; height:44px; object-fit:cover; border-radius:8px; flex-shrink:0; }
   #attPreview .info { flex:1; min-width:0; font-size:14px; }
   #attPreview .info small { display:block; color:var(--muted); font-size:12px; margin-top:2px;
@@ -336,6 +340,11 @@
       <span id="attIcon" style="font-size:26px;display:none"></span>
       <span class="info"><span id="attName"></span><small id="attSize"></small></span>
       <button id="attCancel" aria-label="Retirer">✕</button>
+      <!-- Se réécouter AVANT d'envoyer : un vocal parti ne se rattrape
+           pas, et le magnétophone du téléphone ne dit pas toujours si le
+           micro a réellement capté. Sur sa propre ligne — un lecteur
+           comprimé entre l'icône et la croix serait inutilisable. -->
+      <audio id="attAudio" controls preload="metadata" hidden></audio>
     </div>
     <!-- Étape G — ce que l'on s'apprête à citer. Sans cet aperçu on écrit
          une réponse sans plus savoir à quoi elle répond. -->
@@ -1516,12 +1525,28 @@ function afficherApercu(att) {
   }
   attName.textContent = att.kind === "voice" ? t("attVoice") : (att.name || t("attFile"));
   attSize.textContent = humanSize(att.bytes.length);
+  // Lecteur pour les vocaux, construit sur les octets RETENUS et non sur
+  // le fichier d'origine : c'est ce qui partira qu'on doit pouvoir
+  // réécouter.
+  const audio = document.getElementById("attAudio");
+  if (audio.src) { URL.revokeObjectURL(audio.src); audio.removeAttribute("src"); }
+  if (att.kind === "voice") {
+    audio.src = URL.createObjectURL(new Blob([att.bytes], { type: att.mime || "audio/webm" }));
+    audio.hidden = false;
+  } else {
+    audio.hidden = true;
+  }
   attPreview.classList.add("show");
   draft.placeholder = t("attCaption");
 }
 
 function annulerApercu() {
   pendingAtt = null;
+  // Libérer les octets retenus par l'URL d'objet du lecteur : un vocal
+  // refait dix fois dans une même session finirait par peser.
+  const audio = document.getElementById("attAudio");
+  if (audio && audio.src) { URL.revokeObjectURL(audio.src); audio.removeAttribute("src"); }
+  if (audio) audio.hidden = true;
   attPreview.classList.remove("show");
   showAttError("");
   draft.placeholder = t("draftPlaceholder");
