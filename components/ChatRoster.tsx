@@ -11,6 +11,7 @@
 import { useTranslation } from "@/hooks/useTranslation";
 import { MessageSquare, Users } from "lucide-react";
 import { store, directThreadId, type RosterPerson } from "@/context/chatstore";
+import ChatAvatar from "./ChatAvatar";
 
 interface Props {
   accent: string;
@@ -70,10 +71,16 @@ export default function ChatRoster({ accent, muted, border, onOpenThread, unread
             }}
             title={fil ? t("Chat.rosterWriteTo") : undefined}
           >
-            <span style={{
-              width: 8, height: 8, borderRadius: "50%", flexShrink: 0,
-              background: p.online ? "#00c853" : "rgba(255,255,255,0.25)",
-            }} />
+            {/* Étape M — la pastille de présence est désormais portée par
+                l'avatar : deux ronds côte à côte, l'un pour la couleur de
+                la personne et l'autre pour sa présence, se disputaient le
+                regard sans que l'on sache lequel lire. */}
+            <ChatAvatar
+              personId={p.personId || p.fingerprint}
+              name={p.name}
+              online={p.online}
+              size={30}
+            />
             <span style={{ flex: 1, minWidth: 0 }}>
               <span style={{ display: "block", fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {p.name || t("Chat.rosterUnnamed")}

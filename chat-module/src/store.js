@@ -192,6 +192,23 @@ export function initStore(dataDir = DEFAULT_DATA_DIR) {
     db.exec("CREATE INDEX IF NOT EXISTS idx_devices_person ON devices(personId)");
   }
 
+  // ── Étape M — photo de profil, par PERSONNE ───────────────────────────
+  // Sur la personne et non sur l'appareil : depuis l'appairage, quelqu'un
+  // qui a un téléphone n'a plus qu'une entrée d'annuaire, et il serait
+  // absurde de lui demander de déposer sa photo deux fois.
+  //
+  // On ne stocke que l'EMPREINTE du fichier, pas l'image : les octets
+  // vivent dans le magasin de pièces jointes existant, et l'annuaire reste
+  // léger. Une image en clair dans chaque réponse d'annuaire ferait passer
+  // plusieurs centaines de kilooctets à chaque changement de présence.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS persons (
+      personId  TEXT PRIMARY KEY,
+      avatarSha TEXT,
+      updatedAt INTEGER NOT NULL
+    );
+  `);
+
   // ── Étape K — demande qualifiée ───────────────────────────────────────
   // `tag` dit la NATURE de l'envoi (info, avis, validation, approbation) et
   // `destinataire` DÉSIGNE nommément qui doit répondre. Les deux sont
@@ -544,11 +561,19 @@ export function listDemandes(roomId, groupIds) {
  *  ménage des fichiers orphelins après la purge de rétention
  *  (voir purgeOrphans dans src/media.js). */
 export function listReferencedMedia() {
-  const rows = ensureDb().prepare("SELECT media FROM messages WHERE media IS NOT NULL").all();
+  const d = ensureDb();
+  const rows = d.prepare("SELECT media FROM messages WHERE media IS NOT NULL").all();
   const set = new Set();
   for (const r of rows) {
     const m = safeJson(r.media, null);
     if (m?.sha256) set.add(String(m.sha256));
+  }
+  // ⚠️ Étape M — les photos de profil vivent dans le même magasin de
+  // fichiers mais ne sont référencées par AUCUN message. Sans cette
+  // seconde source, le ménage des orphelins les effacerait à la première
+  // purge, et tout le monde perdrait sa photo sans explication.
+  for (const r of d.prepare("SELECT avatarSha FROM persons WHERE avatarSha IS NOT NULL").all()) {
+    set.add(String(r.avatarSha));
   }
   return set;
 }
@@ -606,9 +631,10 @@ export function setDeviceRole(fingerprint, role) {
 export function listRoster(roomId) {
   const rows = ensureDb().prepare(
     `SELECT dev.fingerprint, dev.lastNickname, dev.role, dev.label, dev.lastSeen,
-            dev.personId
+            dev.personId, p.avatarSha
      FROM devices dev
      JOIN room_members m ON m.fingerprint = dev.fingerprint
+     LEFT JOIN persons p ON p.personId = dev.personId
      WHERE m.roomId = ?
      ORDER BY dev.lastSeen DESC`,
   ).all(String(roomId));
@@ -627,6 +653,7 @@ export function listRoster(roomId) {
       deja.role = deja.role || r.role;
       deja.label = deja.label || r.label;
       deja.lastNickname = deja.lastNickname || r.lastNickname;
+      deja.avatarSha = deja.avatarSha || r.avatarSha;
     }
   }
   return [...parPersonne.values()]
@@ -649,6 +676,23 @@ export function linkDeviceToPerson(fingerprint, personId, pairedBy) {
   ensureDb().prepare(
     "UPDATE devices SET personId = ?, pairedAt = ?, pairedBy = ? WHERE fingerprint = ?",
   ).run(String(personId), Date.now(), String(pairedBy || ""), String(fingerprint));
+}
+
+// ── Étape M — photo de profil ──────────────────────────────────────────────
+/** Dépose (ou retire, avec sha null) la photo d'une personne. L'appelant a
+ *  déjà téléversé les octets dans le magasin de pièces jointes. */
+export function setPersonAvatar(personId, avatarSha) {
+  ensureDb().prepare(
+    `INSERT INTO persons (personId, avatarSha, updatedAt) VALUES (?, ?, ?)
+     ON CONFLICT(personId) DO UPDATE SET avatarSha = excluded.avatarSha,
+                                         updatedAt = excluded.updatedAt`,
+  ).run(String(personId), avatarSha ? String(avatarSha) : null, Date.now());
+}
+
+export function getPersonAvatar(personId) {
+  const r = ensureDb().prepare("SELECT avatarSha FROM persons WHERE personId = ?")
+    .get(String(personId));
+  return r?.avatarSha || null;
 }
 
 /** Toutes les empreintes d'une personne — sert à savoir si elle est en

@@ -118,6 +118,14 @@
   #replyBar button { background:transparent; border:none; color:var(--muted); font-size:22px;
                      cursor:pointer; flex-shrink:0; min-width:44px; min-height:44px;
                      display:flex; align-items:center; justify-content:center; }
+  /* — Étape M : pastille d'identité — */
+  .avatar { position:relative; flex-shrink:0; width:36px; height:36px; border-radius:50%;
+            display:flex; align-items:center; justify-content:center;
+            color:#fff; font-size:14px; font-weight:700; user-select:none; }
+  .avatar::after { content:""; position:absolute; right:-1px; bottom:-1px;
+                   width:11px; height:11px; border-radius:50%;
+                   background:#6b6b6b; border:2px solid var(--panel); }
+  .avatar.on::after { background:#00c853; }
   /* — Étape K : qualifier l'envoi — */
   #tagBar { display:flex; flex-direction:column; gap:6px; padding:8px 12px 0; flex-shrink:0; }
   .tag-choix { display:flex; gap:5px; flex-wrap:wrap; }
@@ -1014,6 +1022,51 @@ const depuis = (ts) => {
   return h < 24 ? h + " h" : Math.floor(h / 24) + " j";
 };
 
+// ── Étape M — pastille d'identité ─────────────────────────────
+// Pas de fichier : ni image générique livrée avec la page, ni silhouette
+// grise identique pour tous, qui ne distingue personne. Des initiales sur
+// une couleur DÉRIVÉE de l'identifiant de la personne — toujours
+// disponible, stable d'une session à l'autre, et distinctive.
+//
+// ⚠️ La couleur vient de l'identifiant de PERSONNE, jamais du pseudo :
+// corriger une faute dans son nom ne doit pas changer sa couleur, sinon
+// le repère visuel ne vaut rien. Mêmes formules que ChatAvatar.tsx côté
+// poste, pour que la même personne ait la même couleur partout.
+// ⚠️ PALETTE DISCRÈTE : une teinte calculée librement sur 360° donnait,
+// sur quatre personnes réelles, trois turquoises presque identiques —
+// indistinguables d'un coup d'œil. Deux couleurs IDENTIQUES gênent moins
+// que deux couleurs PRESQUE identiques. Douze teintes écartées d'au moins
+// 25°, deux clartés : 24 pastilles nettement séparées.
+// Doit rester rigoureusement identique à ChatAvatar.tsx côté poste.
+const TEINTES = [0, 30, 60, 95, 130, 160, 190, 215, 245, 275, 305, 335];
+const CLARTES = [38, 29];
+
+function couleurDePersonne(id) {
+  const s = String(id || "");
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  const n = Math.abs(h);
+  return "hsl(" + TEINTES[n % TEINTES.length] + " 45% " + CLARTES[(n >>> 8) % CLARTES.length] + "%)";
+}
+
+function initialesDe(nom) {
+  const mots = String(nom || "").trim().split(/\s+/).filter(Boolean);
+  if (!mots.length) return "?";
+  if (mots.length === 1) return mots[0].slice(0, 2).toUpperCase();
+  return (mots[0][0] + mots[1][0]).toUpperCase();
+}
+
+function avatarNode(p) {
+  const box = document.createElement("span");
+  box.className = "avatar" + (p.online ? " on" : "");
+  box.style.background = couleurDePersonne(p.personId || p.fingerprint);
+  box.textContent = initialesDe(p.name);
+  return box;
+}
+
 function renderRoster() {
   rosterEl.textContent = "";
   const tri = [...people].sort((a, b) => {
@@ -1031,8 +1084,9 @@ function renderRoster() {
   tri.forEach((p) => {
     const b = document.createElement("button");
     b.className = "person";
-    const dot = document.createElement("span");
-    dot.className = "dot" + (p.online ? " on" : "");
+    // Étape M — l'avatar porte la présence : deux ronds côte à côte se
+    // disputaient le regard sans qu'on sache lequel lire.
+    const dot = avatarNode(p);
     const who = document.createElement("span"); who.className = "who";
     const nom = document.createElement("b");
     nom.textContent = (p.name || t("rosterUnnamed")) + (p.isMe ? " · " + t("rosterMe") : "");

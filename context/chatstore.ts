@@ -98,6 +98,12 @@ export interface RosterPerson {
   online: boolean;
   lastSeen: number;
   isMe: boolean;
+  // Étape L — identifiant de la PERSONNE : stable même si elle change de
+  // pseudo, et commun à ses appareils appairés. C'est de lui que dérive la
+  // couleur de son avatar, pour que le repère visuel ne bouge pas.
+  personId?: string | null;
+  // Étape M — empreinte de la photo de profil ; null = initiales.
+  avatarSha?: string | null;
 }
 
 /** Identifiant d'un fil privé — même règle que côté module

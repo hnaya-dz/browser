@@ -63,6 +63,7 @@ export function joinSession({
   onInviteSent,
   onRoster,
   onDevicePaired,
+  onAvatarsChanged,
   pairing,
 }) {
   const sessionKey = deriveKeyFromPin(pin);
@@ -146,6 +147,8 @@ export function joinSession({
     // le jeton ne peut pas empêcher un usage détourné, mais le signaler
     // permet de s'en apercevoir.
     else if (payload.type === "device-paired") onDevicePaired?.(payload);
+    // Étape M — quelqu'un a changé sa photo : l'annuaire affiché est périmé.
+    else if (payload.type === "avatars-changed") onAvatarsChanged?.(payload);
     else if (payload.type === "invite-sent") onInviteSent?.(payload);
     else if (payload.type === "admin-result") onAdminResult?.(payload);
     // Étape F — annuaire : qui est inscrit, sa fonction, sa présence
@@ -347,6 +350,11 @@ export function joinSession({
     /** Étape L — jeton à glisser dans le QR « Ajouter mon mobile ». Signé
      *  par CET appareil : c'est ce qui prouve le rattachement. */
     makePairingToken: (dureeMs) => identity.makePairingToken(dureeMs),
+    /** Étape M — déclare SA photo de profil, dont les octets ont déjà été
+     *  téléversés. `sha256` à null la retire. */
+    setAvatar(sha256) {
+      ws.send(encryptPayload(sessionKey, { v: 1, type: "set-avatar", sha256: sha256 || null }));
+    },
     markRead,
     requestRoster,
     sendAdmin,

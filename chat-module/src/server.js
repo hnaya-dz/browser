@@ -22,6 +22,7 @@ import {
   retireDevice, restoreDevice,
   saveDecision, listDecisions, listDemandes,
   personIdOf, linkDeviceToPerson, empreintesDeLaPersonne,
+  setPersonAvatar,
 } from "./store.js";
 import { fingerprintFromRawPublicKey, rawFromSpkiBase64, verifyMessage,
          voteDefinitionSeal, voteAnswerSeal,
@@ -777,6 +778,34 @@ export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, 
       // commandes d'administration : chacun doit pouvoir voir qui existe
       // pour lui écrire. Ne révèle que ce qui est nécessaire à cela —
       // ni IP, ni machine, ni empreinte d'appareil autre que la sienne.
+      // ── Étape M — déposer ou retirer SA photo de profil ──────────
+      // On ne change que la sienne : `personIdOf` part de l'appareil
+      // connecté, jamais d'un identifiant fourni par le réseau. Sans cela,
+      // n'importe qui remplacerait la photo du Directeur.
+      if (payload.type === "set-avatar") {
+        const device = clients.get(ws)?.device || null;
+        if (!device) return;
+        const sha = payload.sha256 ? String(payload.sha256) : null;
+        if (sha) {
+          // Le fichier doit avoir été RÉELLEMENT téléversé : même règle que
+          // pour une pièce jointe, on ne référence pas un contenu absent.
+          // JPEG imposé : une photo de profil est réencodée par le client
+          // (jamais le fichier d'origine — on ne sert pas des octets qu'on
+          // n'a pas fabriqués), et en JPEG elle pèse cinq fois moins qu'en
+          // PNG pour un carré de 128 px.
+          let chemin;
+          try { chemin = mediaPath(mediaRoot, sha, "image/jpeg"); } catch { return; }
+          if (!existsSync(chemin)) return;
+        }
+        setPersonAvatar(personIdOf(device.fingerprint), sha);
+        // Tout le salon voit le changement : un annuaire à jour chez les
+        // uns et périmé chez les autres serait pire que pas de photo.
+        for (const c of clients.values()) {
+          try { c.ws.send(encryptPayload(sessionKey, { v: 1, type: "avatars-changed" })); } catch {}
+        }
+        return;
+      }
+
       if (payload.type === "roster") {
         if (!userId) return;
         const enLigne = new Set(
@@ -794,6 +823,16 @@ export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, 
           online: d.appareils.some((f) => enLigne.has(f)),
           lastSeen: Number(d.lastSeen) || 0,
           isMe: !!moi && d.appareils.includes(moi),
+          // Étape L — identifiant de personne : c'est de lui que le client
+          // tire la couleur de l'avatar. Le pseudo ne conviendrait pas —
+          // corriger une faute dans son nom changerait sa couleur.
+          personId: d.personId || d.fingerprint,
+          // Étape M — l'EMPREINTE de la photo, pas la photo : le client va
+          // la chercher une fois par le canal des pièces jointes, puis la
+          // garde. Un annuaire qui transporterait les images repasserait
+          // plusieurs centaines de kilooctets à chaque changement de
+          // présence, plusieurs fois par minute.
+          avatarSha: d.avatarSha || null,
         }));
         sendTo({ v: 1, type: "roster", people: gens, me: moi });
         return;
