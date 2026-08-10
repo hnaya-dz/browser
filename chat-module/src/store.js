@@ -174,6 +174,24 @@ export function initStore(dataDir = DEFAULT_DATA_DIR) {
     db.exec("ALTER TABLE devices ADD COLUMN retiredAt INTEGER");
   }
 
+  // ── Étape L — une PERSONNE, plusieurs appareils ───────────────────────
+  // L'identité est la clé de l'appareil, et « Ajouter mon mobile » en crée
+  // une seconde : la même personne comptait donc deux fiches. L'annuaire
+  // l'affichait deux fois, et le vote comme les décisions devaient la
+  // reconnaître « par empreinte OU par pseudo » — un contournement qui
+  // tombe en défaut dès que deux personnes partagent un prénom.
+  //
+  // `personId` regroupe les appareils. Migration sans perte : chaque fiche
+  // existante devient sa propre personne, de sorte que rien ne change tant
+  // que personne n'appaire quoi que ce soit.
+  if (!db.prepare("PRAGMA table_info(devices)").all().some((c) => c.name === "personId")) {
+    db.exec("ALTER TABLE devices ADD COLUMN personId TEXT");
+    db.exec("ALTER TABLE devices ADD COLUMN pairedAt INTEGER");
+    db.exec("ALTER TABLE devices ADD COLUMN pairedBy TEXT");
+    db.exec("UPDATE devices SET personId = fingerprint WHERE personId IS NULL");
+    db.exec("CREATE INDEX IF NOT EXISTS idx_devices_person ON devices(personId)");
+  }
+
   // ── Étape K — demande qualifiée ───────────────────────────────────────
   // `tag` dit la NATURE de l'envoi (info, avis, validation, approbation) et
   // `destinataire` DÉSIGNE nommément qui doit répondre. Les deux sont
@@ -341,27 +359,37 @@ export function listVotes(roomId = "default", groupIds = ["all"], limite = 50) {
 /** Cette personne a-t-elle déjà répondu à ce vote ? Se lit toujours dans
  *  vote_voters, jamais dans les choix : c'est la seule table qui porte
  *  l'identité en mode non nominatif. */
+/** Toutes les empreintes de la personne à qui appartient cet appareil.
+ *  Un appareil non appairé se retrouve seul dans sa propre liste. */
+export function empreintesDeLaPersonne(fingerprint) {
+  const fps = devicesOfPerson(personIdOf(fingerprint));
+  return fps.length ? fps : [String(fingerprint)];
+}
+
 /**
- * Retrouve la PERSONNE qui a déjà répondu à ce vote, par son appareil OU
- * par son pseudo.
+ * Retrouve la PERSONNE qui a déjà répondu à ce vote.
  *
  * ⚠️ Une voix par PERSONNE, pas par appareil. « Ajouter mon mobile » fait
- * rejoindre le téléphone sous le même pseudo mais avec sa PROPRE clé :
- * sans ce rapprochement, une personne équipée d'un téléphone pesait DEUX
- * voix dans une validation. Constaté en test réel.
+ * rejoindre le téléphone avec sa PROPRE clé : sans ce rapprochement, une
+ * personne équipée d'un téléphone pesait DEUX voix dans une validation.
+ * Constaté en test réel.
  *
- * Le pseudo est libre, donc imparfait : quelqu'un qui en changerait
- * pourrait voter une seconde fois. L'empreinte ferme cette porte pour un
- * même appareil ; les deux critères ensemble couvrent les cas réels.
- * Un vrai appairage d'appareils reste la solution complète — le QR ne
- * transmet aujourd'hui que le pseudo, aucun lien n'est enregistré.
+ * Étape L — le critère principal est désormais l'APPAIRAGE : tous les
+ * appareils rattachés à la même personne sont une seule voix, prouvé par
+ * signature. Le rapprochement par pseudo reste en second filet pour les
+ * appareils pas encore appairés — il est faillible (deux collègues peuvent
+ * porter le même prénom, et un pseudo se change), et il pourra disparaître
+ * quand l'appairage sera la norme. Il n'élargit jamais le droit de vote :
+ * il ne fait que réunir des lignes.
  */
 export function findVoter(voteId, fingerprint, sender) {
+  const fps = empreintesDeLaPersonne(fingerprint);
+  const trous = fps.map(() => "?").join(",");
   return ensureDb().prepare(
     `SELECT * FROM vote_voters
-      WHERE voteId = ? AND (fingerprint = ? OR (sender <> '' AND sender = ?))
+      WHERE voteId = ? AND (fingerprint IN (${trous}) OR (sender <> '' AND sender = ?))
       LIMIT 1`,
-  ).get(String(voteId), String(fingerprint), String(sender || ""));
+  ).get(String(voteId), ...fps, String(sender || ""));
 }
 
 export function hasVoted(voteId, fingerprint, sender) {
@@ -390,10 +418,13 @@ export function saveVoteChoice({ voteId, choice, comment, fingerprint, sender, n
 
   if (nominatif) {
     // Effacer le choix PRÉCÉDENT DE CETTE PERSONNE, quel que soit
-    // l'appareil depuis lequel il avait été émis.
+    // l'appareil depuis lequel il avait été émis — tous ses appareils
+    // appairés comptent pour un.
+    const fps = empreintesDeLaPersonne(fingerprint);
+    const trous = fps.map(() => "?").join(",");
     db.prepare(`DELETE FROM vote_choices
-                 WHERE voteId = ? AND (fingerprint = ? OR (sender <> '' AND sender = ?))`)
-      .run(String(voteId), String(fingerprint), nom);
+                 WHERE voteId = ? AND (fingerprint IN (${trous}) OR (sender <> '' AND sender = ?))`)
+      .run(String(voteId), ...fps, nom);
     db.prepare(`INSERT INTO vote_choices (voteId, choice, comment, ts, fingerprint, sender)
                 VALUES (?, ?, ?, ?, ?, ?)`)
       .run(String(voteId), Number(choice), comment ? String(comment) : null, quand,
@@ -465,6 +496,17 @@ function rowToMessage(r) {
  *  Le remplacement est voulu : on doit pouvoir se rétracter, et c'est
  *  l'état courant qui répond à « a-t-il validé ? ». */
 export function saveDecision({ messageId, fingerprint, sender, issue, comment, ts, signature }) {
+  // Étape L — une personne, une décision. Sans ce ménage, quelqu'un qui
+  // valide depuis son poste puis se ravise depuis son téléphone laisserait
+  // DEUX positions contradictoires sur la même demande, chacune signée.
+  // On efface celles de ses autres appareils avant d'écrire la nouvelle.
+  const autres = empreintesDeLaPersonne(fingerprint).filter((f) => f !== String(fingerprint));
+  if (autres.length) {
+    const trous = autres.map(() => "?").join(",");
+    ensureDb().prepare(
+      `DELETE FROM message_decisions WHERE messageId = ? AND fingerprint IN (${trous})`,
+    ).run(String(messageId), ...autres);
+  }
   ensureDb().prepare(
     `INSERT INTO message_decisions (messageId, fingerprint, sender, issue, comment, ts, signature)
      VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -534,11 +576,15 @@ export function upsertDeviceSeen({ fingerprint, publicKeySpki, nickname, hostnam
       .run(now, nickname || null, JSON.stringify(nicknames),
            hostname || null, platform || null, ip || null, fingerprint);
   } else {
+    // Étape L — un appareil neuf est sa propre personne jusqu'à preuve du
+    // contraire. Le rattachement à une personne existante est un acte
+    // séparé et PROUVÉ (voir linkDeviceToPerson).
     d.prepare(`INSERT INTO devices
-      (fingerprint, publicKeySpki, firstSeen, lastSeen, lastNickname, nicknames, hostname, platform, lastIp)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      (fingerprint, publicKeySpki, firstSeen, lastSeen, lastNickname, nicknames, hostname, platform, lastIp, personId)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
       .run(fingerprint, publicKeySpki, now, now, nickname || null,
-           JSON.stringify(nickname ? [nickname] : []), hostname || null, platform || null, ip || null);
+           JSON.stringify(nickname ? [nickname] : []), hostname || null, platform || null, ip || null,
+           fingerprint);
   }
 }
 
@@ -550,15 +596,66 @@ export function setDeviceRole(fingerprint, role) {
 
 /** Annuaire d'un salon : qui est inscrit, sous quel nom, avec quelle
  *  fonction. La présence (en ligne) est ajoutée par le serveur, qui seul
- *  connaît les connexions ouvertes. */
+ *  connaît les connexions ouvertes.
+ *
+ *  Étape L — UNE ligne par PERSONNE, pas par appareil. Quelqu'un qui a
+ *  appairé son téléphone y figurait deux fois ; avec des avatars, on aurait
+ *  vu le même visage en double. On garde l'appareil vu le plus récemment
+ *  comme représentant (son empreinte sert d'adresse pour les fils privés)
+ *  et on expose la liste complète de ses appareils. */
 export function listRoster(roomId) {
-  return ensureDb().prepare(
-    `SELECT dev.fingerprint, dev.lastNickname, dev.role, dev.label, dev.lastSeen
+  const rows = ensureDb().prepare(
+    `SELECT dev.fingerprint, dev.lastNickname, dev.role, dev.label, dev.lastSeen,
+            dev.personId
      FROM devices dev
      JOIN room_members m ON m.fingerprint = dev.fingerprint
      WHERE m.roomId = ?
-     ORDER BY dev.lastNickname COLLATE NOCASE ASC`,
+     ORDER BY dev.lastSeen DESC`,
   ).all(String(roomId));
+
+  const parPersonne = new Map();
+  for (const r of rows) {
+    const pid = r.personId || r.fingerprint;
+    const deja = parPersonne.get(pid);
+    if (!deja) {
+      parPersonne.set(pid, { ...r, personId: pid, appareils: [r.fingerprint] });
+    } else {
+      deja.appareils.push(r.fingerprint);
+      // Le nom et la fonction viennent de l'appareil le plus récent, déjà
+      // retenu par l'ordre du SELECT ; on complète seulement les trous, un
+      // téléphone n'ayant souvent ni étiquette ni fonction renseignée.
+      deja.role = deja.role || r.role;
+      deja.label = deja.label || r.label;
+      deja.lastNickname = deja.lastNickname || r.lastNickname;
+    }
+  }
+  return [...parPersonne.values()]
+    .sort((a, b) => String(a.lastNickname || "").localeCompare(String(b.lastNickname || "")));
+}
+
+// ── Étape L — appairage ────────────────────────────────────────────────────
+/** La personne à laquelle appartient cet appareil. Repli sur l'empreinte :
+ *  un appareil non migré est sa propre personne. */
+export function personIdOf(fingerprint) {
+  const r = ensureDb().prepare("SELECT personId FROM devices WHERE fingerprint = ?")
+    .get(String(fingerprint));
+  return r?.personId || String(fingerprint);
+}
+
+/** Rattache un appareil à une personne existante. `pairedBy` garde
+ *  l'empreinte de l'appareil qui a signé le jeton : si un rattachement est
+ *  contesté, on sait lequel l'a autorisé. */
+export function linkDeviceToPerson(fingerprint, personId, pairedBy) {
+  ensureDb().prepare(
+    "UPDATE devices SET personId = ?, pairedAt = ?, pairedBy = ? WHERE fingerprint = ?",
+  ).run(String(personId), Date.now(), String(pairedBy || ""), String(fingerprint));
+}
+
+/** Toutes les empreintes d'une personne — sert à savoir si elle est en
+ *  ligne (l'un quelconque de ses appareils suffit). */
+export function devicesOfPerson(personId) {
+  return ensureDb().prepare("SELECT fingerprint FROM devices WHERE personId = ?")
+    .all(String(personId)).map((r) => r.fingerprint);
 }
 
 /** Fils privés auxquels cet appareil participe, dans ce salon. Sert à lui

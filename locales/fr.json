@@ -251,6 +251,7 @@
     "adminRetireDeviceHelp": "Rend la place de licence d'un appareil qui n'existe plus. Sa fiche et ses messages sont conservés. Pour écarter une personne, utilisez « Bloquer ».",
     "adminRestoreDevice": "Reprendre la place",
     "adminRetiredTag": "Place libérée",
+    "adminPairedWith": "Appareil rattaché par",
     "adminErrDeviceOnline": "Cet appareil est connecté : sa place serait reprise dès sa prochaine connexion. Déconnectez-le, ou utilisez « Bloquer » pour l'écarter.",
     "adminErrDeviceUnknown": "Appareil inconnu",
     "adminErrLicenceFull": "Plafond de licence atteint : libérez une autre place d'abord.",

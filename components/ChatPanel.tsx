@@ -392,13 +392,36 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
   // qui choisira son pseudo) et « ajouter mon mobile » (URL + pseudo, pour
   // que le téléphone rejoigne sous LA MÊME identité). Le PIN n'est dans
   // aucun des deux : un QR se photographie par-dessus l'épaule.
+  // Étape L — le QR « Ajouter mon mobile » porte en plus un JETON
+  // D'APPAIRAGE signé par ce poste. C'est lui qui prouve que le téléphone
+  // est bien un second appareil de la même personne : sans preuve, l'hôte
+  // en ferait une personne distincte, et l'on retrouverait le doublon dans
+  // l'annuaire, le vote et les décisions.
+  // Redemandé à chaque ouverture du QR : le jeton expire en quelques
+  // minutes, ce qui limite la portée d'une photo prise par-dessus l'épaule.
+  const [pairingToken, setPairingToken] = useState<string>("");
+  useEffect(() => {
+    if (showInvite !== "mine") { setPairingToken(""); return; }
+    let vivant = true;
+    getApi()?.invoke?.("chat-pairing-token").then((r: { ok?: boolean; token?: unknown }) => {
+      if (!vivant || !r?.ok || !r.token) return;
+      // base64url : un QR est plus court et plus fiable sans +, / ni =.
+      // btoa et non Buffer : on est dans le renderer, sans polyfill Node.
+      // Le contenu est intégralement ASCII (hexadécimal, base64, nombres).
+      const brut = btoa(JSON.stringify(r.token));
+      setPairingToken(brut.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""));
+    }).catch(() => { /* pas connecté : le QR marche encore, sans appairage */ });
+    return () => { vivant = false; };
+  }, [showInvite]);
+
   const inviteQrTarget = useMemo(() => {
     if (!store.inviteUrl) return "";
     if (showInvite === "mine" && nickname.trim()) {
-      return `${store.inviteUrl}/?u=${encodeURIComponent(nickname.trim())}`;
+      const base = `${store.inviteUrl}/?u=${encodeURIComponent(nickname.trim())}`;
+      return pairingToken ? `${base}&p=${pairingToken}` : base;
     }
     return store.inviteUrl;
-  }, [store.inviteUrl, showInvite, nickname]);
+  }, [store.inviteUrl, showInvite, nickname, pairingToken]);
 
   const inviteQrSvg = useMemo(() => {
     if (!inviteQrTarget) return "";

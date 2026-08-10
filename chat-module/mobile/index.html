@@ -447,6 +447,19 @@ langSel.onchange = () => { lang = langSel.value; localStorage.setItem("hnaya-mob
 // photographié par-dessus l'épaule donnerait l'accès au salon.
 const paramsUrl = new URLSearchParams(location.search);
 const pseudoInvite = (paramsUrl.get("u") || "").slice(0, 24).trim();
+// Étape L — jeton d'appairage porté par le QR « Ajouter mon mobile ». Il
+// prouve à l'hôte que ce téléphone est un SECOND appareil de la même
+// personne, et non un homonyme. Décodé ici, présenté tel quel au join ;
+// s'il est illisible on rejoint quand même, simplement sans rattachement.
+const jetonAppairage = (() => {
+  const brut = paramsUrl.get("p");
+  if (!brut) return null;
+  try {
+    const b64 = brut.replace(/-/g, "+").replace(/_/g, "/");
+    const j = JSON.parse(atob(b64 + "=".repeat((4 - b64.length % 4) % 4)));
+    return (j && j.fp && j.sig) ? j : null;
+  } catch { return null; }
+})();
 nicknameInput.value = pseudoInvite || localStorage.getItem("hnaya-chat-nickname") || "";
 if (pseudoInvite) {
   // Le champ PIN prend le focus : c'est la seule chose qui reste à saisir.
@@ -1290,6 +1303,10 @@ async function connect() {
         hostname: null, // pas de nom de machine exposé par un navigateur
         platform: "mobile-web (" + ((navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || "?") + ")",
       },
+      // Étape L — présenté une seule fois, à la toute première connexion
+      // issue du QR. Une reconnexion ultérieure n'en a plus besoin : le
+      // rattachement est enregistré chez l'hôte.
+      pairing: jetonAppairage || undefined,
     }));
   };
   ws.onmessage = (ev) => {

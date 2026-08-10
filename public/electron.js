@@ -1089,6 +1089,18 @@ ipcMain.on("chat-send-message", (event, { text, groupId, media, replyTo, demande
   chatWorker?.send({ cmd: "send-message", text, groupId, media, replyTo, demande });
 });
 
+// ── Étape L — jeton d'appairage, glissé dans le QR « Ajouter mon mobile »
+// Demandé à chaque affichage du QR plutôt que gardé : il expire en quelques
+// minutes, c'est ce qui limite la portée d'un QR photographié.
+ipcMain.handle("chat-pairing-token", async () => {
+  try {
+    const res = await chatMediaRequest("pairing-token", {}, 10000);
+    return { ok: true, token: res.token };
+  } catch (e) {
+    return { ok: false, error: e?.message || "jeton" };
+  }
+});
+
 // ── Étape K — se prononcer sur une demande qualifiée ───────────────────
 ipcMain.on("chat-decider", (event, { messageId, issue, comment }) => {
   chatWorker?.send({ cmd: "decider", messageId, issue, comment });

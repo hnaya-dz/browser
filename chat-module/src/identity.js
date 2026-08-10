@@ -24,6 +24,7 @@ import {
   generateKeyPairSync,
   sign as cryptoSign,
   verify as cryptoVerify,
+  randomBytes,
 } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
@@ -112,6 +113,45 @@ export function decisionSeal(messageId, issue) {
   return "dec:" + String(messageId) + ":" + String(issue);
 }
 
+// ── Étape L — jeton d'appairage d'un second appareil ───────────────────────
+// « Ajouter mon mobile » ne transportait que le pseudo : le téléphone
+// arrivait avec sa propre clé, donc une seconde fiche, donc un doublon
+// partout — annuaire, vote, décisions.
+//
+// Le rattachement doit être PROUVÉ, jamais déclaré : sans preuve, n'importe
+// qui se déclarerait second appareil du Directeur et validerait à sa place.
+// L'appareil déjà connu signe donc un jeton court, à usage unique, que le
+// nouveau présente à l'arrivée. L'hôte vérifie cette signature avec la clé
+// publique qu'il détient déjà.
+//
+// ⚠️ Forme distincte de celle d'un message, et c'est délibéré. Un message
+// signe [id, from, text, ts] où ts est un NOMBRE ; un jeton signe
+// ["pair", fp, exp, nonce] où le nonce est une CHAÎNE hexadécimale. Les
+// octets ne peuvent donc jamais coïncider, et un jeton d'appairage ne peut
+// pas être rejoué comme un message signé — ni l'inverse.
+export function pairingPayload({ fp, exp, nonce }) {
+  return JSON.stringify(["pair", String(fp), Number(exp), String(nonce)]);
+}
+
+/** Vérifie un jeton présenté au join. Ne lève jamais : retourne un booléen.
+ *  L'expiration et l'unicité du nonce sont contrôlées par l'appelant —
+ *  seule la signature se vérifie ici. */
+export function verifyPairing(token, publicKeySpkiB64) {
+  try {
+    const publicKey = createPublicKey({
+      key: Buffer.from(publicKeySpkiB64, "base64"), type: "spki", format: "der",
+    });
+    return cryptoVerify(
+      null,
+      Buffer.from(pairingPayload(token), "utf8"),
+      publicKey,
+      Buffer.from(token.sig, "base64"),
+    );
+  } catch {
+    return false;
+  }
+}
+
 // ── Empreinte d'appareil ───────────────────────────────────────────────────
 // sha256 de la clé publique BRUTE (32 octets), tronqué à 16 hex — court,
 // affichable dans le panneau admin, collision improbable à cette échelle.
@@ -170,6 +210,19 @@ function hydrate(saved) {
     // Signe un message ({id, from, text, ts}) → signature base64
     signMessage(msg) {
       return cryptoSign(null, Buffer.from(signablePayload(msg), "utf8"), privateKey).toString("base64");
+    },
+    /** Étape L — jeton d'appairage à présenter par un SECOND appareil.
+     *  Court (quelques minutes) et à usage unique : le QR qui le porte peut
+     *  être photographié par-dessus l'épaule. Il ne suffit d'ailleurs pas —
+     *  il faut aussi le PIN du salon, que le QR ne contient jamais. */
+    makePairingToken(dureeMs = 5 * 60 * 1000) {
+      const token = {
+        fp: fingerprintFromRawPublicKey(rawPub),
+        exp: Date.now() + dureeMs,
+        nonce: randomBytes(8).toString("hex"),
+      };
+      token.sig = cryptoSign(null, Buffer.from(pairingPayload(token), "utf8"), privateKey).toString("base64");
+      return token;
     },
   };
 }

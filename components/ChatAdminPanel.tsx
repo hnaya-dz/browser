@@ -233,6 +233,21 @@ export default function ChatAdminPanel({ accent, muted, border, inputBg, inputSt
                 {t("Chat.adminNicknames")} : {d.nicknames.join(", ") || "—"}
                 <br />
                 {t("Chat.adminSeen")} : {new Date(d.lastSeen).toLocaleString()}
+                {/* Étape L — trace d'appairage. Le jeton ne peut pas
+                    couvrir la clé du nouvel appareil (elle n'existe pas
+                    encore quand l'ancien signe) : un jeton intercepté
+                    resterait utilisable. On ne peut donc pas tout prévenir,
+                    mais on rend le fait CONSTATABLE — qui a été rattaché,
+                    quand, et par quel appareil. */}
+                {d.pairedAt && (
+                  <>
+                    <br />
+                    <span style={{ color: accent }}>
+                      {t("Chat.adminPairedWith")} {deviceName(d.pairedBy ?? null) || d.pairedBy?.slice(0, 8)}
+                      {" · "}{new Date(d.pairedAt).toLocaleString()}
+                    </span>
+                  </>
+                )}
               </div>
               {/* Étape F — FONCTION dans l'organisation (DRH, DGA…). Elle
                   décrit la PERSONNE et apparaît dans l'annuaire, là où

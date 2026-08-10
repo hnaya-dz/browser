@@ -265,6 +265,10 @@ function handleCommand(msg) {
         onDecisionRefused: (r) => process.send({
           event: "decision-refused", messageId: r.messageId, reason: r.reason,
         }),
+        // Étape L — un appareil vient d'être rattaché à cette personne
+        onDevicePaired: (p) => process.send({
+          event: "device-paired", fingerprint: p.fingerprint, nickname: p.nickname,
+        }),
         onLicenceNotice: (n) => process.send({
           event: "licence-notice", mode: n.mode, readOnly: !!n.readOnly,
           notice: n.notice || null, refused: n.refused || null,
@@ -318,6 +322,19 @@ function handleCommand(msg) {
       // validation. C'est exactement ce qui était arrivé à `replyTo`.
       clientHandle.send(msg.text, msg.groupId, msg.media || null, msg.replyTo || null,
         msg.demande || null);
+      break;
+    }
+
+    // ── Étape L — jeton d'appairage pour le QR « Ajouter mon mobile » ──
+    // Réponse par reqId, comme les transferts : le renderer attend une
+    // valeur, pas un événement diffusé.
+    case "pairing-token": {
+      if (!clientHandle) { process.send({ reqId: msg.reqId, event: "media-error", reason: "non-connecte" }); break; }
+      try {
+        process.send({ reqId: msg.reqId, event: "pairing-token", token: clientHandle.makePairingToken() });
+      } catch (e) {
+        process.send({ reqId: msg.reqId, event: "media-error", reason: e?.message || "jeton" });
+      }
       break;
     }
 

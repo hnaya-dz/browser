@@ -21,10 +21,11 @@ import {
   setDeviceRole, listRoster, listDirectThreads,
   retireDevice, restoreDevice,
   saveDecision, listDecisions, listDemandes,
+  personIdOf, linkDeviceToPerson, empreintesDeLaPersonne,
 } from "./store.js";
 import { fingerprintFromRawPublicKey, rawFromSpkiBase64, verifyMessage,
          voteDefinitionSeal, voteAnswerSeal,
-         demandeSeal, decisionSeal } from "./identity.js";
+         demandeSeal, decisionSeal, verifyPairing } from "./identity.js";
 import { startMobileServer } from "./mobile-server.js";
 import { existsSync } from "node:fs";
 import {
@@ -123,6 +124,10 @@ export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, 
   // du salon (et non de la connexion) : se reconnecter ne remet pas les
   // compteurs à zéro.
   const uploadQuota = createQuota();
+  // Étape L — nonces d'appairage déjà servis, avec leur échéance. En
+  // mémoire et non en base : un jeton vit quelques minutes, et un
+  // redémarrage de l'hôte périme de toute façon tous ceux en circulation.
+  const jetonsUtilises = new Map(); // "fp:nonce" -> exp
   const roomPin = room.roomPin || (pin ?? generatePin());
   let currentAdminPin = room.adminPin;
   const sessionKey = deriveKeyFromPin(roomPin);
@@ -242,6 +247,45 @@ export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, 
               platform: payload.device.platform || null,
               ip: remoteIp,
             });
+
+            // ── Étape L — appairage d'un second appareil ──────────────
+            // Le jeton est signé par un appareil DÉJÀ connu de l'hôte. On
+            // ne rattache donc jamais sur simple déclaration : c'est ce qui
+            // empêche un inconnu de se présenter comme le second appareil
+            // du Directeur et de valider à sa place.
+            //
+            // ⚠️ Le jeton ne peut pas couvrir la clé du nouvel appareil :
+            // elle n'existe pas encore quand l'ancien signe. Un jeton
+            // intercepté serait donc utilisable par un autre appareil. Trois
+            // garde-fous : il expire en quelques minutes, il ne sert qu'une
+            // fois, et il ne suffit pas — le PIN du salon reste exigé, et le
+            // QR ne le contient pas. Le rattachement est en outre horodaté
+            // et attribué (pairedBy) dans le registre : un appairage abusif
+            // se voit après coup.
+            const jeton = payload.pairing;
+            if (jeton && jeton.fp && jeton.sig) {
+              const cle = String(jeton.fp) + ":" + String(jeton.nonce);
+              const source = getDevice(String(jeton.fp));
+              const expire = Number(jeton.exp) || 0;
+              if (!source) { /* signataire inconnu : on ignore, on n'échoue pas */ }
+              else if (expire < Date.now()) { /* périmé */ }
+              else if (jetonsUtilises.has(cle)) { /* déjà servi */ }
+              else if (!isRoomMember(activeRoomId, source.fingerprint)) { /* pas de ce salon */ }
+              else if (source.fingerprint === fingerprint) { /* déjà cet appareil */ }
+              else if (verifyPairing(jeton, source.publicKeySpki)) {
+                linkDeviceToPerson(fingerprint, personIdOf(source.fingerprint), source.fingerprint);
+                jetonsUtilises.set(cle, expire);
+                // Prévenir l'appareil qui a autorisé : détecter vaut mieux
+                // que prévenir quand on ne peut pas tout prévenir.
+                for (const c of clients.values()) {
+                  if (c.device?.fingerprint === source.fingerprint) {
+                    c.ws.send(encryptPayload(sessionKey, {
+                      v: 1, type: "device-paired", fingerprint, nickname: userId,
+                    }));
+                  }
+                }
+              }
+            }
           } catch { device = null; /* clé malformée → traité comme v1 */ }
         }
 
@@ -586,7 +630,11 @@ export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, 
         // toute l'exigence : aucune confusion sur qui valide. Sans
         // destinataire, la demande s'adresse au fil et chacun peut se
         // prononcer — son nom reste attaché à sa décision.
-        if (cible.destinataire && cible.destinataire !== device.fingerprint) {
+        // Étape L — le destinataire est une PERSONNE : le Directeur désigné
+        // sur son poste doit pouvoir répondre depuis son téléphone appairé.
+        // Comparer les seules empreintes lui aurait refusé sa propre demande.
+        if (cible.destinataire
+            && !empreintesDeLaPersonne(device.fingerprint).includes(cible.destinataire)) {
           ws.send(encryptPayload(sessionKey, {
             v: 1, type: "decision-refused", messageId, reason: "pas-destinataire",
           }));
@@ -735,13 +783,17 @@ export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, 
           [...clients.values()].map((c) => c.device?.fingerprint).filter(Boolean),
         );
         const moi = clients.get(ws)?.device?.fingerprint || null;
+        // Étape L — une entrée par PERSONNE. Elle est en ligne dès qu'un
+        // quelconque de ses appareils l'est : sinon le Directeur, connecté
+        // depuis son téléphone, apparaîtrait absent parce que son poste est
+        // éteint. Même raisonnement pour « c'est moi ».
         const gens = listRoster(activeRoomId).map((d) => ({
           fingerprint: d.fingerprint,
           name: d.lastNickname || null,
           role: d.role || null,
-          online: enLigne.has(d.fingerprint),
+          online: d.appareils.some((f) => enLigne.has(f)),
           lastSeen: Number(d.lastSeen) || 0,
-          isMe: d.fingerprint === moi,
+          isMe: !!moi && d.appareils.includes(moi),
         }));
         sendTo({ v: 1, type: "roster", people: gens, me: moi });
         return;

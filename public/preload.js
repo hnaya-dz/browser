@@ -47,6 +47,7 @@ const ALLOWED_INVOKE = [
   "chat-server-get-info",
   "chat-server-pick-licence",
   "chat-server-installed-licence",
+  "chat-pairing-token",
   "chat-server-install",
   "chat-server-uninstall",
   // ✅ Confidentialité — interrupteurs utilisateur

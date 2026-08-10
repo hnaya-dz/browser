@@ -251,6 +251,7 @@
     "adminRetireDeviceHelp": "Returns the licence seat of a device that no longer exists. Its record and messages are kept. To exclude a person, use \"Block\".",
     "adminRestoreDevice": "Take the seat back",
     "adminRetiredTag": "Seat freed",
+    "adminPairedWith": "Device paired by",
     "adminErrDeviceOnline": "This device is connected: its seat would be taken again on its next connection. Disconnect it, or use \"Block\" to exclude it.",
     "adminErrDeviceUnknown": "Unknown device",
     "adminErrLicenceFull": "Licence limit reached: free another seat first.",

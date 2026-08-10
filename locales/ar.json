@@ -251,6 +251,7 @@
     "adminRetireDeviceHelp": "يُرجع مقعد الرخصة لجهاز لم يعد موجودًا. تُحفظ بطاقته ورسائله. لإقصاء شخص، استعمل « حظر ».",
     "adminRestoreDevice": "استرجاع المقعد",
     "adminRetiredTag": "مقعد محرَّر",
+    "adminPairedWith": "جهاز مرتبط بواسطة",
     "adminErrDeviceOnline": "هذا الجهاز متصل: سيستعيد مقعده عند اتصاله القادم. افصله، أو استعمل « حظر » لإقصائه.",
     "adminErrDeviceUnknown": "جهاز غير معروف",
     "adminErrLicenceFull": "بلغت الرخصة حدّها: حرّر مقعدًا آخر أولًا.",

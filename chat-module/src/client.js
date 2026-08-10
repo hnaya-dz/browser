@@ -62,6 +62,8 @@ export function joinSession({
   onAdminResult,
   onInviteSent,
   onRoster,
+  onDevicePaired,
+  pairing,
 }) {
   const sessionKey = deriveKeyFromPin(pin);
   // ✅ Étape D — identité d'appareil : pseudo libre en surface, clé Ed25519
@@ -82,6 +84,9 @@ export function joinSession({
         hostname: os.hostname(),
         platform: process.platform,
       },
+      // Étape L — jeton d'appairage, présenté une seule fois par un SECOND
+      // appareil de la même personne. Absent dans le cas courant.
+      pairing: pairing || undefined,
     }));
   });
 
@@ -137,6 +142,10 @@ export function joinSession({
     // prise de position.
     else if (payload.type === "decisions") onDecisions?.(payload);
     else if (payload.type === "decision-refused") onDecisionRefused?.(payload);
+    // Étape L — un appareil vient d'être rattaché à MA personne. On le dit :
+    // le jeton ne peut pas empêcher un usage détourné, mais le signaler
+    // permet de s'en apercevoir.
+    else if (payload.type === "device-paired") onDevicePaired?.(payload);
     else if (payload.type === "invite-sent") onInviteSent?.(payload);
     else if (payload.type === "admin-result") onAdminResult?.(payload);
     // Étape F — annuaire : qui est inscrit, sa fonction, sa présence
@@ -335,6 +344,9 @@ export function joinSession({
     openVote,
     answerVote,
     decider,
+    /** Étape L — jeton à glisser dans le QR « Ajouter mon mobile ». Signé
+     *  par CET appareil : c'est ce qui prouve le rattachement. */
+    makePairingToken: (dureeMs) => identity.makePairingToken(dureeMs),
     markRead,
     requestRoster,
     sendAdmin,

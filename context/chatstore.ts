@@ -275,6 +275,12 @@ export interface AdminDevice {
   // sa fiche et ses messages sont conservés. Il redevient comptable s'il
   // se reconnecte.
   retiredAt: number | null;
+  // Étape L — appairage : quand cet appareil a été rattaché à une personne,
+  // et par quel appareil. C'est la trace qui rend un rattachement abusif
+  // constatable après coup.
+  personId?: string | null;
+  pairedAt?: number | null;
+  pairedBy?: string | null;
 }
 
 export const store: ChatStore = {
