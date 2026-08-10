@@ -9,12 +9,14 @@ import DownloadPanel from "./DownloadPanel";
 import dynamic from "next/dynamic";
 import { isDownloadableUrl as isDownloadable } from "@/shared/supportedHosts";
 import { useTranslation } from "@/hooks/useTranslation";
-import { MessageSquare, Shield } from "lucide-react";
+import { MessageSquare, Shield, Bell } from "lucide-react";
 import { setPanelOpen, useChatSnapshot } from "@/context/chatstore";
+import { useNotifications } from "@/context/notifications";
 
 const VaultPanel = dynamic(() => import("./VaultPanel"), { ssr: false });
 const FavoritesPanel = dynamic(() => import("./FavoritesPanel"), { ssr: false });
 const PrivacyPanel = dynamic(() => import("./PrivacyPanel"), { ssr: false });
+const NotificationCenter = dynamic(() => import("./NotificationCenter"), { ssr: false });
 
 const HINT_DL_KEY    = "hnaya-hint-download-seen";
 const HINT_VAULT_KEY = "hnaya-hint-vault-seen";
@@ -60,6 +62,8 @@ export default function URLBar() {
   const [showVault, setShowVault] = useState(false);
   const [showFavorites, setShowFavorites] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
+  const [showNotifs, setShowNotifs] = useState(false);
+  const { nonLues: notifsNonLues } = useNotifications();
   // État global de la messagerie : couleur d'icône, badge non-lus, dock
   const chat = useChatSnapshot();
   const [isFavorited, setIsFavorited] = useState(false);
@@ -222,6 +226,16 @@ export default function URLBar() {
     (window as any)?.electronAPI?.send("show-active-view");
   }, []);
 
+  const handleNotifsClick = useCallback(async () => {
+    await (window as any)?.electronAPI?.invoke("hide-active-view-sync");
+    setShowNotifs(true);
+  }, []);
+
+  const handleCloseNotifs = useCallback(() => {
+    setShowNotifs(false);
+    (window as any)?.electronAPI?.send("show-active-view");
+  }, []);
+
   const handlePrivacyClick = useCallback(async () => {
     await (window as any)?.electronAPI?.invoke("hide-active-view-sync");
     setShowPrivacy(true);
@@ -378,6 +392,20 @@ export default function URLBar() {
           })()}
         </button>
 
+        {/* Centre de notifications — surface COMMUNE, hors du dock de
+            messagerie : elle accueillera les outils de productivité à
+            venir. La pastille de non-lus de la messagerie reste sur son
+            propre bouton, là où l'œil la cherche ; ici on retrouve ce qui
+            demande une suite (validation attendue, licence, réunion). */}
+        <button
+          onClick={handleNotifsClick}
+          className="urlbar-btn"
+          title={t("Notifications.title")}
+        >
+          <Bell size={17} />
+          {notifsNonLues > 0 && <span className="chat-unread-count">{notifsNonLues}</span>}
+        </button>
+
         {/* Bouton confidentialité — interrupteurs blocage traqueurs /
             nettoyage des liens (panneau modal, comme coffre-fort/favoris) */}
         <button
@@ -407,6 +435,10 @@ export default function URLBar() {
 
       {showPrivacy && (
         <PrivacyPanel onClose={handleClosePrivacy} />
+      )}
+
+      {showNotifs && (
+        <NotificationCenter onClose={handleCloseNotifs} />
       )}
     </>
   );

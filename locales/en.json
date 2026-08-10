@@ -141,6 +141,13 @@
     "buildDev": "development version",
     "buildHint": "Installed version and the date it was built - compare across machines when testing."
   },
+  "Notifications": {
+    "title": "Notifications",
+    "empty": "Nothing to report.\nRequests awaiting you, deadlines and reminders will appear here.",
+    "markAllRead": "Mark all as read",
+    "dismiss": "Dismiss",
+    "justNow": "just now"
+  },
   "Chat": {
     "title": "Local Messaging",
     "subtitle": "Secure communication over your internal network",

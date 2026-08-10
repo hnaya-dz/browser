@@ -11,6 +11,7 @@
 // ═══════════════════════════════════════════════════════════════
 import { useEffect, useState } from "react";
 import { jouerSon, amorcerSon } from "./chat-sound";
+import { publier as publierNotif, viderSource } from "./notifications";
 
 export interface ChatMessage {
   id: string;
@@ -425,6 +426,10 @@ export function startConnecting() {
     // qu'on quitte.
     unreadPrivate: {}, decisions: {}, decisionRefused: null, reads: {},
   });
+  // Étape O — et les notifications de la messagerie aussi : elles pointent
+  // vers des fils d'un salon qu'on ne rejoint pas forcément. Cliquer sur
+  // une notification orpheline ouvrirait un fil vide.
+  viderSource("messagerie");
   connectTimer = setTimeout(() => {
     connectTimer = null;
     if (store.status === "connecting") {
@@ -584,6 +589,31 @@ export function ensureListening() {
           // Jamais sur le rattrapage (voir client.js) : rejoindre après une
           // absence sonnerait une fois par message manqué.
           if (!evt.message.backlog) jouerSon(prive ? "private" : "room");
+          // Étape O — ce qui mérite d'être RETROUVÉ plus tard va au centre
+          // de notifications ; ce qui se consomme sur l'instant reste au
+          // dock. Un message de salon est du flux : on ne le publie pas,
+          // sinon le centre devient un second fil, illisible. Un message
+          // PRIVÉ et une demande qui me DÉSIGNE appellent une suite.
+          const pourMoi = evt.message.tag
+            && evt.message.destinataire
+            && evt.message.destinataire === store.myFingerprint;
+          if (!evt.message.backlog && (prive || pourMoi)) {
+            const fil = groupe;
+            publierNotif({
+              source: "messagerie",
+              titre: pourMoi
+                ? `${evt.message.from} — ${evt.message.tag}`
+                : `${evt.message.from} — message privé`,
+              detail: evt.message.text?.slice(0, 120) || null,
+              // Une notification par fil : dix messages privés d'affilée
+              // ne doivent pas produire dix lignes à dépiler.
+              cle: prive ? "dm:" + fil : "demande:" + evt.message.id,
+              action: () => {
+                patchStore({ activeThread: fil });
+                setPanelOpen(true);
+              },
+            });
+          }
         }
         patchStore(patch);
         break;
@@ -636,6 +666,18 @@ export function ensureListening() {
           licenceNotice: evt.notice || null,
           licenceReadOnly: !!evt.readOnly,
         });
+        // Étape O — l'échéance de licence est le cas type du centre : elle
+        // concerne le gérant, pas celui qui discute, et elle doit se
+        // retrouver plus tard. La clé fixe évite qu'une réévaluation
+        // horaire n'empile une ligne par heure.
+        if (evt.notice) {
+          publierNotif({
+            source: "licence",
+            titre: evt.readOnly ? "Envoi suspendu — licence échue" : "Licence à renouveler",
+            detail: evt.notice,
+            cle: "licence",
+          });
+        }
         break;
       case "presence":
         patchStore({ online: evt.online || [] });

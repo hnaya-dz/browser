@@ -141,6 +141,13 @@
     "buildDev": "version de développement",
     "buildHint": "Version installée et date de sa construction — à comparer entre postes lors d'un test."
   },
+  "Notifications": {
+    "title": "Notifications",
+    "empty": "Rien à signaler.\nLes demandes qui vous attendent, les échéances et les rappels apparaîtront ici.",
+    "markAllRead": "Tout marquer comme lu",
+    "dismiss": "Retirer",
+    "justNow": "à l'instant"
+  },
   "Chat": {
     "title": "Messagerie locale",
     "subtitle": "Communication sécurisée sur votre réseau interne",

@@ -2,7 +2,8 @@
 import { useState } from "react";
 import { usePathname } from "next/navigation";
 import dynamic from "next/dynamic";
-import { MessageSquare, Shield, BookOpen } from "lucide-react";
+import { MessageSquare, Shield, BookOpen, Bell } from "lucide-react";
+import { useNotifications } from "@/context/notifications";
 import { ThemeSwitch } from "@/components/theme-switch";
 import LangSwitch from "./lang-switch";
 import { useTabContext } from "@/context/tabcontext";
@@ -13,6 +14,7 @@ import { setPanelOpen, useChatSnapshot } from "@/context/chatstore";
 import { setTutorialActive, useTutorialSnapshot } from "@/context/tutorialStore";
 
 const PrivacyPanel = dynamic(() => import("./PrivacyPanel"), { ssr: false });
+const NotificationCenter = dynamic(() => import("./NotificationCenter"), { ssr: false });
 
 const HNAYA_NAV = [
   { key: "home",    url: "https://hnaya.dz",                 labels: { ar: "حنايا",       fr: "Accueil",        en: "Home"           } },
@@ -33,6 +35,8 @@ export const Navbar = () => {
   const chat = useChatSnapshot();
   const tutorial = useTutorialSnapshot();
   const [showPrivacy, setShowPrivacy] = useState(false);
+  const [showNotifs, setShowNotifs] = useState(false);
+  const { nonLues: notifsNonLues } = useNotifications();
 
   if (pathname === "/browser") return null;
 
@@ -100,6 +104,25 @@ export const Navbar = () => {
             ) : null;
           })()}
         </button>
+        {/* Centre de notifications — même surface que dans la barre
+            d'adresse : ce qui demande une suite doit se retrouver depuis
+            n'importe quel écran, y compris l'accueil. */}
+        <button
+          onClick={() => setShowNotifs(true)}
+          className="px-2 text-white/70 hover:text-white transition-all duration-150"
+          title={t("Notifications.title")}
+          style={{ position: "relative" }}
+        >
+          <Bell size={16} />
+          {notifsNonLues > 0 && (
+            <span style={{
+              position: "absolute", top: -3, right: -1, minWidth: 14, height: 14,
+              padding: "0 3px", borderRadius: 7, background: "#ff3b30", color: "#fff",
+              fontSize: 9, fontWeight: 700, lineHeight: "14px", textAlign: "center",
+              border: "1.5px solid rgba(0,0,0,0.4)",
+            }}>{notifsNonLues}</span>
+          )}
+        </button>
         {/* Panneau Confidentialité — page d'accueil : pas de WebContentsView
             à masquer, ouverture directe */}
         <button
@@ -116,6 +139,7 @@ export const Navbar = () => {
         </div>
       </div>
       {showPrivacy && <PrivacyPanel onClose={() => setShowPrivacy(false)} />}
+      {showNotifs && <NotificationCenter onClose={() => setShowNotifs(false)} />}
     </nav>
   );
 };
