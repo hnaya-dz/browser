@@ -331,7 +331,7 @@ export function saveMessage(msg) {
       // oublier d'y ajouter un nouveau type — un vote enregistré comme
       // simple message perdrait sa nature, et l'hôte refuserait ensuite
       // TOUTES les réponses (il vérifie que la cible est bien un vote).
-      ["invite", "vote"].includes(msg.type) ? msg.type : "message",
+      ["invite", "vote", "meeting"].includes(msg.type) ? msg.type : "message",
       msg.extra ? JSON.stringify(msg.extra) : null,
       msg.media ? JSON.stringify(msg.media) : null,
       msg.replyTo ? String(msg.replyTo) : null,
@@ -571,6 +571,26 @@ export function listDecisions(messageId) {
  *  votes : une décision ne voyage PAS avec les messages, donc un arrivant
  *  (ou une reconnexion, qui ne redemande que les messages récents) verrait
  *  une demande de validation sans son issue. */
+/** Étape P — réunions annoncées d'un salon, dans les fils demandés, dont
+ *  l'heure de FIN n'est pas passée. Une réunion terminée n'a plus à être
+ *  épinglée : elle reste dans l'historique comme n'importe quel message. */
+export function listMeetings(roomId, groupIds, maintenant = Date.now()) {
+  const groupes = (groupIds || []).map(String);
+  if (!groupes.length) return [];
+  const trous = groupes.map(() => "?").join(",");
+  return ensureDb().prepare(
+    `SELECT * FROM messages
+      WHERE roomId = ? AND type = 'meeting' AND groupId IN (${trous})
+      ORDER BY ts ASC`,
+  ).all(String(roomId), ...groupes)
+    .map(rowToMessage)
+    .filter((m) => {
+      const e = m.extra || {};
+      const fin = Number(e.startsAt || 0) + Number(e.durationMin || 0) * 60000;
+      return fin > maintenant;
+    });
+}
+
 export function listDemandes(roomId, groupIds) {
   const groupes = (groupIds || []).map(String);
   if (!groupes.length) return [];

@@ -3,13 +3,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 // ✅ Icônes vectorielles (lucide, déjà dans les dépendances) plutôt
 // qu'emoji : les emoji sont rendus par la police du système et diffèrent
 // visuellement entre Windows 10 et 11 — incohérent d'un poste à l'autre.
-import { MessageSquare, Shield, Lock, Smartphone, KeyRound, Eye, EyeOff, Send, History, DoorOpen, Trash2, KeySquare, Users, ArrowLeft, CornerUpLeft, X, CheckCircle2, AlertTriangle, Volume2, VolumeX } from "lucide-react";
+import { MessageSquare, Shield, Lock, Smartphone, KeyRound, Eye, EyeOff, Send, History, DoorOpen, Trash2, KeySquare, Users, ArrowLeft, CornerUpLeft, X, CheckCircle2, AlertTriangle, Volume2, VolumeX, CalendarClock } from "lucide-react";
 import ChatAdminPanel from "./ChatAdminPanel";
 import ChatServerSetup from "./ChatServerSetup";
 import ChatComposerMedia, { MediaPreview, type PreparedMedia } from "./ChatComposerMedia";
 import ChatVoteCard from "./ChatVoteCard";
 import ChatDemandeCard from "./ChatDemandeCard";
-import type { InviteExtra } from "@/context/chatstore";
+import ChatMeetingCard from "./ChatMeetingCard";
+import type { InviteExtra, MeetingExtra } from "@/context/chatstore";
 
 // Les trois issues d'un vote, dans le vocabulaire administratif validé
 // par l'utilisateur. Ce sont des CLÉS i18n : les libellés partent traduits
@@ -173,6 +174,12 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
   // demande de validation le message anodin qui suit.
   const [tag, setTag] = useState<"info" | "avis" | "validation" | "approbation" | null>(null);
   const [destinataire, setDestinataire] = useState<string>("");
+  // Étape P — formulaire d'annonce d'une réunion
+  const [reunionOuverte, setReunionOuverte] = useState(false);
+  const [reunionTitre, setReunionTitre] = useState("");
+  const [reunionQuand, setReunionQuand] = useState("");
+  const [reunionDuree, setReunionDuree] = useState("60");
+  const [reunionLieu, setReunionLieu] = useState("");
   const [voteOuvert, setVoteOuvert] = useState(false);
   const [voteQuestion, setVoteQuestion] = useState("");
   const [voteNominatif, setVoteNominatif] = useState(true);
@@ -250,6 +257,7 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
     });
   const totalPrives = privesEnAttente.reduce((a, p) => a + p.n, 0);
 
+
   const revenirAuSalon = () => {
     patchStore({ activeThread: "all" });
     setThreadPeer(null);
@@ -260,6 +268,16 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
   const messagesDuFil = store.messages.filter(
     (m) => (m.groupId || "all") === store.activeThread,
   );
+
+  // Étape P — réunions du fil courant qui ne sont pas terminées. Le filtre
+  // porte sur l'heure de FIN, pas de début : une réunion en cours doit
+  // rester épinglée, c'est même à ce moment-là qu'elle sert le plus.
+  const reunionsAVenir = messagesDuFil.filter((m) => {
+    if (m.type !== "meeting") return false;
+    const e = m.extra as MeetingExtra | null;
+    if (!e?.startsAt) return false;
+    return e.startsAt + (e.durationMin || 0) * 60000 > Date.now();
+  });
 
   // Pré-remplissage du formulaire d'invitation : le salon qu'on héberge
   // (cas type : je viens de créer « Service Y », j'invite depuis « X »),
@@ -1269,6 +1287,19 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
                   {son ? <Volume2 size={12} /> : <VolumeX size={12} />}
                 </button>
               )}
+              {/* Étape P — annoncer une réunion */}
+              {!showAdmin && (
+                <button
+                  onClick={() => setReunionOuverte((v) => !v)}
+                  disabled={store.licenceReadOnly}
+                  style={{
+                    ...btnStyle(reunionOuverte), padding: "4px 8px", fontSize: 10,
+                    display: "flex", alignItems: "center", gap: 4, flexShrink: 0,
+                  }}
+                >
+                  <CalendarClock size={12} /> {t("Chat.meeting")}
+                </button>
+              )}
               {/* Étape H — soumettre au vote */}
               {!showAdmin && (
                 <button
@@ -1435,6 +1466,16 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
 
             {/* Fil de messages : occupe tout l'espace restant du dock,
                 défile indépendamment (minHeight: 0 requis en flex) */}
+            {/* Étape P — réunions à venir, ÉPINGLÉES en tête du fil. Elles
+                y restent jusqu'à leur heure de fin, puis redescendent dans
+                l'historique comme n'importe quel message — sinon le haut
+                du salon se remplirait de réunions périmées. */}
+            {!showAdmin && !showRoster && reunionsAVenir.map((m) => (
+              <div key={"pin-" + m.id} style={{ flexShrink: 0 }}>
+                <ChatMeetingCard message={m} accent={accent} muted={muted} border={border} compact />
+              </div>
+            ))}
+
             {/* Étape J — messages privés en attente. Ils n'étaient signalés
                 que par un petit compte sur le bouton « Annuaire », au milieu
                 d'une rangée d'autres boutons : on ne le voyait pas. Ici, le
@@ -1571,6 +1612,15 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
                           onAnswer={(choice) => getApi()?.send?.("chat-answer-vote", { voteId: m.id, choice })}
                           accent={accent} muted={muted} border={border}
                         />
+                      </div>
+                    );
+                  }
+                  // Étape P — une réunion occupe toute la largeur : c'est
+                  // une convocation, pas une réplique.
+                  if (m.type === "meeting") {
+                    return (
+                      <div key={m.id} id={"msg-" + m.id} style={{ alignSelf: "stretch", display: "flex" }}>
+                        <ChatMeetingCard message={m} accent={accent} muted={muted} border={border} />
                       </div>
                     );
                   }
@@ -1722,6 +1772,83 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
                   </div>
                 </div>
               )}
+              {/* Étape P — annoncer une réunion. L'heure se saisit en heure
+                  LOCALE (datetime-local) et part en millisecondes absolues :
+                  deux postes réglés sur des fuseaux différents doivent voir
+                  le même instant, pas la même chaîne de caractères. */}
+              {reunionOuverte && (
+                <div style={{
+                  border: `1px solid ${accent}55`, background: `${accent}10`,
+                  borderRadius: 6, padding: 8, marginBottom: 6,
+                  display: "flex", flexDirection: "column", gap: 6,
+                }}>
+                  <div style={{ fontSize: 10, color: accent, fontWeight: 700 }}>
+                    {t("Chat.meetingNew")}
+                  </div>
+                  <input
+                    style={{ ...inputStyle, fontSize: 11 }}
+                    value={reunionTitre}
+                    onChange={(e) => setReunionTitre(e.target.value)}
+                    placeholder={t("Chat.meetingTitlePlaceholder")}
+                    maxLength={120}
+                  />
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <input
+                      type="datetime-local"
+                      style={{ ...inputStyle, fontSize: 11, flex: 1, minWidth: 0 }}
+                      value={reunionQuand}
+                      onChange={(e) => setReunionQuand(e.target.value)}
+                    />
+                    <input
+                      type="number"
+                      style={{ ...inputStyle, fontSize: 11, width: 76 }}
+                      value={reunionDuree}
+                      min={5}
+                      max={1440}
+                      onChange={(e) => setReunionDuree(e.target.value)}
+                      title={t("Chat.meetingDuration")}
+                    />
+                  </div>
+                  <input
+                    style={{ ...inputStyle, fontSize: 11 }}
+                    value={reunionLieu}
+                    onChange={(e) => setReunionLieu(e.target.value)}
+                    placeholder={t("Chat.meetingPlacePlaceholder")}
+                    maxLength={120}
+                  />
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <button
+                      onClick={() => {
+                        const quand = new Date(reunionQuand).getTime();
+                        const duree = Number(reunionDuree);
+                        if (!reunionTitre.trim() || !Number.isFinite(quand)) return;
+                        getApi()?.send?.("chat-open-meeting", {
+                          title: reunionTitre.trim(), startsAt: quand, durationMin: duree,
+                          location: reunionLieu.trim(), groupId: store.activeThread,
+                        });
+                        setReunionOuverte(false); setReunionTitre("");
+                        setReunionQuand(""); setReunionLieu(""); setReunionDuree("60");
+                      }}
+                      disabled={store.licenceReadOnly || !reunionTitre.trim() || !reunionQuand
+                        || Number(reunionDuree) < 5 || Number(reunionDuree) > 1440}
+                      style={{
+                        ...btnStyle(true, store.licenceReadOnly || !reunionTitre.trim() || !reunionQuand
+                          || Number(reunionDuree) < 5 || Number(reunionDuree) > 1440),
+                        flex: 1, fontSize: 11,
+                      }}
+                    >
+                      {t("Chat.meetingSend")}
+                    </button>
+                    <button
+                      onClick={() => { setReunionOuverte(false); setReunionTitre(""); setReunionQuand(""); setReunionLieu(""); }}
+                      style={{ ...btnStyle(false), fontSize: 11 }}
+                    >
+                      {t("Chat.inviteClose")}
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Étape H — ouvrir un vote. Le mode non nominatif est une
                   case à cocher, décidée À L'ÉMISSION : c'est le choix de
                   celui qui pose la question, pas un réglage du salon. */}

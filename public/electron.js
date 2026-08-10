@@ -1,4 +1,4 @@
-import { app, BrowserWindow, WebContentsView, ipcMain, Menu, dialog, shell, screen, clipboard, powerMonitor } from "electron";
+import { app, BrowserWindow, WebContentsView, ipcMain, Menu, dialog, shell, screen, clipboard, powerMonitor, Notification } from "electron";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import { spawn, fork } from "child_process";
@@ -1087,6 +1087,58 @@ ipcMain.on("chat-join", (event, joinParams) => {
 
 ipcMain.on("chat-send-message", (event, { text, groupId, media, replyTo, demande }) => {
   chatWorker?.send({ cmd: "send-message", text, groupId, media, replyTo, demande });
+});
+
+// ── Étape P — réunion annoncée ─────────────────────────────────────────
+ipcMain.on("chat-open-meeting", (event, params = {}) => {
+  chatWorker?.send({ cmd: "open-meeting", ...params });
+});
+
+// Rappel de réunion : la minuterie vit dans le PROCESS PRINCIPAL, pas dans
+// le renderer. Chromium ralentit les minuteries d'une fenêtre en arrière-
+// plan — un rappel programmé côté interface serait arrivé en retard, ou
+// pas du tout, précisément quand l'utilisateur travaille ailleurs. C'est
+// là tout l'intérêt du rappel.
+const rappelsReunion = new Map(); // id -> timeout
+ipcMain.on("chat-schedule-reminder", (event, { id, titre, corps, atMs } = {}) => {
+  if (!id) return;
+  const ancien = rappelsReunion.get(id);
+  if (ancien) { clearTimeout(ancien); rappelsReunion.delete(id); }
+  const delai = Number(atMs) - Date.now();
+  // Passé, ou au-delà de ce que setTimeout sait tenir (~24,8 jours) : on
+  // ne programme rien plutôt que de déclencher immédiatement par débordement.
+  if (!Number.isFinite(delai) || delai <= 0 || delai > 2147483647) return;
+  const timer = setTimeout(() => {
+    rappelsReunion.delete(id);
+    try {
+      if (Notification.isSupported()) {
+        new Notification({ title: String(titre || "Réunion"), body: String(corps || "") }).show();
+      }
+    } catch { /* notifications refusées par le système */ }
+  }, delai);
+  rappelsReunion.set(id, timer);
+});
+ipcMain.on("chat-cancel-reminder", (event, { id } = {}) => {
+  const t = rappelsReunion.get(id);
+  if (t) { clearTimeout(t); rappelsReunion.delete(id); }
+});
+
+// Export .ics — lien avec Outlook par le FORMAT, pas par une API : aucune
+// dépendance, aucune authentification, aucun compte Microsoft, et cela
+// fonctionne hors ligne. Le contenu est composé par le renderer ; ici on
+// ne fait que demander où l'enregistrer.
+ipcMain.handle("chat-export-ics", async (event, { filename, content } = {}) => {
+  try {
+    const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
+      defaultPath: join(app.getPath("documents"), String(filename || "reunion.ics")),
+      filters: [{ name: "Calendrier (iCalendar)", extensions: ["ics"] }],
+    });
+    if (canceled || !filePath) return { ok: false, error: "canceled" };
+    writeFileSync(filePath, String(content), "utf8");
+    return { ok: true, path: filePath };
+  } catch (e) {
+    return { ok: false, error: e?.message || "ics" };
+  }
 });
 
 // ── Étape M — photo de profil : déclarer l'empreinte déjà téléversée

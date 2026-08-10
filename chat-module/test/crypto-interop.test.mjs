@@ -42,7 +42,7 @@ import { createPrivateKey, sign as nodeSign } from "node:crypto";
 import {
   loadOrCreateIdentity, verifyMessage as nodeVerify,
   fingerprintFromRawPublicKey, rawFromSpkiBase64, signablePayload,
-  demandeSeal, decisionSeal,
+  demandeSeal, decisionSeal, meetingSeal,
 } from "../src/identity.js";
 
 const core = { id: "msg_interop1", from: "Téléphone-Test", text: "توقيع interop é€", ts: 1789000000000 };
@@ -161,4 +161,18 @@ assert.notStrictEqual(demandeSeal("info", "aaaa"), demandeSeal("approbation", "a
 assert.ok(demandeSeal("validation", "x").startsWith("dem:"));
 assert.ok(decisionSeal("msg_1", "valide").startsWith("dec:"));
 
-console.log("✅ Interop crypto Node ↔ navigateur : 26/26 OK (AES-GCM + Ed25519 + rangs signés + sceaux de demande)");
+// Étape P — la réunion partage le rang 8, d'où un TROISIÈME préfixe.
+assert.strictEqual(meetingSeal("Conseil", 1800000000000, 60),
+  browserCrypto.meetingSeal("Conseil", 1800000000000, 60),
+  "Sceau de réunion : Node et navigateur divergent");
+assert.ok(meetingSeal("Conseil", 1, 1).startsWith("mtg:"));
+// L'HEURE fait partie du sceau : déplacer une réunion signée doit casser
+// la signature, sinon le .ics exporté porterait une heure jamais annoncée.
+assert.notStrictEqual(meetingSeal("Conseil", 1800000000000, 60),
+  meetingSeal("Conseil", 1800003600000, 60),
+  "L'heure ne compte pas dans le sceau : la réunion serait déplaçable");
+assert.notStrictEqual(meetingSeal("Conseil", 1800000000000, 60),
+  meetingSeal("Conseil", 1800000000000, 90),
+  "La durée ne compte pas dans le sceau");
+
+console.log("✅ Interop crypto Node ↔ navigateur : 31/31 OK (AES-GCM + Ed25519 + rangs signés + sceaux demande/décision/réunion)");

@@ -24,7 +24,9 @@ export interface ChatMessage {
   // Étape H — type "vote" : question soumise au vote, options et mode
   // dans extra. Un vote EST un message (même table, même signature) ;
   // seules les RÉPONSES vivent à part, dans le dépouillement.
-  type?: "message" | "invite" | "vote";
+  // Étape P — type "meeting" : réunion annoncée, définition (titre, heure,
+  // durée, lieu) dans extra. Épinglée tant qu'elle n'est pas terminée.
+  type?: "message" | "invite" | "vote" | "meeting";
   // Étape G — citation : identifiant du message auquel celui-ci répond.
   // L'hôte n'accepte qu'un identifiant EXISTANT dans ce salon, et la
   // citation est couverte par la signature (voir signablePayload) : une
@@ -34,7 +36,7 @@ export interface ChatMessage {
   // définition du vote pour un vote. TypeScript ne sait pas discriminer
   // sur un `type` optionnel — les deux points de lecture rétrécissent
   // donc explicitement, après avoir testé `type`.
-  extra?: InviteExtra | VoteExtra | null;
+  extra?: InviteExtra | VoteExtra | MeetingExtra | null;
   // Étape E — pièce jointe : MÉTADONNÉES seulement. Le fichier vit chez
   // l'hôte et n'est téléchargé qu'à l'ouverture ; `thumb` est une vignette
   // minuscule embarquée, qui permet un aperçu immédiat même dans
@@ -97,6 +99,15 @@ export interface InviteExtra {
 export interface VoteExtra {
   options: string[];
   nominatif: boolean;
+}
+
+/** Étape P — définition d'une réunion. Titre, heure et durée sont scellés
+ *  dans la signature : ils ne peuvent pas être déplacés après coup. */
+export interface MeetingExtra {
+  title: string;
+  startsAt: number;
+  durationMin: number;
+  location?: string | null;
 }
 
 export interface RosterPerson {
@@ -450,6 +461,46 @@ export function setPanelOpen(open: boolean) {
   if (store.activeThread !== "all") marquerFilLu(store.activeThread);
 }
 
+// ── Étape P — rappel d'une réunion ─────────────────────────────────────
+// Quinze minutes avant : assez tôt pour se déplacer, assez tard pour ne
+// pas être oublié entre-temps.
+const PREAVIS_REUNION_MS = 15 * 60000;
+const reunionsVues = new Set<string>();
+
+function programmerRappel(m: ChatMessage) {
+  if (reunionsVues.has(m.id)) return;
+  reunionsVues.add(m.id);
+  const e = (m.extra || {}) as { title?: string; startsAt?: number; location?: string | null };
+  const debut = Number(e.startsAt) || 0;
+  if (!debut) return;
+  const quand = debut - PREAVIS_REUNION_MS;
+
+  // Rappel système, tenu par le processus principal. Rien n'est programmé
+  // si l'échéance est déjà passée : une réunion rattrapée après coup ne
+  // doit pas déclencher une notification à retardement.
+  if (quand > Date.now()) {
+    getApi()?.send?.("chat-schedule-reminder", {
+      id: m.id,
+      titre: e.title || "Réunion",
+      corps: `${new Date(debut).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
+        + (e.location ? ` · ${e.location}` : ""),
+      atMs: quand,
+    });
+  }
+
+  // Et une entrée dans le centre, qui elle se retrouve à tout moment —
+  // y compris si l'on a manqué la notification système.
+  if (debut > Date.now()) {
+    publierNotif({
+      source: "agenda",
+      titre: e.title || "Réunion",
+      detail: new Date(debut).toLocaleString() + (e.location ? ` · ${e.location}` : ""),
+      cle: "reunion:" + m.id,
+      action: () => { patchStore({ activeThread: m.groupId || "all" }); setPanelOpen(true); },
+    });
+  }
+}
+
 /** Le fil vient d'être ouvert : ses messages sont lus. */
 export function marquerFilLu(threadId: string) {
   if (!store.unreadPrivate[threadId]) return;
@@ -597,6 +648,13 @@ export function ensureListening() {
           const pourMoi = evt.message.tag
             && evt.message.destinataire
             && evt.message.destinataire === store.myFingerprint;
+          // Étape P — une réunion annoncée : rappel système ET entrée dans
+          // le centre. Programmé même pour le RATTRAPAGE, contrairement au
+          // son : une réunion annoncée pendant qu'on était absent doit
+          // quand même rappeler. C'est le processus principal qui tient la
+          // minuterie — Chromium ralentit celles d'une fenêtre en
+          // arrière-plan, c'est-à-dire précisément quand le rappel sert.
+          if (evt.message.type === "meeting") programmerRappel(evt.message);
           if (!evt.message.backlog && (prive || pourMoi)) {
             const fil = groupe;
             publierNotif({

@@ -48,6 +48,7 @@ const ALLOWED_INVOKE = [
   "chat-server-pick-licence",
   "chat-server-installed-licence",
   "chat-pairing-token",
+  "chat-export-ics",
   "chat-server-install",
   "chat-server-uninstall",
   // ✅ Confidentialité — interrupteurs utilisateur
@@ -82,6 +83,9 @@ const ALLOWED_SEND = [
   "chat-answer-vote",
   "chat-decider",
   "chat-set-avatar",
+  "chat-open-meeting",
+  "chat-schedule-reminder",
+  "chat-cancel-reminder",
   "chat-mark-read",
   "chat-roster",
   "chat-leave",

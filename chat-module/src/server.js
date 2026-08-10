@@ -26,7 +26,7 @@ import {
 } from "./store.js";
 import { fingerprintFromRawPublicKey, rawFromSpkiBase64, verifyMessage,
          voteDefinitionSeal, voteAnswerSeal,
-         demandeSeal, decisionSeal, verifyPairing } from "./identity.js";
+         demandeSeal, decisionSeal, meetingSeal, verifyPairing } from "./identity.js";
 import { startMobileServer } from "./mobile-server.js";
 import { existsSync } from "node:fs";
 import {
@@ -618,6 +618,59 @@ export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, 
           groupId: vote.groupId,
           ...getVoteTally(voteId),
         });
+        return;
+      }
+
+      // ── Étape P — annoncer une réunion ───────────────────────────
+      // Une réunion EST un message (même table, même historique, même
+      // signature), avec sa définition dans extra. L'heure et la durée
+      // sont scellées : une réunion déplaçable après signature ne vaudrait
+      // pas mieux qu'un message libre, et le .ics exporté porterait une
+      // heure que personne n'a annoncée.
+      if (payload.type === "meeting") {
+        const device = clients.get(ws)?.device || null;
+        if (!userId || !device) return;
+        const titre = String(payload.title ?? "").slice(0, 120).trim();
+        const debut = Number(payload.startsAt);
+        const duree = Number(payload.durationMin);
+        if (!titre || !Number.isFinite(debut)) return;
+        // ⚠️ On REFUSE une durée hors bornes, on ne la corrige PAS. La
+        // durée fait partie du sceau signé : la ramener à 5 minutes ici
+        // produirait un sceau différent de celui que le client a signé, et
+        // la réunion serait rejetée à l'étape suivante — silencieusement,
+        // sans que rien n'explique pourquoi elle n'est jamais partie.
+        // Un serveur ne réécrit jamais ce qui est signé.
+        if (!Number.isFinite(duree) || duree < 5 || duree > 24 * 60) return;
+        // Une réunion dans le passé n'a rien à épingler. On tolère une
+        // heure toute proche (quelqu'un annonce « dans cinq minutes »)
+        // mais pas une antidatée.
+        if (debut < Date.now() - 60000) return;
+
+        const core = {
+          id: String(payload.id), from: userId,
+          text: String(payload.text ?? "").slice(0, 500), ts: Number(payload.ts),
+          demandeSha: meetingSeal(titre, debut, duree),
+        };
+        const verified = verifyMessage(core, payload.signature, device.publicKeySpki);
+        // Non signée, une convocation n'engage personne : on la refuse
+        // plutôt que de l'épingler en tête du salon avec l'autorité que
+        // cette place confère.
+        if (!verified) return;
+        const driftOk = Math.abs(Date.now() - core.ts) <= MAX_CLOCK_DRIFT_MS;
+        const msg = {
+          v: 1, type: "meeting", id: core.id, roomId: activeRoomId,
+          groupId: payload.groupId || "all", from: userId, text: core.text,
+          extra: {
+            title: titre, startsAt: debut, durationMin: duree,
+            location: String(payload.location ?? "").slice(0, 120) || null,
+          },
+          ts: driftOk ? core.ts : Date.now(),
+          deviceFp: device.fingerprint,
+          signature: payload.signature,
+          signatureValid: true,
+        };
+        if (!saveMessage(msg).inserted) return;
+        broadcastToGroup(msg.groupId, msg);
         return;
       }
 

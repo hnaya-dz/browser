@@ -118,6 +118,20 @@
   #replyBar button { background:transparent; border:none; color:var(--muted); font-size:22px;
                      cursor:pointer; flex-shrink:0; min-width:44px; min-height:44px;
                      display:flex; align-items:center; justify-content:center; }
+  /* — Étape P : réunion annoncée — */
+  .reunion { align-self:stretch; border-radius:14px; padding:12px 14px;
+             background:rgba(0,99,65,0.16); border:1px solid rgba(0,200,83,0.4); }
+  .reunion.proche { background:rgba(0,200,83,0.20); border-color:rgba(0,200,83,0.75); }
+  .reunion-tete { display:flex; align-items:center; gap:6px; font-size:15px; }
+  .reunion-tete b { flex:1; min-width:0; }
+  .reunion-compte { font-size:12px; font-weight:700; color:var(--accent2); flex-shrink:0; }
+  .reunion-quand { font-size:12.5px; color:var(--muted); margin-top:4px; line-height:1.5; }
+  .reunion-txt { font-size:14px; margin-top:6px; line-height:1.5; }
+  .reunion-bas { display:flex; align-items:center; gap:8px; margin-top:10px; }
+  .reunion-bas span { flex:1; min-width:0; font-size:12px; color:var(--muted); }
+  .reunion-bas button { min-height:44px; padding:8px 12px; border-radius:10px;
+                        border:1px solid var(--border); background:transparent;
+                        color:var(--fg); font-size:13px; cursor:pointer; flex-shrink:0; }
   /* — Étape N : accusé de lecture — */
   .vu { font-size:11.5px; color:var(--muted); margin-top:3px; text-align:end; }
   /* — Étape M : pastille d'identité et photo de profil — */
@@ -405,6 +419,8 @@ const I18N = {
         issue_valide:"Validé", issue_refuse:"Refusé", issue_reserve:"Réserves",
         demandeYou:"vous", demandePending:"En attente d'une réponse", demandeAnyone:"Sans destinataire précis",
         seenBy:"Vu par", avatarChange:"Ma photo", avatarRemove:"Retirer",
+        meetingIn:"dans", meetingNow:"en cours", meetingOver:"terminée",
+        meetingBy:"Annoncée par", meetingExport:"Mon agenda",
         avatarFailed:"Photo impossible à préparer. Choisissez une image.",
         demandeNotForYou:"Cette demande est adressée à quelqu'un d'autre.",
         attVoice:"Message vocal", attFile:"Pièce jointe", attSave:"Ouvrir", attLoading:"Chargement…", attGone:"Pièce jointe indisponible.", attFailed:"Échec du téléchargement.",
@@ -415,6 +431,8 @@ const I18N = {
         issue_valide:"Validated", issue_refuse:"Refused", issue_reserve:"Reservations",
         demandeYou:"you", demandePending:"Awaiting a response", demandeAnyone:"No specific recipient",
         seenBy:"Seen by", avatarChange:"My photo", avatarRemove:"Remove",
+        meetingIn:"in", meetingNow:"under way", meetingOver:"over",
+        meetingBy:"Announced by", meetingExport:"My calendar",
         avatarFailed:"Could not prepare that photo. Pick an image.",
         demandeNotForYou:"This request is addressed to someone else.",
         attVoice:"Voice message", attFile:"Attachment", attSave:"Open", attLoading:"Loading…", attGone:"Attachment unavailable.", attFailed:"Download failed.",
@@ -425,6 +443,8 @@ const I18N = {
         issue_valide:"مُصادَق", issue_refuse:"مرفوض", issue_reserve:"تحفّظات",
         demandeYou:"أنت", demandePending:"في انتظار الرد", demandeAnyone:"بلا مرسَل إليه محدَّد",
         seenBy:"قرأها", avatarChange:"صورتي", avatarRemove:"إزالة",
+        meetingIn:"بعد", meetingNow:"جارٍ", meetingOver:"انتهى",
+        meetingBy:"أعلنه", meetingExport:"مفكرتي",
         avatarFailed:"تعذّر تحضير الصورة. اختر صورة.",
         demandeNotForYou:"هذا الطلب موجَّه إلى شخص آخر.",
         attVoice:"رسالة صوتية", attFile:"مرفق", attSave:"فتح", attLoading:"جارٍ التحميل…", attGone:"المرفق غير متاح.", attFailed:"فشل التحميل.",
@@ -855,8 +875,100 @@ function lecturesNode(m) {
   return d;
 }
 
+// ── Étape P — réunion annoncée ────────────────────────────────
+// ⚠️ Le mobile ne peut PAS notifier : pas de service worker, donc pas de
+// contexte sécurisé (page servie en http sur une IP privée) — la même
+// cause que l'absence de microphone. La page doit rester ouverte. On
+// affiche donc ce qu'on peut : la carte et son compte à rebours.
+function resteAvant(debut, dureeMin) {
+  const n = Date.now();
+  if (n >= debut) return n < debut + dureeMin * 60000 ? t("meetingNow") : t("meetingOver");
+  const min = Math.ceil((debut - n) / 60000);
+  if (min < 60) return t("meetingIn") + " " + min + " min";
+  const h = Math.floor(min / 60), r = min % 60;
+  if (h < 24) return t("meetingIn") + " " + h + " h" + (r ? " " + r : "");
+  return t("meetingIn") + " " + Math.floor(h / 24) + " j";
+}
+
+// Échappement iCalendar : virgule, point-virgule et contre-oblique sont
+// des séparateurs du format. Doit rester identique à context/ics.ts.
+function echapperIcs(s) {
+  return String(s ?? "").replace(/\\/g, "\\\\").replace(/;/g, "\\;")
+    .replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
+}
+
+function horodatageUtc(ms) {
+  const d = new Date(ms), p = (n) => String(n).padStart(2, "0");
+  return d.getUTCFullYear() + p(d.getUTCMonth() + 1) + p(d.getUTCDate())
+    + "T" + p(d.getUTCHours()) + p(d.getUTCMinutes()) + p(d.getUTCSeconds()) + "Z";
+}
+
+function telechargerIcs(m) {
+  const e = m.extra || {};
+  const fin = Number(e.startsAt) + Math.max(1, Number(e.durationMin) || 60) * 60000;
+  const lignes = [
+    "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Hnaya DZ//Messagerie locale//FR",
+    "CALSCALE:GREGORIAN", "METHOD:PUBLISH", "BEGIN:VEVENT",
+    "UID:" + echapperIcs(m.id) + "@hnaya.dz",
+    "DTSTAMP:" + horodatageUtc(Date.now()),
+    "DTSTART:" + horodatageUtc(Number(e.startsAt)),
+    "DTEND:" + horodatageUtc(fin),
+    "SUMMARY:" + echapperIcs(e.title),
+  ];
+  if (e.location) lignes.push("LOCATION:" + echapperIcs(e.location));
+  if (m.text) lignes.push("DESCRIPTION:" + echapperIcs(m.text));
+  lignes.push("END:VEVENT", "END:VCALENDAR");
+  // CRLF exigé par la RFC : Outlook rejette un fichier en LF seuls.
+  const blob = new Blob([lignes.join("\r\n") + "\r\n"], { type: "text/calendar" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = String(e.title || "reunion").replace(/[\\/:*?"<>|]/g, "-").slice(0, 60) + ".ics";
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+
+function meetingNode(m) {
+  const e = m.extra || {};
+  const debut = Number(e.startsAt) || 0;
+  const duree = Number(e.durationMin) || 60;
+  const imminent = debut - Date.now() < 15 * 60000 && Date.now() < debut + duree * 60000;
+  const box = document.createElement("div");
+  box.className = "reunion" + (imminent ? " proche" : "");
+  box.dataset.id = m.id || "";
+
+  const tete = document.createElement("div"); tete.className = "reunion-tete";
+  const titre = document.createElement("b"); titre.textContent = e.title || "";
+  const compte = document.createElement("span");
+  compte.className = "reunion-compte";
+  compte.textContent = resteAvant(debut, duree);
+  tete.append("📅 ", titre, compte);
+  box.appendChild(tete);
+
+  const quand = document.createElement("div"); quand.className = "reunion-quand";
+  quand.textContent = new Date(debut).toLocaleString() + " · " + duree + " min"
+    + (e.location ? " · " + e.location : "");
+  box.appendChild(quand);
+
+  if (m.text) {
+    const txt = document.createElement("div"); txt.className = "reunion-txt";
+    txt.textContent = m.text;
+    box.appendChild(txt);
+  }
+
+  const bas = document.createElement("div"); bas.className = "reunion-bas";
+  const par = document.createElement("span");
+  par.textContent = t("meetingBy") + " " + (m.from || "");
+  const b = document.createElement("button");
+  b.textContent = "⤓ " + t("meetingExport");
+  b.onclick = () => telechargerIcs(m);
+  bas.append(par, b);
+  box.appendChild(bas);
+  return box;
+}
+
 function messageNode(m) {
   if (m.type === "vote") return voteNode(m);
+  if (m.type === "meeting") return meetingNode(m);
   const div = document.createElement("div");
   div.className = "msg" + (m.from === userId ? " mine" : "");
   const from = document.createElement("div"); from.className = "from"; from.textContent = m.from || "";

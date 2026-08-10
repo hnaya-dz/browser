@@ -113,6 +113,16 @@ export function decisionSeal(messageId, issue) {
   return "dec:" + String(messageId) + ":" + String(issue);
 }
 
+// ── Étape P — réunion annoncée ─────────────────────────────────────────────
+// Même rang 8, troisième préfixe. L'heure et la durée sont SCELLÉES : une
+// réunion dont on pourrait déplacer l'horaire après signature ne vaudrait
+// pas mieux qu'un message libre, et le fichier .ics exporté porterait une
+// heure que personne n'a réellement annoncée.
+export function meetingSeal(titre, debutMs, dureeMin) {
+  const canonique = JSON.stringify([String(titre), Number(debutMs), Number(dureeMin)]);
+  return "mtg:" + createHash("sha256").update(canonique).digest("hex").slice(0, 32);
+}
+
 // ── Étape L — jeton d'appairage d'un second appareil ───────────────────────
 // « Ajouter mon mobile » ne transportait que le pseudo : le téléphone
 // arrivait avec sa propre clé, donc une seconde fiche, donc un doublon

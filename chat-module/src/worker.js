@@ -329,6 +329,16 @@ function handleCommand(msg) {
       break;
     }
 
+    // ── Étape P — annoncer une réunion ────────────────────────────
+    case "open-meeting": {
+      if (!clientHandle) { process.send({ event: "disconnected" }); break; }
+      clientHandle.openMeeting({
+        title: msg.title, startsAt: msg.startsAt, durationMin: msg.durationMin,
+        location: msg.location || "", text: msg.text || "", groupId: msg.groupId,
+      });
+      break;
+    }
+
     // ── Étape M — déclarer sa photo de profil (octets déjà téléversés) ──
     case "set-avatar": {
       if (!clientHandle) { process.send({ event: "disconnected" }); break; }

@@ -14,7 +14,7 @@ import { fileURLToPath } from "node:url";
 import { deriveKeyFromPin, encryptPayload, decryptPayload } from "./crypto.js";
 import { listenForSessions } from "./discovery.js";
 import { loadOrCreateIdentity, voteDefinitionSeal, voteAnswerSeal,
-         demandeSeal, decisionSeal } from "./identity.js";
+         demandeSeal, decisionSeal, meetingSeal } from "./identity.js";
 import { CHUNK_BYTES } from "./media.js";
 
 // Répertoire par défaut de l'identité d'appareil (même défaut que store.js) ;
@@ -133,6 +133,9 @@ export function joinSession({
     // Étape H — un vote EST un message dans le fil ; son dépouillement,
     // lui, arrive à part et se rafraîchit à chaque réponse.
     else if (payload.type === "vote") onMessage?.(payload);
+    // Étape P — une réunion EST un message du fil ; l'interface l'épingle
+    // en plus, tant qu'elle n'est pas terminée.
+    else if (payload.type === "meeting") onMessage?.(payload);
     else if (payload.type === "vote-tally") onVoteTally?.(payload);
     else if (payload.type === "vote-refused") onVoteRefused?.(payload);
     // Étape I — échéance de licence : préavis, délai de grâce, puis
@@ -230,6 +233,22 @@ export function joinSession({
       destinataire,
       signature: identity.signMessage(core),
     }));
+  }
+
+  /** Étape P — annoncer une réunion. Titre, heure et durée sont scellés :
+   *  la convocation ne peut pas être déplacée après signature. */
+  function openMeeting({ title, startsAt, durationMin = 60, location = "", text = "", groupId = "all" }) {
+    const core = {
+      id: "mtg_" + crypto.randomUUID(), from: userId,
+      text: text ?? "", ts: Date.now(),
+      demandeSha: meetingSeal(title, startsAt, durationMin),
+    };
+    ws.send(encryptPayload(sessionKey, {
+      v: 2, type: "meeting", id: core.id, text: core.text, ts: core.ts,
+      title, startsAt, durationMin, location, groupId,
+      signature: identity.signMessage(core),
+    }));
+    return core.id;
   }
 
   /** Étape K — se prononcer sur une demande. La signature EST la valeur de
@@ -351,6 +370,7 @@ export function joinSession({
     openVote,
     answerVote,
     decider,
+    openMeeting,
     /** Étape L — jeton à glisser dans le QR « Ajouter mon mobile ». Signé
      *  par CET appareil : c'est ce qui prouve le rattachement. */
     makePairingToken: (dureeMs) => identity.makePairingToken(dureeMs),
