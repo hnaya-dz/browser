@@ -10,6 +10,7 @@
 // (chat-module/worker) — ce store n'est que son reflet côté interface.
 // ═══════════════════════════════════════════════════════════════
 import { useEffect, useState } from "react";
+import { jouerSon, amorcerSon } from "./chat-sound";
 
 export interface ChatMessage {
   id: string;
@@ -50,6 +51,10 @@ export interface ChatMessage {
   } | null;
   deviceFp?: string | null;
   signatureValid?: boolean;
+  // Étape J — indice de LIVRAISON, posé par client.js sur les messages du
+  // rattrapage. Il ne vient pas du réseau et n'est pas persisté : il sert
+  // uniquement à ne pas faire sonner une absence rattrapée.
+  backlog?: boolean;
 }
 
 /** Une personne de l'annuaire du salon (étape F). Le serveur ne renvoie
@@ -179,6 +184,12 @@ export interface ChatStore {
   // Messages des autres participants reçus pendant que le panneau est
   // fermé — affiché en pastille rouge sur l'icône, remis à zéro à l'ouverture
   unreadCount: number;
+  // ── Étape J ──
+  // Non-lus des fils PRIVÉS, par fil. Vit dans le store et non dans le
+  // panneau : il y était en useState, donc fermer le dock effaçait les
+  // compteurs. On revenait à zéro message privé en attente alors qu'il y
+  // en avait — une bonne part du « notification trop discrète ».
+  unreadPrivate: Record<string, number>;
   // Le panneau (dock) est-il actuellement affiché ? Piloté par setPanelOpen
   // — source unique de vérité pour le montage du panneau ET le badge
   panelOpen: boolean;
@@ -261,6 +272,7 @@ export const store: ChatStore = {
   inviteUrl: null,
   networkOk: null,
   unreadCount: 0,
+  unreadPrivate: {},
   panelOpen: false,
   adminPin: null,
   adminAuthed: false,
@@ -356,7 +368,11 @@ export function startConnecting() {
   // L'état de licence appartient au salon qu'on rejoint, pas au précédent.
   // Sans cette remise à zéro, quitter un serveur en lecture seule pour
   // créer un salon local laissait le bandeau — et la saisie bloquée.
-  patchStore({ status: "connecting", error: null, licenceNotice: null, licenceReadOnly: false });
+  patchStore({
+    status: "connecting", error: null, licenceNotice: null, licenceReadOnly: false,
+    // Les non-lus privés appartiennent au salon qu'on quitte.
+    unreadPrivate: {},
+  });
   connectTimer = setTimeout(() => {
     connectTimer = null;
     if (store.status === "connecting") {
@@ -365,9 +381,29 @@ export function startConnecting() {
   }, CONNECT_TIMEOUT_MS);
 }
 
-/** Ouvre/ferme le panneau. L'ouverture remet le compteur non-lus à zéro. */
+/** Ouvre/ferme le panneau. L'ouverture remet le compteur non-lus à zéro.
+ *  ⚠️ PAS les non-lus privés : ouvrir le dock ne fait pas lire les
+ *  conversations privées, qui sont dans d'autres fils. Les remettre à zéro
+ *  ici escamoterait justement ce qu'on cherche à rendre visible. Seul
+ *  marquerFilLu, à l'ouverture du fil concerné, les efface. */
 export function setPanelOpen(open: boolean) {
-  patchStore(open ? { panelOpen: true, unreadCount: 0 } : { panelOpen: false });
+  if (!open) { patchStore({ panelOpen: false }); return; }
+  amorcerSon(); // le clic est le geste utilisateur qui débloque l'audio
+  patchStore({ panelOpen: true, unreadCount: 0 });
+  if (store.activeThread !== "all") marquerFilLu(store.activeThread);
+}
+
+/** Le fil vient d'être ouvert : ses messages sont lus. */
+export function marquerFilLu(threadId: string) {
+  if (!store.unreadPrivate[threadId]) return;
+  const reste = { ...store.unreadPrivate };
+  delete reste[threadId];
+  patchStore({ unreadPrivate: reste });
+}
+
+/** Total des messages privés non lus, tous fils confondus. */
+export function totalPrivesNonLus(): number {
+  return Object.values(store.unreadPrivate).reduce((a, b) => a + b, 0);
 }
 
 let listening = false;
@@ -474,6 +510,28 @@ export function ensureListening() {
         // reçus pendant que le panneau est fermé
         if (!store.panelOpen && evt.message.from !== store.userId) {
           patch.unreadCount = store.unreadCount + 1;
+        }
+        // ── Étape J — signal sonore et non-lus privés ──
+        // « Sous les yeux » = panneau ouvert ET fil concerné affiché. Dans
+        // ce seul cas on ne fait ni bruit ni compteur : le message est déjà
+        // lu au moment où il arrive.
+        const groupe = evt.message.groupId || "all";
+        const prive = groupe.startsWith("dm:");
+        const sousLesYeux = store.panelOpen && groupe === store.activeThread;
+        const desAutres = evt.message.from !== store.userId;
+        if (desAutres && !sousLesYeux) {
+          if (prive) {
+            patch.unreadPrivate = {
+              ...store.unreadPrivate,
+              [groupe]: (store.unreadPrivate[groupe] || 0) + 1,
+            };
+          }
+          // Le son est déclenché ICI, dans le store, et non dans un effet
+          // React : il doit sonner une fois par message, y compris panneau
+          // fermé, sans dépendre du montage d'un composant.
+          // Jamais sur le rattrapage (voir client.js) : rejoindre après une
+          // absence sonnerait une fois par message manqué.
+          if (!evt.message.backlog) jouerSon(prive ? "private" : "room");
         }
         patchStore(patch);
         break;

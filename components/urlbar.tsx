@@ -270,6 +270,11 @@ export default function URLBar() {
           .light .urlbar-btn-vault:hover{background:rgba(0,99,65,0.1);border-color:rgba(0,99,65,0.2)}
           .vault-dot{position:absolute;top:1px;right:1px;width:7px;height:7px;border-radius:50%;background:#00c853;border:1.5px solid rgba(0,0,0,0.4)}
           .chat-unread-dot{position:absolute;top:1px;right:1px;width:8px;height:8px;border-radius:50%;background:#ff3b30;border:1.5px solid rgba(0,0,0,0.4)}
+          /* Étape J — un message PRIVÉ mérite plus qu'une pastille muette
+             identique à celle du salon : un compte chiffré, et une pulsation
+             les premières secondes. C'est celui qu'on ne doit pas rater. */
+          .chat-unread-count{position:absolute;top:-2px;right:-3px;min-width:14px;height:14px;padding:0 3px;border-radius:7px;background:#ff3b30;color:#fff;font-size:9px;font-weight:700;line-height:14px;text-align:center;border:1.5px solid rgba(0,0,0,0.4);animation:chat-pulse 1.1s ease-out 3}
+          @keyframes chat-pulse{0%{box-shadow:0 0 0 0 rgba(255,59,48,0.65)}70%{box-shadow:0 0 0 7px rgba(255,59,48,0)}100%{box-shadow:0 0 0 0 rgba(255,59,48,0)}}
           .urlbar-hint{position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.88);color:#fff;font-size:11px;font-weight:500;padding:5px 10px;border-radius:6px;white-space:nowrap;pointer-events:none;z-index:9999;animation:hint-in 0.2s ease}
           .urlbar-hint::after{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);border:4px solid transparent;border-top-color:rgba(0,0,0,0.88)}
           @keyframes hint-in{from{opacity:0;transform:translateX(-50%) translateY(4px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
@@ -364,7 +369,13 @@ export default function URLBar() {
           data-tutorial="chat-btn"
         >
           <MessageSquare size={17} style={chat.status === "joined" ? { color: "#00c853" } : undefined} />
-          {chat.unreadCount > 0 && <span className="chat-unread-dot" />}
+          {/* Privé d'abord : le compte chiffré remplace la pastille, sinon
+              les deux signaux se ressembleraient à s'y méprendre. */}
+          {(() => {
+            const prives = Object.values(chat.unreadPrivate).reduce((a, b) => a + b, 0);
+            if (prives > 0) return <span className="chat-unread-count">{prives}</span>;
+            return chat.unreadCount > 0 ? <span className="chat-unread-dot" /> : null;
+          })()}
         </button>
 
         {/* Bouton confidentialité — interrupteurs blocage traqueurs /

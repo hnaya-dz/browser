@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 // ✅ Icônes vectorielles (lucide, déjà dans les dépendances) plutôt
 // qu'emoji : les emoji sont rendus par la police du système et diffèrent
 // visuellement entre Windows 10 et 11 — incohérent d'un poste à l'autre.
-import { MessageSquare, Shield, Lock, Smartphone, KeyRound, Eye, EyeOff, Send, History, DoorOpen, Trash2, KeySquare, Users, ArrowLeft, CornerUpLeft, X, CheckCircle2, AlertTriangle } from "lucide-react";
+import { MessageSquare, Shield, Lock, Smartphone, KeyRound, Eye, EyeOff, Send, History, DoorOpen, Trash2, KeySquare, Users, ArrowLeft, CornerUpLeft, X, CheckCircle2, AlertTriangle, Volume2, VolumeX } from "lucide-react";
 import ChatAdminPanel from "./ChatAdminPanel";
 import ChatServerSetup from "./ChatServerSetup";
 import ChatComposerMedia, { MediaPreview, type PreparedMedia } from "./ChatComposerMedia";
@@ -30,8 +30,10 @@ import {
   startConnecting,
   useChatSnapshot,
   resetAdminState,
+  marquerFilLu,
   type DiscoveredSession,
 } from "@/context/chatstore";
+import { estActif as sonActif, definirActif as definirSon, jouerSon } from "@/context/chat-sound";
 
 interface ChatPanelProps {
   onClose: () => void;
@@ -144,8 +146,10 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
   // Étape F — annuaire ouvert, et personne à qui l'on écrit en privé
   const [showRoster, setShowRoster] = useState(false);
   const [threadPeer, setThreadPeer] = useState<{ name: string | null; role: string | null } | null>(null);
-  // Non-lus par fil privé : remis à zéro à l'ouverture du fil concerné.
-  const [unreadByThread, setUnreadByThread] = useState<Record<string, number>>({});
+  // Étape J — les non-lus privés vivaient ICI, en useState : fermer le dock
+  // démontait le panneau et effaçait les compteurs. On retrouvait « aucun
+  // message privé » alors qu'il y en avait. Ils sont maintenant dans le
+  // store, alimentés à la réception (voir chatstore, événement "message").
   const [pendingMedia, setPendingMedia] = useState<PreparedMedia | null>(null);
   // Étape G — message auquel on répond. On garde l'identifiant SEUL : le
   // message cité est relu dans le fil au moment de l'affichage, de sorte
@@ -154,6 +158,9 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
   // Étape H — ouverture d'un vote. Les trois libellés sont ceux du
   // vocabulaire administratif validé par l'utilisateur ; ils restent
   // modifiables, mais ce sont les valeurs par défaut.
+  // Étape J — interrupteur du signal sonore. Lu paresseusement : le
+  // localStorage n'existe pas au rendu serveur.
+  const [son, setSon] = useState(() => sonActif());
   const [voteOuvert, setVoteOuvert] = useState(false);
   const [voteQuestion, setVoteQuestion] = useState("");
   const [voteNominatif, setVoteNominatif] = useState(true);
@@ -196,22 +203,24 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
     if (store.status === "joined") getApi()?.send?.("chat-roster");
   }, [store.status]);
 
-  // Compteur de non-lus par fil privé. Le fil ouvert ne compte pas, et
-  // nos propres messages non plus.
-  useEffect(() => {
-    const dernier = store.messages[store.messages.length - 1];
-    if (!dernier?.groupId?.startsWith("dm:")) return;
-    if (dernier.groupId === store.activeThread) return;
-    if (dernier.from === nickname) return;
-    setUnreadByThread((u) => ({ ...u, [dernier.groupId]: (u[dernier.groupId] || 0) + 1 }));
-  }, [store.messages.length]);
-
   const ouvrirFil = (threadId: string, personne: { name: string | null; role: string | null }) => {
     patchStore({ activeThread: threadId });
     setThreadPeer(personne);
     setShowRoster(false);
-    setUnreadByThread((u) => ({ ...u, [threadId]: 0 }));
+    marquerFilLu(threadId);
   };
+
+  // Étape J — de qui viennent les messages privés en attente. Le nom est
+  // relu dans le fil plutôt que stocké : un pseudo changé entre-temps
+  // s'affiche à jour, et il n'y a pas un deuxième état à tenir cohérent.
+  const privesEnAttente = Object.entries(store.unreadPrivate)
+    .filter(([, n]) => n > 0)
+    .map(([fil, n]) => {
+      const dernier = [...store.messages].reverse()
+        .find((m) => m.groupId === fil && m.from !== store.userId);
+      return { fil, n, de: dernier?.from || t("Chat.adminUnnamed") };
+    });
+  const totalPrives = privesEnAttente.reduce((a, p) => a + p.n, 0);
 
   const revenirAuSalon = () => {
     patchStore({ activeThread: "all" });
@@ -1166,16 +1175,37 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
                 >
                   <Users size={12} />
                   {showRoster ? t("Chat.inviteClose") : t("Chat.rosterTitle")}
-                  {(() => {
-                    const total = Object.values(unreadByThread).reduce((a, b) => a + b, 0);
-                    return total > 0 ? (
-                      <span style={{
-                        background: "#ff5252", color: "#fff", borderRadius: 8,
-                        minWidth: 15, height: 15, fontSize: 9, fontWeight: 700,
-                        display: "flex", alignItems: "center", justifyContent: "center", padding: "0 4px",
-                      }}>{total}</span>
-                    ) : null;
-                  })()}
+                  {totalPrives > 0 && (
+                    <span style={{
+                      background: "#ff5252", color: "#fff", borderRadius: 8,
+                      minWidth: 15, height: 15, fontSize: 9, fontWeight: 700,
+                      display: "flex", alignItems: "center", justifyContent: "center", padding: "0 4px",
+                    }}>{totalPrives}</span>
+                  )}
+                </button>
+              )}
+              {/* Étape J — signal sonore, activable. Allumer joue le son
+                  aussitôt : l'utilisateur entend ce qu'il vient d'activer,
+                  et cela confirme du même coup que l'audio du poste marche
+                  — sinon un réglage « activé » sans effet resterait un
+                  mystère. Le clic est aussi le geste utilisateur exigé par
+                  Chromium pour débloquer la lecture. */}
+              {!showAdmin && (
+                <button
+                  onClick={() => {
+                    const suivant = !son;
+                    definirSon(suivant);
+                    setSon(suivant);
+                    if (suivant) jouerSon("private");
+                  }}
+                  style={{
+                    ...btnStyle(son), padding: "4px 8px", fontSize: 10,
+                    display: "flex", alignItems: "center", gap: 4, flexShrink: 0,
+                  }}
+                  title={son ? t("Chat.soundOn") : t("Chat.soundOff")}
+                  aria-label={son ? t("Chat.soundOn") : t("Chat.soundOff")}
+                >
+                  {son ? <Volume2 size={12} /> : <VolumeX size={12} />}
                 </button>
               )}
               {/* Étape H — soumettre au vote */}
@@ -1344,6 +1374,37 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
 
             {/* Fil de messages : occupe tout l'espace restant du dock,
                 défile indépendamment (minHeight: 0 requis en flex) */}
+            {/* Étape J — messages privés en attente. Ils n'étaient signalés
+                que par un petit compte sur le bouton « Annuaire », au milieu
+                d'une rangée d'autres boutons : on ne le voyait pas. Ici, le
+                bandeau NOMME l'expéditeur et ouvre la conversation d'un clic.
+                Il ne s'affiche que pour les fils qu'on ne regarde pas. */}
+            {!showAdmin && !showRoster && privesEnAttente
+              .filter((p) => p.fil !== store.activeThread)
+              .map((p) => (
+                <button
+                  key={p.fil}
+                  onClick={() => ouvrirFil(p.fil, { name: p.de, role: null })}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 7, flexShrink: 0,
+                    width: "100%", textAlign: "start", cursor: "pointer",
+                    background: "rgba(255,82,82,0.14)", border: "1px solid rgba(255,82,82,0.45)",
+                    borderRadius: 6, padding: "7px 9px", color: "inherit",
+                  }}
+                >
+                  <MessageSquare size={13} style={{ color: "#ff8080", flexShrink: 0 }} />
+                  <span style={{ fontSize: 11.5, flex: 1, minWidth: 0 }}>
+                    <b>{p.de}</b> — {t("Chat.privateWaiting")}
+                  </span>
+                  <span style={{
+                    background: "#ff5252", color: "#fff", borderRadius: 8,
+                    minWidth: 16, height: 16, fontSize: 9.5, fontWeight: 700,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    padding: "0 4px", flexShrink: 0,
+                  }}>{p.n}</span>
+                </button>
+              ))}
+
             {/* Étape F — bandeau du fil privé : on doit savoir À QUI l'on
                 écrit, et pouvoir revenir au salon d'un geste. */}
             {!showAdmin && threadPeer && store.activeThread !== "all" && (
@@ -1376,7 +1437,7 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
               <ChatRoster
                 accent={accent} muted={muted} border={border}
                 onOpenThread={ouvrirFil}
-                unreadByThread={unreadByThread}
+                unreadByThread={store.unreadPrivate}
               />
             </div>}
 

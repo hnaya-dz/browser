@@ -108,7 +108,12 @@ export function joinSession({
       return;
     }
 
-    if (payload.type === "backlog") payload.messages.forEach((m) => onMessage?.(m));
+    // ⚠️ Étape J — les messages du RATTRAPAGE sont marqués. Ils empruntent
+    // le même chemin que les messages vifs : sans ce drapeau, rejoindre un
+    // salon après une absence déclenchait un signal sonore PAR message
+    // rattrapé. Ils restent comptés comme non lus (ils le sont), mais ne
+    // sonnent pas — on ne sonne que pour ce qui arrive maintenant.
+    if (payload.type === "backlog") payload.messages.forEach((m) => onMessage?.({ ...m, backlog: true }));
     else if (payload.type === "presence") onPresence?.(payload.online);
     else if (payload.type === "message") onMessage?.(payload);
     // Invitation vers un autre salon : mêmes champs qu'un message (id,

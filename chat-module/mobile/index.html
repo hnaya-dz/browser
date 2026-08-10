@@ -118,6 +118,18 @@
   #replyBar button { background:transparent; border:none; color:var(--muted); font-size:22px;
                      cursor:pointer; flex-shrink:0; min-width:44px; min-height:44px;
                      display:flex; align-items:center; justify-content:center; }
+  /* — Étape J : messages privés en attente — */
+  #priveBar { display:flex; flex-direction:column; gap:6px; padding:9px 12px; flex-shrink:0;
+              border-top:1px solid rgba(255,82,82,0.45); background:rgba(255,82,82,0.13); }
+  #priveBar[hidden] { display:none; }
+  #priveBar button { display:flex; align-items:center; gap:9px; width:100%;
+                     min-height:44px; padding:8px 10px; border-radius:10px;
+                     border:1px solid rgba(255,82,82,0.5); background:rgba(255,82,82,0.10);
+                     color:var(--fg); font-size:14px; text-align:start; cursor:pointer; }
+  #priveBar .qui { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #priveBar .n { flex-shrink:0; min-width:20px; height:20px; padding:0 6px; border-radius:10px;
+                 background:#ff5252; color:#fff; font-size:11px; font-weight:700;
+                 display:flex; align-items:center; justify-content:center; }
   /* — Étape I : échéance de licence — */
   #licenceBar { padding:10px 14px; font-size:12.5px; line-height:1.45; flex-shrink:0;
                 border-top:1px solid rgba(255,180,60,0.30); color:#ffcf8a;
@@ -227,6 +239,11 @@
   <button id="rosterBtn" class="icon" style="display:none" aria-label="Annuaire">
     <span>👥</span><span id="rosterBadge"></span>
   </button>
+  <!-- Étape J — signal sonore, activable. Masqué avant la connexion :
+       il n'y a rien à entendre sur l'écran d'accès. -->
+  <button id="sonBtn" class="icon" style="display:none" aria-label="Signal sonore">
+    <span id="sonIcone">🔔</span>
+  </button>
   <select id="lang">
     <option value="ar">العربية</option>
     <option value="fr">Français</option>
@@ -273,6 +290,12 @@
       <span class="info"><span id="replyWho"></span><small id="replyTxt"></small></span>
       <button id="replyCancel" aria-label="Annuler la réponse">✕</button>
     </div>
+    <!-- Étape J — messages privés en attente. Le seul signal était un
+         petit compte sur l'icône 👥 de l'en-tête : invisible sur un
+         téléphone tenu à bout de bras. Ici le bandeau nomme l'expéditeur,
+         se place au-dessus du clavier, et ouvre la conversation d'un
+         appui. -->
+    <div id="priveBar" hidden></div>
     <!-- Étape I — échéance de licence : préavis, puis envoi suspendu. Le
          texte est celui envoyé par l'hôte (organisme, date, coordonnées de
          renouvellement) : même formulation que sur le poste. -->
@@ -322,15 +345,15 @@ function genMsgId() {
 // ── i18n ──────────────────────────────────────────────────────
 const I18N = {
   fr: { appTitle:"Messagerie locale", joinTitle:"Rejoindre le salon", joinSub:"Communication chiffrée sur votre réseau interne — rien ne transite par Internet.", nickname:"Pseudo", pinLabel:"Code PIN (6 chiffres, communiqué par l'hôte)", joinBtn:"Rejoindre", notice:"Gardez cette page ouverte pour recevoir les messages — les notifications d'écran verrouillé ne sont pas disponibles dans cette version.", connectionLost:"Connexion au salon perdue.", rejoin:"Reconnecter", send:"Envoyer", wrongPin:"PIN incorrect — vérifiez le code auprès de l'hôte.", cantReach:"Salon injoignable — vérifiez que vous êtes sur le même wifi.", online:"en ligne", draftPlaceholder:"Écrire un message…", connecting:"Connexion…",
-        rosterTitle:"Annuaire", rosterEmpty:"Personne d'autre n'a encore rejoint ce salon.", rosterMe:"vous", rosterUnnamed:"Sans nom", rosterOnline:"En ligne", rosterJustNow:"à l'instant", threadPrivate:"Privé", threadEmpty:"Aucun message dans cette conversation privée.", roomThread:"Salon",
+        rosterTitle:"Annuaire", rosterEmpty:"Personne d'autre n'a encore rejoint ce salon.", rosterMe:"vous", rosterUnnamed:"Sans nom", rosterOnline:"En ligne", rosterJustNow:"à l'instant", threadPrivate:"Privé", threadEmpty:"Aucun message dans cette conversation privée.", roomThread:"Salon", priveWaiting:"vous a écrit en privé", soundOn:"Signal sonore activé", soundOff:"Signal sonore coupé",
         attVoice:"Message vocal", attFile:"Pièce jointe", attSave:"Ouvrir", attLoading:"Chargement…", attGone:"Pièce jointe indisponible.", attFailed:"Échec du téléchargement.",
         attSending:"Envoi…", attTooBig:"Fichier trop volumineux (25 Mo maximum).", attTypeRefused:"Ce type de fichier n'est pas autorisé.", attQuotaBytes:"Limite de volume atteinte pour cet appareil (200 Mo par heure).", attQuotaFiles:"Trop de fichiers envoyés depuis cet appareil dans la dernière heure.", attBusy:"Trop d'envois simultanés — patientez.", attSendFailed:"L'envoi de la pièce jointe a échoué.", attImageFailed:"Cette image n'a pas pu être lue. Son extension annonce un format que son contenu ne respecte pas — cas fréquent des photos d'iPhone enregistrées en « .jpg » alors qu'elles sont au format HEIC.", attCaption:"Ajouter un mot (facultatif)…", attAttachment:"Pièce jointe", roomEmpty:"Aucun message pour l'instant.", roomEmptyHint:"Écrivez le premier message du salon, ou attendez qu'un collègue s'exprime.", reply:"Répondre", replyingTo:"En réponse à", replyGone:"Message supprimé", voteLabel:"POUR VALIDATION", voteNotNamed:"non nominatif", voteAnswered:"ont répondu", votePending:"en attente", voteFinal:"Votre bulletin est définitif.", voteAlready:"Vous avez déjà voté — un vote non nominatif est définitif." },
   en: { appTitle:"Local Messaging", joinTitle:"Join the room", joinSub:"Encrypted communication over your internal network — nothing goes through the Internet.", nickname:"Nickname", pinLabel:"PIN code (6 digits, provided by the host)", joinBtn:"Join", notice:"Keep this page open to receive messages — lock-screen notifications are not available in this version.", connectionLost:"Connection to the room lost.", rejoin:"Reconnect", send:"Send", wrongPin:"Incorrect PIN — check the code with the host.", cantReach:"Room unreachable — make sure you are on the same wifi.", online:"online", draftPlaceholder:"Write a message…", connecting:"Connecting…",
-        rosterTitle:"Directory", rosterEmpty:"Nobody else has joined this room yet.", rosterMe:"you", rosterUnnamed:"Unnamed", rosterOnline:"Online", rosterJustNow:"just now", threadPrivate:"Private", threadEmpty:"No messages in this private conversation yet.", roomThread:"Room",
+        rosterTitle:"Directory", rosterEmpty:"Nobody else has joined this room yet.", rosterMe:"you", rosterUnnamed:"Unnamed", rosterOnline:"Online", rosterJustNow:"just now", threadPrivate:"Private", threadEmpty:"No messages in this private conversation yet.", roomThread:"Room", priveWaiting:"wrote to you privately", soundOn:"Sound on", soundOff:"Sound off",
         attVoice:"Voice message", attFile:"Attachment", attSave:"Open", attLoading:"Loading…", attGone:"Attachment unavailable.", attFailed:"Download failed.",
         attSending:"Sending…", attTooBig:"File too large (25 MB maximum).", attTypeRefused:"This file type is not allowed.", attQuotaBytes:"Upload limit reached for this device (200 MB per hour).", attQuotaFiles:"Too many files sent from this device in the past hour.", attBusy:"Too many uploads at once — please wait.", attSendFailed:"Sending the attachment failed.", attImageFailed:"This image could not be read. Its extension claims a format its contents do not match — commonly an iPhone photo saved as “.jpg” while actually being HEIC.", attCaption:"Add a note (optional)…", attAttachment:"Attachment", roomEmpty:"No messages yet.", roomEmptyHint:"Write the room's first message, or wait for a colleague to speak.", reply:"Reply", replyingTo:"Replying to", replyGone:"Message deleted", voteLabel:"FOR APPROVAL", voteNotNamed:"not named", voteAnswered:"answered", votePending:"pending", voteFinal:"Your ballot is final.", voteAlready:"You have already voted — a non-nominative ballot is final." },
   ar: { appTitle:"المراسلة المحلية", joinTitle:"الانضمام إلى الغرفة", joinSub:"تواصل مشفّر عبر شبكتك الداخلية — لا شيء يمر عبر الإنترنت.", nickname:"الاسم المستعار", pinLabel:"رمز PIN (6 أرقام، يقدّمه المضيف)", joinBtn:"انضمام", notice:"أبقِ هذه الصفحة مفتوحة لاستقبال الرسائل — إشعارات شاشة القفل غير متاحة في هذا الإصدار.", connectionLost:"انقطع الاتصال بالغرفة.", rejoin:"إعادة الاتصال", send:"إرسال", wrongPin:"رمز PIN غير صحيح — تحقّق من الرمز لدى المضيف.", cantReach:"تعذّر الوصول إلى الغرفة — تأكّد أنك على نفس شبكة الواي فاي.", online:"متصل", draftPlaceholder:"اكتب رسالة…", connecting:"جارٍ الاتصال…",
-        rosterTitle:"الدليل", rosterEmpty:"لم ينضم أحد آخر إلى هذه الغرفة بعد.", rosterMe:"أنت", rosterUnnamed:"بلا اسم", rosterOnline:"متصل", rosterJustNow:"الآن", threadPrivate:"خاص", threadEmpty:"لا توجد رسائل في هذه المحادثة الخاصة.", roomThread:"الغرفة",
+        rosterTitle:"الدليل", rosterEmpty:"لم ينضم أحد آخر إلى هذه الغرفة بعد.", rosterMe:"أنت", rosterUnnamed:"بلا اسم", rosterOnline:"متصل", rosterJustNow:"الآن", threadPrivate:"خاص", threadEmpty:"لا توجد رسائل في هذه المحادثة الخاصة.", roomThread:"الغرفة", priveWaiting:"راسلك على الخاص", soundOn:"التنبيه الصوتي مفعَّل", soundOff:"التنبيه الصوتي مكتوم",
         attVoice:"رسالة صوتية", attFile:"مرفق", attSave:"فتح", attLoading:"جارٍ التحميل…", attGone:"المرفق غير متاح.", attFailed:"فشل التحميل.",
         attSending:"جارٍ الإرسال…", attTooBig:"الملف كبير جداً (25 ميغابايت كحد أقصى).", attTypeRefused:"هذا النوع من الملفات غير مسموح به.", attQuotaBytes:"بلغ هذا الجهاز حدّ الحجم المسموح (200 ميغابايت في الساعة).", attQuotaFiles:"أُرسلت ملفات كثيرة من هذا الجهاز خلال الساعة الأخيرة.", attBusy:"عمليات إرسال كثيرة في آن واحد — انتظر قليلاً.", attSendFailed:"فشل إرسال المرفق.", attImageFailed:"تعذّرت قراءة هذه الصورة. امتدادها يعلن صيغة لا يطابقها محتواها — وهي حالة شائعة في صور آيفون المحفوظة بامتداد «.jpg» بينما هي بصيغة HEIC.", attCaption:"أضف كلمة (اختياري)…", attAttachment:"مرفق", roomEmpty:"لا توجد رسائل بعد.", roomEmptyHint:"اكتب أول رسالة في الغرفة، أو انتظر أن يتحدّث زميل.", reply:"رد", replyingTo:"رداً على", replyGone:"رسالة محذوفة", voteLabel:"للمصادقة", voteNotNamed:"غير اسمي", voteAnswered:"أجابوا", votePending:"في الانتظار", voteFinal:"صوتك نهائي.", voteAlready:"لقد صوّتّ من قبل — التصويت غير الاسمي نهائي." },
 };
@@ -344,6 +367,18 @@ function applyLang() {
   document.querySelectorAll("[data-i18n]").forEach(el => { el.textContent = t(el.dataset.i18n); });
   draft.placeholder = t("draftPlaceholder");
   langSel.value = lang;
+  // Le bouton du son et le rappel des messages privés portent du texte
+  // traduit : ils doivent suivre le changement de langue.
+  //
+  // ⚠️ SEULEMENT une fois dans le salon. applyLang() s'exécute au
+  // chargement de la page, donc AVANT les déclarations de `unread`,
+  // `sonActif` et compagnie, qui vivent plus bas dans le module. Les
+  // appeler ici sans condition lève une ReferenceError de zone morte
+  // temporelle et casse toute la page — constaté en test navigateur, et
+  // invisible à la vérification de syntaxe : c'est une erreur d'exécution.
+  // Avant d'avoir rejoint, il n'y a de toute façon ni bouton de son
+  // affiché ni message privé à rappeler.
+  if (chatScreen.classList.contains("active")) { majBoutonSon(); renderPrive(); }
 }
 
 // ── Références DOM ────────────────────────────────────────────
@@ -631,7 +666,10 @@ function renderMessages() {
   messagesEl.scrollTop = messagesEl.scrollHeight;
 }
 
-function addMessage(m) {
+// `duBacklog` : message rattrapé, pas message vif. Il compte comme non lu
+// (il l'est), mais il ne sonne pas — sinon rejoindre après une absence
+// déclencherait un signal par message manqué.
+function addMessage(m, duBacklog) {
   if (m.id && seenIds.has(m.id)) return;
   if (m.id) seenIds.add(m.id);
   if (m.ts) lastSeenTs = Math.max(lastSeenTs, m.ts);
@@ -640,6 +678,12 @@ function addMessage(m) {
   if (fil !== activeThread && fil.startsWith("dm:") && m.from !== userId) {
     unread[fil] = (unread[fil] || 0) + 1;
     renderBadge();
+  }
+  // Signal sonore : rien pour nos propres messages, ni pour un fil qu'on a
+  // sous les yeux et page au premier plan.
+  const auRegard = fil === activeThread && !document.hidden;
+  if (!duBacklog && m.from !== userId && !auRegard) {
+    jouerSon(fil.startsWith("dm:") ? "private" : "room");
   }
   if (fil === activeThread) {
     // Rendu incrémental : reconstruire tout le fil à chaque message
@@ -654,7 +698,109 @@ function renderBadge() {
   const total = Object.values(unread).reduce((a, b) => a + b, 0);
   rosterBadge.className = total ? "badge" : "";
   rosterBadge.textContent = total ? String(total) : "";
+  renderPrive();
 }
+
+// ── Étape J — messages privés en attente ──────────────────────
+// Le compte sur l'icône 👥 ne suffisait pas : sur un téléphone il fait
+// quelques pixels, dans l'en-tête, loin du regard. Le bandeau nomme
+// l'expéditeur et ouvre sa conversation d'un appui.
+function renderPrive() {
+  const bar = document.getElementById("priveBar");
+  const attente = Object.entries(unread)
+    .filter(([fil, n]) => n > 0 && fil !== activeThread);
+  if (!attente.length) { bar.hidden = true; bar.textContent = ""; return; }
+  bar.textContent = "";
+  for (const [fil, n] of attente) {
+    // Le nom est relu dans le fil : un pseudo changé s'affiche à jour, et
+    // il n'y a pas un second état à tenir cohérent.
+    let de = t("rosterUnnamed");
+    for (let i = allMessages.length - 1; i >= 0; i--) {
+      const m = allMessages[i];
+      if ((m.groupId || "all") === fil && m.from !== userId) { de = m.from; break; }
+    }
+    const b = document.createElement("button");
+    const qui = document.createElement("span");
+    qui.className = "qui";
+    const fort = document.createElement("b"); fort.textContent = de;
+    qui.appendChild(fort);
+    qui.appendChild(document.createTextNode(" — " + t("priveWaiting")));
+    const compte = document.createElement("span");
+    compte.className = "n"; compte.textContent = String(n);
+    b.appendChild(document.createTextNode("✉ "));
+    b.appendChild(qui); b.appendChild(compte);
+    b.onclick = () => {
+      // ⚠️ L'identifiant du fil contient les DEUX empreintes, la nôtre
+      // comprise : chercher la première qui y figure retombait sur
+      // nous-même, et le bandeau du fil affichait notre propre nom en face
+      // de « Privé ». On exclut explicitement notre empreinte.
+      const mien = (myFp || "").toLowerCase();
+      const p = people.find((x) => x.fingerprint
+        && x.fingerprint.toLowerCase() !== mien
+        && fil.includes(x.fingerprint.toLowerCase()));
+      openThread(fil, p || { name: de, role: null, fingerprint: null });
+    };
+    bar.appendChild(b);
+  }
+  bar.hidden = false;
+}
+
+// ── Étape J — signal sonore ───────────────────────────────────
+// Synthétisé, comme sur le poste : aucun fichier à servir depuis l'hôte,
+// donc rien de plus à télécharger sur un téléphone en wifi d'entreprise.
+// Deux timbres : le privé monte et dure plus longtemps que le salon.
+const CLE_SON = "hnaya-mobile-son";
+let audioCtx = null;
+const sonActif = () => localStorage.getItem(CLE_SON) !== "0";
+
+function ctxAudio() {
+  const Ctor = window.AudioContext || window.webkitAudioContext;
+  if (!Ctor) return null;
+  if (!audioCtx) { try { audioCtx = new Ctor(); } catch { return null; } }
+  // ⚠️ Indispensable sur mobile : le contexte naît suspendu et ne se
+  // débloque que dans un geste utilisateur. Sans ce resume, la page
+  // restait muette toute la session sans le moindre message d'erreur.
+  if (audioCtx.state === "suspended") audioCtx.resume().catch(() => {});
+  return audioCtx;
+}
+
+function note(ac, freq, depart, duree, gain) {
+  const osc = ac.createOscillator(), vol = ac.createGain();
+  osc.type = "sine"; osc.frequency.value = freq;
+  const t0 = ac.currentTime + depart;
+  vol.gain.setValueAtTime(0.0001, t0);
+  vol.gain.exponentialRampToValueAtTime(gain, t0 + 0.012);
+  vol.gain.exponentialRampToValueAtTime(0.0001, t0 + duree);
+  osc.connect(vol).connect(ac.destination);
+  osc.start(t0); osc.stop(t0 + duree + 0.02);
+}
+
+function jouerSon(genre) {
+  if (!sonActif()) return;
+  const ac = ctxAudio();
+  if (!ac) return;
+  try {
+    if (genre === "private") { note(ac, 660, 0, 0.16, 0.16); note(ac, 990, 0.13, 0.26, 0.16); }
+    else note(ac, 620, 0, 0.14, 0.09);
+  } catch { /* contexte fermé */ }
+}
+
+function majBoutonSon() {
+  const b = document.getElementById("sonBtn");
+  const actif = sonActif();
+  document.getElementById("sonIcone").textContent = actif ? "🔔" : "🔕";
+  b.setAttribute("aria-label", t(actif ? "soundOn" : "soundOff"));
+  b.title = t(actif ? "soundOn" : "soundOff");
+}
+
+document.getElementById("sonBtn").onclick = () => {
+  const suivant = !sonActif();
+  localStorage.setItem(CLE_SON, suivant ? "1" : "0");
+  majBoutonSon();
+  // Allumer joue le son : on entend ce qu'on vient d'activer, et l'appui
+  // sert de geste utilisateur pour débloquer l'audio du téléphone.
+  if (suivant) jouerSon("private");
+};
 
 // ── Annuaire ──────────────────────────────────────────────────
 const depuis = (ts) => {
@@ -719,6 +865,9 @@ function backToRoom() {
   activeThread = "all"; peerOfThread = null;
   threadBar.classList.remove("show");
   renderMessages();
+  // Le fil qu'on quitte redevient « non regardé » : son rappel doit
+  // réapparaître s'il reste des messages non lus dedans.
+  renderPrive();
 }
 
 function showRoster(on) {
@@ -963,9 +1112,15 @@ async function connect() {
         joined = true;
         joinScreen.classList.remove("active"); chatScreen.classList.add("active");
         rosterBtn.style.display = "flex";
+        // Étape J — l'interrupteur du son n'apparaît qu'une fois dans le
+        // salon. L'appui sur « Rejoindre » est le geste utilisateur qui
+        // autorise l'audio : on amorce le contexte tant qu'il est valide.
+        document.getElementById("sonBtn").style.display = "flex";
+        majBoutonSon();
+        if (sonActif()) ctxAudio();
       }
       showStatus(false);
-      payload.messages.forEach(addMessage);
+      payload.messages.forEach((m) => addMessage(m, true));
       renderMessages();
       // L'annuaire donne notre propre empreinte : sans elle, impossible
       // de composer l'identifiant d'un fil privé.

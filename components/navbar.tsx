@@ -79,13 +79,26 @@ export const Navbar = () => {
           {/* Icône vectorielle : rendu identique sur Windows 10 et 11,
               contrairement aux emoji (police système) */}
           <MessageSquare size={16} style={chat.status === "joined" ? { color: "#00c853" } : undefined} />
-          {chat.unreadCount > 0 && (
-            <span style={{
-              position: "absolute", top: 0, right: 2, width: 8, height: 8,
-              borderRadius: "50%", background: "#ff3b30",
-              border: "1.5px solid rgba(0,0,0,0.4)",
-            }} />
-          )}
+          {/* Étape J — un message PRIVÉ porte son compte, là où le salon se
+              contente d'une pastille : les deux ne doivent pas se confondre. */}
+          {(() => {
+            const prives = Object.values(chat.unreadPrivate).reduce((a, b) => a + b, 0);
+            if (prives > 0) return (
+              <span style={{
+                position: "absolute", top: -3, right: -1, minWidth: 14, height: 14,
+                padding: "0 3px", borderRadius: 7, background: "#ff3b30", color: "#fff",
+                fontSize: 9, fontWeight: 700, lineHeight: "14px", textAlign: "center",
+                border: "1.5px solid rgba(0,0,0,0.4)",
+              }}>{prives}</span>
+            );
+            return chat.unreadCount > 0 ? (
+              <span style={{
+                position: "absolute", top: 0, right: 2, width: 8, height: 8,
+                borderRadius: "50%", background: "#ff3b30",
+                border: "1.5px solid rgba(0,0,0,0.4)",
+              }} />
+            ) : null;
+          })()}
         </button>
         {/* Panneau Confidentialité — page d'accueil : pas de WebContentsView
             à masquer, ouverture directe */}
