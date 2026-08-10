@@ -603,6 +603,12 @@ export function ensureListening() {
       case "decision-refused":
         patchStore({ decisionRefused: evt.messageId || null });
         break;
+      // Étape M — quelqu'un a changé sa photo : l'annuaire affiché est
+      // périmé. On le redemande plutôt que de deviner ce qui a bougé —
+      // l'hôte ne dit pas QUI a changé, et n'a pas à le dire.
+      case "avatars-changed":
+        if (store.roster.length) getApi()?.send?.("chat-roster");
+        break;
       // Étape I — préavis d'échéance, puis lecture seule. L'hôte l'envoie
       // à la connexion ET au franchissement d'un palier : le bandeau
       // apparaît sur un salon ouvert depuis des jours, sans rien relancer.

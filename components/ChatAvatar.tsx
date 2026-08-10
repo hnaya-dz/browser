@@ -16,13 +16,103 @@
 // quelqu'un qui corrige une faute dans son nom ne doit pas changer de
 // couleur, sinon le repère visuel ne vaut rien.
 
+import { useEffect, useState } from "react";
+import { getApi } from "@/context/chatstore";
+
+// ── Cache des photos, partagé par tous les avatars ─────────────────────
+// L'annuaire ne transporte que des empreintes : chaque photo est
+// téléchargée UNE fois puis gardée. Sans ce cache, une liste de trente
+// personnes redemanderait trente fichiers à chaque changement de présence
+// — plusieurs fois par minute dans un service actif.
+//
+// La clé est l'empreinte du contenu : une photo remplacée a une empreinte
+// différente, donc l'ancienne entrée n'est jamais servie à tort. Rien à
+// invalider, jamais.
+const cachePhotos = new Map<string, string>();   // sha256 -> URL d'objet
+const enCours = new Map<string, Promise<string | null>>();
+
+async function chargerPhoto(sha: string): Promise<string | null> {
+  if (cachePhotos.has(sha)) return cachePhotos.get(sha)!;
+  if (enCours.has(sha)) return enCours.get(sha)!;
+  const p = (async () => {
+    try {
+      const res = await getApi()?.invoke?.("chat-media-download", { sha256: sha, mime: "image/jpeg" });
+      if (!res?.ok) return null;
+      const url = URL.createObjectURL(new Blob([res.bytes], { type: "image/jpeg" }));
+      cachePhotos.set(sha, url);
+      return url;
+    } catch {
+      return null;
+    } finally {
+      enCours.delete(sha);
+    }
+  })();
+  enCours.set(sha, p);
+  return p;
+}
+
+/** URL locale de la photo, ou null tant qu'elle n'est pas là. Les
+ *  initiales s'affichent pendant ce temps : jamais de trou. */
+export function usePhotoDeProfil(sha: string | null | undefined): string | null {
+  const [url, setUrl] = useState<string | null>(() => (sha ? cachePhotos.get(sha) || null : null));
+  useEffect(() => {
+    if (!sha) { setUrl(null); return; }
+    const dejaLa = cachePhotos.get(sha);
+    if (dejaLa) { setUrl(dejaLa); return; }
+    let vivant = true;
+    chargerPhoto(sha).then((u) => { if (vivant) setUrl(u); });
+    return () => { vivant = false; };
+  }, [sha]);
+  return url;
+}
+
+// ── Préparation d'une photo choisie par l'utilisateur ──────────────────
+/** Recadre au carré (centre), redimensionne et RÉENCODE en JPEG.
+ *
+ *  ⚠️ On ne transmet JAMAIS le fichier d'origine. Le réencodage par Canvas
+ *  garantit qu'on ne sert que des octets qu'on a fabriqués : ni métadonnées
+ *  EXIF (qui portent souvent la position GPS de la prise de vue), ni charge
+ *  utile cachée dans un format mal formé. Et 128 px suffisent largement à
+ *  une pastille de 30 px, y compris sur un écran à forte densité. */
+export const TAILLE_AVATAR = 128;
+
+export function preparerPhoto(fichier: File): Promise<Uint8Array> {
+  return new Promise((resolve, reject) => {
+    const lecteur = new FileReader();
+    lecteur.onerror = () => reject(new Error("lecture"));
+    lecteur.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error("image"));
+      img.onload = () => {
+        const cote = Math.min(img.width, img.height);
+        const cnv = document.createElement("canvas");
+        cnv.width = TAILLE_AVATAR;
+        cnv.height = TAILLE_AVATAR;
+        const ctx = cnv.getContext("2d");
+        if (!ctx) { reject(new Error("canvas")); return; }
+        // Carré central : un portrait recadré par le haut couperait les
+        // visages, un recadrage centré les garde dans la plupart des cas.
+        ctx.drawImage(img, (img.width - cote) / 2, (img.height - cote) / 2, cote, cote,
+                      0, 0, TAILLE_AVATAR, TAILLE_AVATAR);
+        cnv.toBlob((blob) => {
+          if (!blob) { reject(new Error("encodage")); return; }
+          blob.arrayBuffer().then((ab) => resolve(new Uint8Array(ab))).catch(reject);
+        }, "image/jpeg", 0.85);
+      };
+      img.src = String(lecteur.result);
+    };
+    lecteur.readAsDataURL(fichier);
+  });
+}
+
 interface Props {
   /** Identifiant stable de la personne — source de la couleur. */
   personId: string;
   /** Pseudo affiché, source des initiales. */
   name: string | null;
-  /** Photo déjà téléchargée, en URL de données. Absente = initiales. */
-  src?: string | null;
+  /** Empreinte de la photo. Absente, ou pas encore téléchargée = initiales.
+   *  Le composant va chercher les octets lui-même, une seule fois. */
+  avatarSha?: string | null;
   size?: number;
   /** Pastille de présence, si l'appelant veut la montrer ici. */
   online?: boolean;
@@ -66,8 +156,9 @@ export function initialesDe(name: string | null): string {
   return (mots[0][0] + mots[1][0]).toUpperCase();
 }
 
-export default function ChatAvatar({ personId, name, src, size = 30, online }: Props) {
+export default function ChatAvatar({ personId, name, avatarSha, size = 30, online }: Props) {
   const fond = couleurDePersonne(personId);
+  const src = usePhotoDeProfil(avatarSha);
   return (
     <span style={{ position: "relative", flexShrink: 0, lineHeight: 0 }}>
       <span

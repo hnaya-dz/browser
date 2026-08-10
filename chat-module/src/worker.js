@@ -265,6 +265,8 @@ function handleCommand(msg) {
         onDecisionRefused: (r) => process.send({
           event: "decision-refused", messageId: r.messageId, reason: r.reason,
         }),
+        // Étape M — quelqu'un a changé sa photo : l'annuaire est périmé
+        onAvatarsChanged: () => process.send({ event: "avatars-changed" }),
         // Étape L — un appareil vient d'être rattaché à cette personne
         onDevicePaired: (p) => process.send({
           event: "device-paired", fingerprint: p.fingerprint, nickname: p.nickname,
@@ -322,6 +324,13 @@ function handleCommand(msg) {
       // validation. C'est exactement ce qui était arrivé à `replyTo`.
       clientHandle.send(msg.text, msg.groupId, msg.media || null, msg.replyTo || null,
         msg.demande || null);
+      break;
+    }
+
+    // ── Étape M — déclarer sa photo de profil (octets déjà téléversés) ──
+    case "set-avatar": {
+      if (!clientHandle) { process.send({ event: "disconnected" }); break; }
+      clientHandle.setAvatar(msg.sha256 || null);
       break;
     }
 

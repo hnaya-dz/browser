@@ -118,7 +118,14 @@
   #replyBar button { background:transparent; border:none; color:var(--muted); font-size:22px;
                      cursor:pointer; flex-shrink:0; min-width:44px; min-height:44px;
                      display:flex; align-items:center; justify-content:center; }
-  /* — Étape M : pastille d'identité — */
+  /* — Étape M : pastille d'identité et photo de profil — */
+  .ma-photo { display:flex; gap:8px; align-items:center; margin-bottom:10px; }
+  .ma-photo button { min-height:44px; padding:8px 12px; border-radius:10px;
+                     border:1px solid var(--border); background:transparent;
+                     color:var(--fg); font-size:13px; cursor:pointer; }
+  .ma-photo button.lien { border:none; color:var(--muted); text-decoration:underline;
+                          padding:8px 6px; }
+  .avatar img { display:block; }
   .avatar { position:relative; flex-shrink:0; width:36px; height:36px; border-radius:50%;
             display:flex; align-items:center; justify-content:center;
             color:#fff; font-size:14px; font-weight:700; user-select:none; }
@@ -353,6 +360,9 @@
            donc contexte non sécurisé) — voir le commentaire près de
            micSupporte dans le script. -->
       <input type="file" id="audioInput" style="display:none" accept="audio/*" capture>
+      <!-- Étape M — photo de profil. Recadrée et réencodée par la page
+           avant d'être téléversée : le fichier d'origine ne part jamais. -->
+      <input type="file" id="photoInput" style="display:none" accept="image/*">
       <button id="attBtn" class="att-btn" aria-label="Joindre">📎</button>
       <button id="micBtn" class="att-btn" aria-label="Vocal">🎤</button>
       <input id="draft" maxlength="2000" autocomplete="off">
@@ -392,6 +402,8 @@ const I18N = {
         tag_info:"Pour info", tag_avis:"Avis", tag_validation:"Validation", tag_approbation:"Approbation",
         issue_valide:"Validé", issue_refuse:"Refusé", issue_reserve:"Réserves",
         demandeYou:"vous", demandePending:"En attente d'une réponse", demandeAnyone:"Sans destinataire précis",
+        avatarChange:"Ma photo", avatarRemove:"Retirer",
+        avatarFailed:"Photo impossible à préparer. Choisissez une image.",
         demandeNotForYou:"Cette demande est adressée à quelqu'un d'autre.",
         attVoice:"Message vocal", attFile:"Pièce jointe", attSave:"Ouvrir", attLoading:"Chargement…", attGone:"Pièce jointe indisponible.", attFailed:"Échec du téléchargement.",
         attSending:"Envoi…", attTooBig:"Fichier trop volumineux (25 Mo maximum).", attTypeRefused:"Ce type de fichier n'est pas autorisé.", attQuotaBytes:"Limite de volume atteinte pour cet appareil (200 Mo par heure).", attQuotaFiles:"Trop de fichiers envoyés depuis cet appareil dans la dernière heure.", attBusy:"Trop d'envois simultanés — patientez.", attSendFailed:"L'envoi de la pièce jointe a échoué.", attImageFailed:"Cette image n'a pas pu être lue. Son extension annonce un format que son contenu ne respecte pas — cas fréquent des photos d'iPhone enregistrées en « .jpg » alors qu'elles sont au format HEIC.", attCaption:"Ajouter un mot (facultatif)…", attAttachment:"Pièce jointe", roomEmpty:"Aucun message pour l'instant.", roomEmptyHint:"Écrivez le premier message du salon, ou attendez qu'un collègue s'exprime.", reply:"Répondre", replyingTo:"En réponse à", replyGone:"Message supprimé", voteLabel:"POUR VALIDATION", voteNotNamed:"non nominatif", voteAnswered:"ont répondu", votePending:"en attente", voteFinal:"Votre bulletin est définitif.", voteAlready:"Vous avez déjà voté — un vote non nominatif est définitif." },
@@ -400,6 +412,8 @@ const I18N = {
         tag_info:"For info", tag_avis:"Opinion", tag_validation:"Validation", tag_approbation:"Approval",
         issue_valide:"Validated", issue_refuse:"Refused", issue_reserve:"Reservations",
         demandeYou:"you", demandePending:"Awaiting a response", demandeAnyone:"No specific recipient",
+        avatarChange:"My photo", avatarRemove:"Remove",
+        avatarFailed:"Could not prepare that photo. Pick an image.",
         demandeNotForYou:"This request is addressed to someone else.",
         attVoice:"Voice message", attFile:"Attachment", attSave:"Open", attLoading:"Loading…", attGone:"Attachment unavailable.", attFailed:"Download failed.",
         attSending:"Sending…", attTooBig:"File too large (25 MB maximum).", attTypeRefused:"This file type is not allowed.", attQuotaBytes:"Upload limit reached for this device (200 MB per hour).", attQuotaFiles:"Too many files sent from this device in the past hour.", attBusy:"Too many uploads at once — please wait.", attSendFailed:"Sending the attachment failed.", attImageFailed:"This image could not be read. Its extension claims a format its contents do not match — commonly an iPhone photo saved as “.jpg” while actually being HEIC.", attCaption:"Add a note (optional)…", attAttachment:"Attachment", roomEmpty:"No messages yet.", roomEmptyHint:"Write the room's first message, or wait for a colleague to speak.", reply:"Reply", replyingTo:"Replying to", replyGone:"Message deleted", voteLabel:"FOR APPROVAL", voteNotNamed:"not named", voteAnswered:"answered", votePending:"pending", voteFinal:"Your ballot is final.", voteAlready:"You have already voted — a non-nominative ballot is final." },
@@ -408,6 +422,8 @@ const I18N = {
         tag_info:"للعلم", tag_avis:"رأي", tag_validation:"مصادقة", tag_approbation:"موافقة",
         issue_valide:"مُصادَق", issue_refuse:"مرفوض", issue_reserve:"تحفّظات",
         demandeYou:"أنت", demandePending:"في انتظار الرد", demandeAnyone:"بلا مرسَل إليه محدَّد",
+        avatarChange:"صورتي", avatarRemove:"إزالة",
+        avatarFailed:"تعذّر تحضير الصورة. اختر صورة.",
         demandeNotForYou:"هذا الطلب موجَّه إلى شخص آخر.",
         attVoice:"رسالة صوتية", attFile:"مرفق", attSave:"فتح", attLoading:"جارٍ التحميل…", attGone:"المرفق غير متاح.", attFailed:"فشل التحميل.",
         attSending:"جارٍ الإرسال…", attTooBig:"الملف كبير جداً (25 ميغابايت كحد أقصى).", attTypeRefused:"هذا النوع من الملفات غير مسموح به.", attQuotaBytes:"بلغ هذا الجهاز حدّ الحجم المسموح (200 ميغابايت في الساعة).", attQuotaFiles:"أُرسلت ملفات كثيرة من هذا الجهاز خلال الساعة الأخيرة.", attBusy:"عمليات إرسال كثيرة في آن واحد — انتظر قليلاً.", attSendFailed:"فشل إرسال المرفق.", attImageFailed:"تعذّرت قراءة هذه الصورة. امتدادها يعلن صيغة لا يطابقها محتواها — وهي حالة شائعة في صور آيفون المحفوظة بامتداد «.jpg» بينما هي بصيغة HEIC.", attCaption:"أضف كلمة (اختياري)…", attAttachment:"مرفق", roomEmpty:"لا توجد رسائل بعد.", roomEmptyHint:"اكتب أول رسالة في الغرفة، أو انتظر أن يتحدّث زميل.", reply:"رد", replyingTo:"رداً على", replyGone:"رسالة محذوفة", voteLabel:"للمصادقة", voteNotNamed:"غير اسمي", voteAnswered:"أجابوا", votePending:"في الانتظار", voteFinal:"صوتك نهائي.", voteAlready:"لقد صوّتّ من قبل — التصويت غير الاسمي نهائي." },
@@ -1059,12 +1075,85 @@ function initialesDe(nom) {
   return (mots[0][0] + mots[1][0]).toUpperCase();
 }
 
+// Photos déjà téléchargées : une empreinte, une URL. Rien à invalider —
+// une photo remplacée a une autre empreinte.
+const photosCache = new Map();
+
 function avatarNode(p) {
   const box = document.createElement("span");
   box.className = "avatar" + (p.online ? " on" : "");
   box.style.background = couleurDePersonne(p.personId || p.fingerprint);
   box.textContent = initialesDe(p.name);
+  if (!p.avatarSha) return box;
+  // Les initiales restent affichées tant que la photo n'est pas là :
+  // jamais de trou pendant le téléchargement.
+  const poser = (url) => {
+    if (!url) return;
+    const img = document.createElement("img");
+    img.src = url; img.alt = "";
+    img.style.cssText = "width:100%;height:100%;object-fit:cover;border-radius:50%";
+    box.textContent = ""; box.style.background = "transparent"; box.appendChild(img);
+  };
+  if (photosCache.has(p.avatarSha)) poser(photosCache.get(p.avatarSha));
+  else {
+    fetchMedia(p.avatarSha, "image/jpeg").then((octets) => {
+      if (!octets) return;
+      const url = URL.createObjectURL(new Blob([octets], { type: "image/jpeg" }));
+      photosCache.set(p.avatarSha, url);
+      poser(url);
+    }).catch(() => { /* on garde les initiales */ });
+  }
   return box;
+}
+
+// ── Étape M — déposer sa propre photo ─────────────────────────────
+// Le fichier choisi ne part JAMAIS tel quel : recadré au carré central,
+// ramené à 128 px et réencodé en JPEG. On ne sert que des octets qu'on a
+// fabriqués — ni métadonnées EXIF (souvent la position GPS de la prise de
+// vue), ni charge cachée dans un format mal formé.
+const TAILLE_AVATAR = 128;
+
+function preparerPhoto(fichier) {
+  return new Promise((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onerror = () => reject(new Error("lecture"));
+    fr.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error("image"));
+      img.onload = () => {
+        const cote = Math.min(img.width, img.height);
+        const cnv = document.createElement("canvas");
+        cnv.width = TAILLE_AVATAR; cnv.height = TAILLE_AVATAR;
+        const ctx = cnv.getContext("2d");
+        if (!ctx) { reject(new Error("canvas")); return; }
+        ctx.drawImage(img, (img.width - cote) / 2, (img.height - cote) / 2, cote, cote,
+                      0, 0, TAILLE_AVATAR, TAILLE_AVATAR);
+        cnv.toBlob((blob) => {
+          if (!blob) { reject(new Error("encodage")); return; }
+          blob.arrayBuffer().then((ab) => resolve(new Uint8Array(ab))).catch(reject);
+        }, "image/jpeg", 0.85);
+      };
+      img.src = String(fr.result);
+    };
+    fr.readAsDataURL(fichier);
+  });
+}
+
+document.getElementById("photoInput").onchange = (e) => {
+  const f = e.target.files && e.target.files[0];
+  e.target.value = ""; // permet de rechoisir le même fichier
+  if (f) deposerPhoto(f);
+};
+
+async function deposerPhoto(fichier) {
+  try {
+    const bytes = await preparerPhoto(fichier);
+    const res = await televerser({ kind: "image", mime: "image/jpeg", bytes, thumb: null });
+    ws.send(encryptPayload(key, { v: 1, type: "set-avatar", sha256: res.sha256 }));
+    setTimeout(requestRoster, 400);
+  } catch {
+    showAttError(t("avatarFailed"));
+  }
 }
 
 function renderRoster() {
@@ -1074,6 +1163,26 @@ function renderRoster() {
     if (a.online !== b.online) return a.online ? -1 : 1;
     return (a.name || "").localeCompare(b.name || "");
   });
+  // Étape M — sa propre photo, en tête de l'annuaire : c'est en regardant
+  // les visages qu'on pense au sien.
+  const barre = document.createElement("div");
+  barre.className = "ma-photo";
+  const bp = document.createElement("button");
+  bp.textContent = "📷 " + t("avatarChange");
+  bp.onclick = () => document.getElementById("photoInput").click();
+  barre.appendChild(bp);
+  if (people.find((x) => x.isMe && x.avatarSha)) {
+    const br = document.createElement("button");
+    br.className = "lien";
+    br.textContent = t("avatarRemove");
+    br.onclick = () => {
+      ws.send(encryptPayload(key, { v: 1, type: "set-avatar", sha256: null }));
+      setTimeout(requestRoster, 400);
+    };
+    barre.appendChild(br);
+  }
+  rosterEl.appendChild(barre);
+
   if (!tri.length) {
     const vide = document.createElement("div");
     vide.style.cssText = "color:var(--muted);font-size:14px;text-align:center;padding:20px 0;line-height:1.6";

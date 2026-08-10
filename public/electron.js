@@ -1089,6 +1089,11 @@ ipcMain.on("chat-send-message", (event, { text, groupId, media, replyTo, demande
   chatWorker?.send({ cmd: "send-message", text, groupId, media, replyTo, demande });
 });
 
+// ── Étape M — photo de profil : déclarer l'empreinte déjà téléversée
+ipcMain.on("chat-set-avatar", (event, { sha256 } = {}) => {
+  chatWorker?.send({ cmd: "set-avatar", sha256: sha256 || null });
+});
+
 // ── Étape L — jeton d'appairage, glissé dans le QR « Ajouter mon mobile »
 // Demandé à chaque affichage du QR plutôt que gardé : il expire en quelques
 // minutes, c'est ce qui limite la portée d'un QR photographié.
