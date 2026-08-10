@@ -192,6 +192,30 @@ export function initStore(dataDir = DEFAULT_DATA_DIR) {
     db.exec("CREATE INDEX IF NOT EXISTS idx_devices_person ON devices(personId)");
   }
 
+  // ── Étape N — accusé de lecture ───────────────────────────────────────
+  // Choisi PLUTÔT qu'une réaction « pouce levé ». Une réaction aurait
+  // introduit un second moyen de dire « d'accord », non signé et non
+  // imputable, à côté de la décision signée de l'étape K : dans un mois,
+  // quelqu'un aurait soutenu « mais j'avais mis un pouce » face à une
+  // demande d'approbation restée sans décision. « Vu par » ne se confond
+  // avec aucune validation.
+  //
+  // Persisté, et non seulement diffusé : sans cela, fermer le dock effaçait
+  // tout, et l'expéditeur ne savait plus jamais qui avait lu.
+  //
+  // Une ligne par PERSONNE, pas par appareil : lire depuis son poste puis
+  // son téléphone ne doit pas compter deux lecteurs.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS message_reads (
+      messageId TEXT NOT NULL,
+      personId  TEXT NOT NULL,
+      sender    TEXT,
+      ts        INTEGER NOT NULL,
+      PRIMARY KEY (messageId, personId)
+    );
+    CREATE INDEX IF NOT EXISTS idx_reads_msg ON message_reads(messageId);
+  `);
+
   // ── Étape M — photo de profil, par PERSONNE ───────────────────────────
   // Sur la personne et non sur l'appareil : depuis l'appairage, quelqu'un
   // qui a un téléphone n'a plus qu'une entrée d'annuaire, et il serait
@@ -676,6 +700,46 @@ export function linkDeviceToPerson(fingerprint, personId, pairedBy) {
   ensureDb().prepare(
     "UPDATE devices SET personId = ?, pairedAt = ?, pairedBy = ? WHERE fingerprint = ?",
   ).run(String(personId), Date.now(), String(pairedBy || ""), String(fingerprint));
+}
+
+// ── Étape N — accusés de lecture ───────────────────────────────────────────
+/** Note qu'une personne a lu ce message. Idempotent : la PREMIÈRE lecture
+ *  est celle qui compte, on ne la repousse pas à chaque coup d'œil — sinon
+ *  l'horodatage afficherait « vu il y a 2 s » indéfiniment tant que le fil
+ *  reste ouvert. */
+export function saveRead({ messageId, personId, sender, ts }) {
+  ensureDb().prepare(
+    `INSERT OR IGNORE INTO message_reads (messageId, personId, sender, ts)
+     VALUES (?, ?, ?, ?)`,
+  ).run(String(messageId), String(personId), sender || null, Number(ts) || Date.now());
+}
+
+/** Qui a lu ce message, du plus ancien au plus récent. */
+export function listReads(messageId) {
+  return ensureDb().prepare(
+    "SELECT personId, sender, ts FROM message_reads WHERE messageId = ? ORDER BY ts ASC",
+  ).all(String(messageId)).map((r) => ({ ...r, ts: Number(r.ts) }));
+}
+
+/** Accusés portant sur les messages ENVOYÉS par cette personne, dans les
+ *  fils demandés. Sert à les rejouer à la connexion : seul l'expéditeur a
+ *  besoin de savoir qui l'a lu, et lui rejouer tout le salon serait à la
+ *  fois inutile et indiscret. Borné aux messages récents — un historique
+ *  de six mois n'a pas à repasser sur le réseau à chaque connexion. */
+export function readsForMyMessages(roomId, groupIds, empreintes, limite = 100) {
+  const groupes = (groupIds || []).map(String);
+  const fps = (empreintes || []).map(String);
+  if (!groupes.length || !fps.length) return [];
+  const tg = groupes.map(() => "?").join(",");
+  const tf = fps.map(() => "?").join(",");
+  const messages = ensureDb().prepare(
+    `SELECT id FROM messages
+      WHERE roomId = ? AND groupId IN (${tg}) AND deviceFp IN (${tf})
+      ORDER BY ts DESC LIMIT ?`,
+  ).all(String(roomId), ...groupes, ...fps, Number(limite));
+  return messages
+    .map((m) => ({ messageId: m.id, reads: listReads(m.id) }))
+    .filter((e) => e.reads.length);
 }
 
 // ── Étape M — photo de profil ──────────────────────────────────────────────

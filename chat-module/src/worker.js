@@ -267,6 +267,8 @@ function handleCommand(msg) {
         }),
         // Étape M — quelqu'un a changé sa photo : l'annuaire est périmé
         onAvatarsChanged: () => process.send({ event: "avatars-changed" }),
+        // Étape N — qui a lu ce message
+        onReads: (r) => process.send({ event: "reads", messageId: r.messageId, reads: r.reads }),
         // Étape L — un appareil vient d'être rattaché à cette personne
         onDevicePaired: (p) => process.send({
           event: "device-paired", fingerprint: p.fingerprint, nickname: p.nickname,

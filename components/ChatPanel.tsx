@@ -215,6 +215,22 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
     if (store.status === "joined") getApi()?.send?.("chat-roster");
   }, [store.status]);
 
+  // Étape N — accuser réception de ce qu'on a SOUS LES YEUX. Le fil doit
+  // être ouvert ET le panneau affiché : un message compté « lu » alors que
+  // le dock est fermé ferait mentir l'accusé, et c'est justement sa seule
+  // valeur. L'ensemble évite de renvoyer indéfiniment le même accusé à
+  // chaque rendu — l'hôte l'ignorerait, mais c'est du trafic pour rien.
+  const dejaAccuses = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!store.panelOpen || showRoster || showAdmin) return;
+    for (const m of messagesDuFil) {
+      if (m.from === store.userId) continue;
+      if (dejaAccuses.current.has(m.id)) continue;
+      dejaAccuses.current.add(m.id);
+      getApi()?.send?.("chat-mark-read", { messageId: m.id, groupId: m.groupId });
+    }
+  }, [store.messages.length, store.activeThread, store.panelOpen, showRoster, showAdmin]);
+
   const ouvrirFil = (threadId: string, personne: { name: string | null; role: string | null }) => {
     patchStore({ activeThread: threadId });
     setThreadPeer(personne);
@@ -1667,6 +1683,20 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
                           muted={muted} border={border}
                           accent={theme === "sunset" ? "#ffb060" : "#00c853"}
                         />
+                      )}
+                      {/* Étape N — « vu par », sous SES PROPRES messages
+                          seulement : c'est l'expéditeur qui se demande si
+                          on l'a lu. L'afficher sous ceux des autres
+                          reviendrait à surveiller qui lit quoi. */}
+                      {isMine && (store.reads[m.id]?.length ?? 0) > 0 && (
+                        <div
+                          style={{ fontSize: 9.5, color: muted, marginTop: 3, textAlign: "end" }}
+                          title={store.reads[m.id]
+                            .map((r) => `${r.sender || "?"} · ${new Date(r.ts).toLocaleString()}`)
+                            .join("\n")}
+                        >
+                          {t("Chat.seenBy")} {store.reads[m.id].map((r) => r.sender || "?").join(", ")}
+                        </div>
                       )}
                     </div>
                   );

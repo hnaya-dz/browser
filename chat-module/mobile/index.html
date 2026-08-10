@@ -118,6 +118,8 @@
   #replyBar button { background:transparent; border:none; color:var(--muted); font-size:22px;
                      cursor:pointer; flex-shrink:0; min-width:44px; min-height:44px;
                      display:flex; align-items:center; justify-content:center; }
+  /* — Étape N : accusé de lecture — */
+  .vu { font-size:11.5px; color:var(--muted); margin-top:3px; text-align:end; }
   /* — Étape M : pastille d'identité et photo de profil — */
   .ma-photo { display:flex; gap:8px; align-items:center; margin-bottom:10px; }
   .ma-photo button { min-height:44px; padding:8px 12px; border-radius:10px;
@@ -402,7 +404,7 @@ const I18N = {
         tag_info:"Pour info", tag_avis:"Avis", tag_validation:"Validation", tag_approbation:"Approbation",
         issue_valide:"Validé", issue_refuse:"Refusé", issue_reserve:"Réserves",
         demandeYou:"vous", demandePending:"En attente d'une réponse", demandeAnyone:"Sans destinataire précis",
-        avatarChange:"Ma photo", avatarRemove:"Retirer",
+        seenBy:"Vu par", avatarChange:"Ma photo", avatarRemove:"Retirer",
         avatarFailed:"Photo impossible à préparer. Choisissez une image.",
         demandeNotForYou:"Cette demande est adressée à quelqu'un d'autre.",
         attVoice:"Message vocal", attFile:"Pièce jointe", attSave:"Ouvrir", attLoading:"Chargement…", attGone:"Pièce jointe indisponible.", attFailed:"Échec du téléchargement.",
@@ -412,7 +414,7 @@ const I18N = {
         tag_info:"For info", tag_avis:"Opinion", tag_validation:"Validation", tag_approbation:"Approval",
         issue_valide:"Validated", issue_refuse:"Refused", issue_reserve:"Reservations",
         demandeYou:"you", demandePending:"Awaiting a response", demandeAnyone:"No specific recipient",
-        avatarChange:"My photo", avatarRemove:"Remove",
+        seenBy:"Seen by", avatarChange:"My photo", avatarRemove:"Remove",
         avatarFailed:"Could not prepare that photo. Pick an image.",
         demandeNotForYou:"This request is addressed to someone else.",
         attVoice:"Voice message", attFile:"Attachment", attSave:"Open", attLoading:"Loading…", attGone:"Attachment unavailable.", attFailed:"Download failed.",
@@ -422,7 +424,7 @@ const I18N = {
         tag_info:"للعلم", tag_avis:"رأي", tag_validation:"مصادقة", tag_approbation:"موافقة",
         issue_valide:"مُصادَق", issue_refuse:"مرفوض", issue_reserve:"تحفّظات",
         demandeYou:"أنت", demandePending:"في انتظار الرد", demandeAnyone:"بلا مرسَل إليه محدَّد",
-        avatarChange:"صورتي", avatarRemove:"إزالة",
+        seenBy:"قرأها", avatarChange:"صورتي", avatarRemove:"إزالة",
         avatarFailed:"تعذّر تحضير الصورة. اختر صورة.",
         demandeNotForYou:"هذا الطلب موجَّه إلى شخص آخر.",
         attVoice:"رسالة صوتية", attFile:"مرفق", attSave:"فتح", attLoading:"جارٍ التحميل…", attGone:"المرفق غير متاح.", attFailed:"فشل التحميل.",
@@ -537,6 +539,12 @@ let myFp = null;         // notre empreinte, donnée par l'annuaire
 let people = [];         // annuaire du salon
 let peerOfThread = null; // personne du fil privé ouvert
 const unread = {};       // non-lus par fil privé
+// Étape N — qui a lu quoi. Renseigné pour NOS messages uniquement :
+// l'hôte ne rejoue que ceux-là, et c'est l'expéditeur que ça intéresse.
+const lectures = {};     // messageId -> [{ personId, sender, ts }]
+// Messages dont on a déjà accusé réception, pour ne pas renvoyer
+// indéfiniment le même accusé à chaque nouveau rendu du fil.
+const dejaAccuses = new Set();
 // Étape H — dépouillements par vote : ils n'arrivent PAS avec les
 // messages, l'hôte les rediffuse à chaque réponse.
 const voteTallies = {};
@@ -820,6 +828,33 @@ function envoyerDecision(messageId, issue) {
   }));
 }
 
+// ── Étape N — accuser réception de ce qu'on a SOUS LES YEUX ───────────
+// Un message compté « lu » alors que l'annuaire recouvre le fil, ou que la
+// page est en arrière-plan, ferait mentir l'accusé — et c'est sa seule
+// valeur. On n'accuse donc que ce qui est réellement affiché.
+function accuserSiVisible(m) {
+  if (!m.id || m.from === userId) return;
+  if (dejaAccuses.has(m.id)) return;
+  if (document.hidden) return;
+  if (rosterEl.classList.contains("show")) return;
+  if (!ws || ws.readyState !== 1) return;
+  dejaAccuses.add(m.id);
+  ws.send(encryptPayload(key, { v: 1, type: "read", messageId: m.id, groupId: m.groupId || "all" }));
+}
+
+// « Vu par », sous SES PROPRES messages seulement : c'est l'expéditeur qui
+// se demande si on l'a lu. Sous ceux des autres, ce serait de la
+// surveillance de qui lit quoi.
+function lecturesNode(m) {
+  const l = lectures[m.id];
+  if (!l || !l.length) return null;
+  const d = document.createElement("div");
+  d.className = "vu";
+  d.textContent = t("seenBy") + " " + l.map((r) => r.sender || "?").join(", ");
+  d.title = l.map((r) => (r.sender || "?") + " · " + new Date(r.ts).toLocaleString()).join("\n");
+  return d;
+}
+
 function messageNode(m) {
   if (m.type === "vote") return voteNode(m);
   const div = document.createElement("div");
@@ -846,6 +881,7 @@ function messageNode(m) {
     div.appendChild(bloc);
   }
   div.dataset.id = m.id || "";
+  accuserSiVisible(m);
   // Étape K — demande qualifiée : nature de l'envoi, personne désignée,
   // issues prises. Placé AVANT le texte : on doit savoir ce qu'on attend
   // de nous avant de lire.
@@ -864,6 +900,10 @@ function messageNode(m) {
   const time = document.createElement("div"); time.className = "time";
   time.textContent = m.ts ? new Date(m.ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
   div.appendChild(time);
+  if (m.from === userId) {
+    const vu = lecturesNode(m);
+    if (vu) div.appendChild(vu);
+  }
   return div;
 }
 
@@ -1518,6 +1558,11 @@ async function connect() {
       renderMessages();
     }
     else if (payload.type === "decision-refused") showAttError(t("demandeNotForYou"));
+    // Étape N — qui a lu ce message. Liste complète, pas un incrément.
+    else if (payload.type === "reads") {
+      lectures[payload.messageId] = payload.reads || [];
+      renderMessages();
+    }
     else if (payload.type === "presence") {
       presenceEl.textContent = `● ${payload.online.length} ${t("online")}`;
       // La présence a changé : l'annuaire affiché doit suivre, sinon la

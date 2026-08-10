@@ -22,7 +22,7 @@ import {
   retireDevice, restoreDevice,
   saveDecision, listDecisions, listDemandes,
   personIdOf, linkDeviceToPerson, empreintesDeLaPersonne,
-  setPersonAvatar,
+  setPersonAvatar, saveRead, listReads, readsForMyMessages,
 } from "./store.js";
 import { fingerprintFromRawPublicKey, rawFromSpkiBase64, verifyMessage,
          voteDefinitionSeal, voteAnswerSeal,
@@ -363,6 +363,20 @@ export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, 
           }));
         }
 
+        // ── Étape N — qui a lu MES messages ───────────────────────────
+        // Rejoué à la connexion, sinon fermer le dock effaçait tout et
+        // l'expéditeur ne savait plus jamais qui l'avait lu. Uniquement
+        // SES messages : rejouer les accusés de tout le salon serait
+        // inutile et indiscret.
+        if (device) {
+          for (const e of readsForMyMessages(activeRoomId, demandes,
+                                             empreintesDeLaPersonne(device.fingerprint))) {
+            ws.send(encryptPayload(sessionKey, {
+              v: 1, type: "reads", messageId: e.messageId, reads: e.reads,
+            }));
+          }
+        }
+
         // État de la licence dès l'arrivée : un utilisateur doit voir le
         // bandeau AVANT de composer un message, pas découvrir le refus
         // après avoir tapé.
@@ -668,12 +682,33 @@ export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, 
         return;
       }
 
+      // ── Étape N — accusé de lecture ──────────────────────────────
+      // Le type existait depuis longtemps, diffusé sans être enregistré ni
+      // affiché par personne. Il est maintenant persisté et rediffusé sous
+      // forme agrégée : l'expéditeur veut savoir QUI a lu, pas recevoir un
+      // événement par lecteur et recomposer la liste lui-même.
       if (payload.type === "read") {
-        broadcastToGroup(payload.groupId, {
-          v: 1,
-          type: "read",
-          messageId: payload.messageId,
-          userId,
+        const device = clients.get(ws)?.device || null;
+        if (!device) return;
+        const messageId = String(payload.messageId || "");
+        const cible = getMessage(messageId, activeRoomId);
+        // Le message doit exister DANS CE SALON : accuser réception d'un
+        // message d'ailleurs en révélerait l'existence.
+        if (!cible) return;
+        // Écrire dans un fil privé exige d'y appartenir — même règle que
+        // partout ailleurs.
+        if (isDirectGroup(cible.groupId) && !isMemberOfDirect(cible.groupId, device.fingerprint)) return;
+        // On n'accuse pas réception de ses PROPRES messages : « vu par
+        // moi-même » n'apprend rien et gonflerait la liste.
+        if (empreintesDeLaPersonne(device.fingerprint).includes(cible.deviceFp)) return;
+
+        saveRead({
+          messageId, personId: personIdOf(device.fingerprint),
+          sender: userId, ts: Date.now(),
+        });
+        broadcastToGroup(cible.groupId, {
+          v: 1, type: "reads", messageId, groupId: cible.groupId,
+          reads: listReads(messageId),
         });
         return;
       }

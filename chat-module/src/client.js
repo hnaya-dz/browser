@@ -64,6 +64,7 @@ export function joinSession({
   onRoster,
   onDevicePaired,
   onAvatarsChanged,
+  onReads,
   pairing,
 }) {
   const sessionKey = deriveKeyFromPin(pin);
@@ -149,6 +150,9 @@ export function joinSession({
     else if (payload.type === "device-paired") onDevicePaired?.(payload);
     // Étape M — quelqu'un a changé sa photo : l'annuaire affiché est périmé.
     else if (payload.type === "avatars-changed") onAvatarsChanged?.(payload);
+    // Étape N — qui a lu ce message. Liste complète et non incrément :
+    // l'expéditeur veut savoir QUI, pas recomposer la liste lui-même.
+    else if (payload.type === "reads") onReads?.(payload);
     else if (payload.type === "invite-sent") onInviteSent?.(payload);
     else if (payload.type === "admin-result") onAdminResult?.(payload);
     // Étape F — annuaire : qui est inscrit, sa fonction, sa présence

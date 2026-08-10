@@ -64,6 +64,13 @@ export interface ChatMessage {
   backlog?: boolean;
 }
 
+/** Étape N — accusé de lecture d'UNE personne sur UN message. */
+export interface ReadReceipt {
+  personId: string;
+  sender: string | null;
+  ts: number;
+}
+
 /** Étape K — position prise par UNE personne sur UNE demande. Le pseudo ET
  *  l'empreinte sont portés : l'exigence est qu'il n'y ait aucune confusion
  *  sur qui a validé, et deux personnes peuvent porter le même pseudo. */
@@ -196,6 +203,9 @@ export interface ChatStore {
   // Demande sur laquelle on vient de se voir refuser une décision : elle
   // était adressée à quelqu'un d'autre. Le dire, sinon on croit à une panne.
   decisionRefused: string | null;
+  // Étape N — qui a lu quoi, par identifiant de message. Renseigné
+  // uniquement pour NOS messages : l'hôte ne rejoue que ceux-là.
+  reads: Record<string, ReadReceipt[]>;
   // Étape I — échéance de licence du serveur permanent. `licenceReadOnly`
   // coupe la composition côté interface ; l'hôte refuse de toute façon, mais
   // laisser taper un message pour le voir rejeté serait cruel.
@@ -303,6 +313,7 @@ export const store: ChatStore = {
   voteRefused: null,
   decisions: {},
   decisionRefused: null,
+  reads: {},
   licenceNotice: null,
   licenceReadOnly: false,
   activeThread: "all",
@@ -410,8 +421,9 @@ export function startConnecting() {
   // créer un salon local laissait le bandeau — et la saisie bloquée.
   patchStore({
     status: "connecting", error: null, licenceNotice: null, licenceReadOnly: false,
-    // Les non-lus privés et les issues appartiennent au salon qu'on quitte.
-    unreadPrivate: {}, decisions: {}, decisionRefused: null,
+    // Les non-lus privés, les issues et les accusés appartiennent au salon
+    // qu'on quitte.
+    unreadPrivate: {}, decisions: {}, decisionRefused: null, reads: {},
   });
   connectTimer = setTimeout(() => {
     connectTimer = null;
@@ -608,6 +620,13 @@ export function ensureListening() {
       // l'hôte ne dit pas QUI a changé, et n'a pas à le dire.
       case "avatars-changed":
         if (store.roster.length) getApi()?.send?.("chat-roster");
+        break;
+      // Étape N — liste complète des lecteurs d'un message, remplacée en
+      // bloc : l'hôte envoie l'état, jamais un incrément.
+      case "reads":
+        patchStore({
+          reads: { ...store.reads, [evt.messageId]: (evt.reads || []) as ReadReceipt[] },
+        });
         break;
       // Étape I — préavis d'échéance, puis lecture seule. L'hôte l'envoie
       // à la connexion ET au franchissement d'un palier : le bandeau
