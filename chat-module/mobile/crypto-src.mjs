@@ -98,10 +98,14 @@ const SPKI_PREFIX = Uint8Array.from([0x30, 0x2a, 0x30, 0x05, 0x06, 0x03, 0x2b, 0
 // les précédents sont écrits, vides au besoin. Deux champs ne doivent
 // jamais pouvoir partager un rang, sinon un message se rejoue en un autre
 // avec la même signature valide.
-// Rangs : 5 = mediaSha, 6 = replyTo, 7 = voteSha.
-function signablePayload({ id, from, text, ts, mediaSha, replyTo, voteSha }) {
+// Étape K — demande qualifiée : l'étiquette et le destinataire désigné
+// sont scellés au rang 8. Sans cela on requalifierait un « pour info » en
+// « approbation », ou on redirigerait une demande vers quelqu'un d'autre
+// après signature.
+// Rangs : 5 = mediaSha, 6 = replyTo, 7 = voteSha, 8 = demandeSha.
+function signablePayload({ id, from, text, ts, mediaSha, replyTo, voteSha, demandeSha }) {
   const core = [String(id), String(from), String(text), Number(ts)];
-  const optionnels = [mediaSha, replyTo, voteSha];
+  const optionnels = [mediaSha, replyTo, voteSha, demandeSha];
   let dernier = -1;
   optionnels.forEach((v, i) => { if (v) dernier = i; });
   for (let i = 0; i <= dernier; i++) core.push(optionnels[i] ? String(optionnels[i]) : "");
@@ -122,6 +126,20 @@ export function voteDefinitionSeal(options, nominatif) {
 
 export function voteAnswerSeal(voteId, choice) {
   return "ans:" + String(voteId) + ":" + Number(choice);
+}
+
+// ── Étape K — attestations de demande qualifiée ──────────────────────
+// ⚠️ DOIVENT rester identiques à identity.js. Le rang 8 sert à la fois aux
+// demandes et aux décisions : les préfixes « dem: » et « dec: » empêchent
+// qu'une décision soit rejouée en demande.
+export function demandeSeal(tag, destinataire) {
+  const canonique = JSON.stringify([String(tag), String(destinataire || "")]);
+  const h = sha256(new TextEncoder().encode(canonique));
+  return "dem:" + Array.from(h.subarray(0, 16)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+export function decisionSeal(messageId, issue) {
+  return "dec:" + String(messageId) + ":" + String(issue);
 }
 
 export function identityFromPrivate(privateKeyB64) {

@@ -257,6 +257,14 @@ function handleCommand(msg) {
         }),
         onVoteRefused: (r) => process.send({ event: "vote-refused", voteId: r.voteId, reason: r.reason }),
         // Étape I — état de la licence du serveur permanent
+        // Étape K — issue d'une demande qualifiée, et refus motivé quand
+        // quelqu'un tente de décider à la place du destinataire désigné
+        onDecisions: (d) => process.send({
+          event: "decisions", messageId: d.messageId, decisions: d.decisions,
+        }),
+        onDecisionRefused: (r) => process.send({
+          event: "decision-refused", messageId: r.messageId, reason: r.reason,
+        }),
         onLicenceNotice: (n) => process.send({
           event: "licence-notice", mode: n.mode, readOnly: !!n.readOnly,
           notice: n.notice || null, refused: n.refused || null,
@@ -304,7 +312,19 @@ function handleCommand(msg) {
       // être connectée alors que la connexion est morte — évite l'envoi
       // silencieux dans le vide.
       if (!clientHandle) { process.send({ event: "disconnected" }); break; }
-      clientHandle.send(msg.text, msg.groupId, msg.media || null, msg.replyTo || null);
+      // ⚠️ `demande` doit être relayée : elle est SIGNÉE côté client, et
+      // l'oublier ici la ferait disparaître silencieusement — le message
+      // partirait en simple note alors que l'utilisateur a demandé une
+      // validation. C'est exactement ce qui était arrivé à `replyTo`.
+      clientHandle.send(msg.text, msg.groupId, msg.media || null, msg.replyTo || null,
+        msg.demande || null);
+      break;
+    }
+
+    // ── Étape K — décision sur une demande qualifiée ──────────────
+    case "decider": {
+      if (!clientHandle) { process.send({ event: "disconnected" }); break; }
+      clientHandle.decider({ messageId: msg.messageId, issue: msg.issue, comment: msg.comment || "" });
       break;
     }
 

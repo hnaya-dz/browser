@@ -8,13 +8,20 @@ import ChatAdminPanel from "./ChatAdminPanel";
 import ChatServerSetup from "./ChatServerSetup";
 import ChatComposerMedia, { MediaPreview, type PreparedMedia } from "./ChatComposerMedia";
 import ChatVoteCard from "./ChatVoteCard";
+import ChatDemandeCard from "./ChatDemandeCard";
 import type { InviteExtra } from "@/context/chatstore";
 
 // Les trois issues d'un vote, dans le vocabulaire administratif validé
 // par l'utilisateur. Ce sont des CLÉS i18n : les libellés partent traduits
 // dans la langue de celui qui ouvre le vote, et voyagent tels quels — un
 // vote doit garder les mots exacts sous lesquels il a été soumis.
-const VOTE_OPTIONS = ["voteApprove", "voteReject", "voteReserve"] as const;
+// Étape K — même palette que ChatDemandeCard : la couleur choisie au moment
+// d'étiqueter doit être celle qu'on retrouvera dans le fil.
+const TAG_TON: Record<string, string> = {
+  info: "#8a8a8a", avis: "#4a9eff", validation: "#00c853", approbation: "#ffa726",
+};
+
+const VOTE_OPTIONS =["voteApprove", "voteReject", "voteReserve"] as const;
 import ChatMediaBubble from "./ChatMediaBubble";
 import ChatRoster from "./ChatRoster";
 import qrcode from "qrcode-generator";
@@ -161,6 +168,11 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
   // Étape J — interrupteur du signal sonore. Lu paresseusement : le
   // localStorage n'existe pas au rendu serveur.
   const [son, setSon] = useState(() => sonActif());
+  // Étape K — nature du prochain envoi, et personne désignée. Remis à zéro
+  // après chaque envoi : une étiquette qui « colle » ferait partir en
+  // demande de validation le message anodin qui suit.
+  const [tag, setTag] = useState<"info" | "avis" | "validation" | "approbation" | null>(null);
+  const [destinataire, setDestinataire] = useState<string>("");
   const [voteOuvert, setVoteOuvert] = useState(false);
   const [voteQuestion, setVoteQuestion] = useState("");
   const [voteNominatif, setVoteNominatif] = useState(true);
@@ -575,9 +587,13 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
     if (!pendingMedia) {
       // Le message part dans le fil OUVERT : le salon, ou la conversation
       // privée en cours.
-      api.send("chat-send-message", { text, groupId: store.activeThread, media: null, replyTo: replyToId });
+      api.send("chat-send-message", {
+        text, groupId: store.activeThread, media: null, replyTo: replyToId,
+        demande: tag ? { tag, destinataire: destinataire || null } : null,
+      });
       setMessageInput("");
       setReplyToId(null);
+      setTag(null); setDestinataire("");
       return;
     }
 
@@ -602,6 +618,11 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
       }
       api.send("chat-send-message", {
         text, groupId: store.activeThread, replyTo: replyToId,
+        // Une demande de validation porte souvent SUR la pièce jointe (un
+        // rapport, un tableur). L'empreinte du fichier est déjà dans le
+        // périmètre signé : valider la demande, c'est valider ces
+        // octets-là, pas « un fichier du même nom ».
+        demande: tag ? { tag, destinataire: destinataire || null } : null,
         media: {
           kind: pendingMedia.kind, mime: pendingMedia.mime,
           sha256: up.sha256, size: up.size,
@@ -614,6 +635,7 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
       setMessageInput("");
       setPendingMedia(null);
       setReplyToId(null);
+      setTag(null); setDestinataire("");
     } finally {
       setMediaBusy(false);
     }
@@ -1513,6 +1535,41 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
                       </div>
                     );
                   }
+                  // Étape K — une demande qualifiée occupe toute la largeur,
+                  // comme un vote : c'est un acte du circuit, pas une
+                  // réplique. Le message et sa pièce jointe restent rendus
+                  // normalement au-dessous — valider « le rapport » veut
+                  // dire valider CE fichier, dont l'empreinte est déjà dans
+                  // la signature de la demande.
+                  if (m.tag) {
+                    return (
+                      <div key={m.id} id={"msg-" + m.id} style={{
+                        alignSelf: "stretch", display: "flex", flexDirection: "column", gap: 5,
+                      }}>
+                        <ChatDemandeCard
+                          message={m}
+                          decisions={store.decisions[m.id] || []}
+                          accent={accent} muted={muted} border={border}
+                          onDecide={(issue) => getApi()?.send?.("chat-decider", { messageId: m.id, issue })}
+                        />
+                        <div style={{
+                          background: isMine ? `${accent}30` : "rgba(255,255,255,0.06)",
+                          border: `1px solid ${isMine ? accent + "40" : border}`,
+                          borderRadius: 8, padding: "6px 10px",
+                        }}>
+                          <div style={{ fontSize: 10.5, color: muted, marginBottom: 2 }}>{m.from}</div>
+                          {m.text && <div style={{ fontSize: 12.5, lineHeight: 1.5, wordBreak: "break-word" }}>{m.text}</div>}
+                          {m.media && (
+                            <ChatMediaBubble
+                              media={m.media}
+                              muted={muted} border={border}
+                              accent={theme === "sunset" ? "#ffb060" : "#00c853"}
+                            />
+                          )}
+                        </div>
+                      </div>
+                    );
+                  }
                   return (
                     <div key={m.id} id={"msg-" + m.id} style={{
                       alignSelf: isMine ? (isRTL ? "flex-start" : "flex-end") : (isRTL ? "flex-end" : "flex-start"),
@@ -1720,6 +1777,50 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
               )}
               {mediaError && (
                 <div style={{ fontSize: 10.5, color: "#ff8080", marginBottom: 5, lineHeight: 1.45 }}>{mediaError}</div>
+              )}
+              {/* Étape K — qualifier l'envoi. Quatre natures, et le nom de
+                  la personne dont on attend la réponse. Rien n'est
+                  sélectionné par défaut : la plupart des messages sont de
+                  simples messages, et une étiquette imposée d'office
+                  perdrait tout son sens de signal. */}
+              {!showRoster && (
+                <div style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center", marginBottom: 6 }}>
+                  {(["info", "avis", "validation", "approbation"] as const).map((k) => (
+                    <button
+                      key={k}
+                      onClick={() => setTag(tag === k ? null : k)}
+                      disabled={store.licenceReadOnly}
+                      style={{
+                        padding: "3px 7px", fontSize: 9.5, fontWeight: 600, borderRadius: 4,
+                        cursor: store.licenceReadOnly ? "default" : "pointer",
+                        background: tag === k ? `${TAG_TON[k]}28` : "transparent",
+                        border: `1px solid ${tag === k ? TAG_TON[k] : border}`,
+                        color: tag === k ? TAG_TON[k] : muted,
+                      }}
+                    >
+                      {t(`Chat.tag_${k}`)}
+                    </button>
+                  ))}
+                  {/* Désigner quelqu'un n'est possible que si l'on attend
+                      une réponse : un « pour info » adressé à une personne
+                      précise laisserait croire qu'elle doit agir. */}
+                  {tag && tag !== "info" && (
+                    <select
+                      value={destinataire}
+                      onChange={(e) => setDestinataire(e.target.value)}
+                      style={{ ...inputStyle, padding: "3px 6px", fontSize: 10, flex: 1, minWidth: 110 }}
+                    >
+                      <option value="">{t("Chat.demandeAnyone")}</option>
+                      {store.roster
+                        .filter((p) => !p.isMe)
+                        .map((p) => (
+                          <option key={p.fingerprint} value={p.fingerprint}>
+                            {p.name || p.fingerprint.slice(0, 8)}{p.role ? ` · ${p.role}` : ""}
+                          </option>
+                        ))}
+                    </select>
+                  )}
+                </div>
               )}
               {/* Étape I — échéance de licence. Le texte vient de l'hôte
                   (nom de l'organisme, date, coordonnées de renouvellement) :

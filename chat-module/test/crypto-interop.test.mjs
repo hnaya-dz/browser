@@ -42,6 +42,7 @@ import { createPrivateKey, sign as nodeSign } from "node:crypto";
 import {
   loadOrCreateIdentity, verifyMessage as nodeVerify,
   fingerprintFromRawPublicKey, rawFromSpkiBase64, signablePayload,
+  demandeSeal, decisionSeal,
 } from "../src/identity.js";
 
 const core = { id: "msg_interop1", from: "Téléphone-Test", text: "توقيع interop é€", ts: 1789000000000 };
@@ -99,20 +100,26 @@ assert.notStrictEqual(
   "Un média peut être rejoué en citation : la forme signée est ambiguë",
 );
 
-// 10. Étape H — la RÈGLE DES RANGS. Les champs optionnels occupent des
-// rangs fixes (5 mediaSha, 6 replyTo, 7 voteSha) et tout rang précédent
-// est écrit, vide au besoin. C'est ce qui interdit qu'un message se
-// rejoue en un autre avec la même signature valide. Chaque combinaison
-// doit produire une forme DISTINCTE, et identique des deux côtés.
+// 10. Étapes H et K — la RÈGLE DES RANGS. Les champs optionnels occupent
+// des rangs fixes (5 mediaSha, 6 replyTo, 7 voteSha, 8 demandeSha) et tout
+// rang précédent est écrit, vide au besoin. C'est ce qui interdit qu'un
+// message se rejoue en un autre avec la même signature valide. Chaque
+// combinaison doit produire une forme DISTINCTE, et identique des deux
+// côtés. Toute combinaison d'un nouveau rang doit être ajoutée ici.
 const combinaisons = [
   ["rien",              {}],
   ["media",             { mediaSha: "X" }],
   ["citation",          { replyTo: "X" }],
   ["vote",              { voteSha: "X" }],
+  ["demande",           { demandeSha: "X" }],
   ["media+citation",    { mediaSha: "X", replyTo: "X" }],
   ["media+vote",        { mediaSha: "X", voteSha: "X" }],
+  ["media+demande",     { mediaSha: "X", demandeSha: "X" }],
   ["citation+vote",     { replyTo: "X", voteSha: "X" }],
-  ["les trois",         { mediaSha: "X", replyTo: "X", voteSha: "X" }],
+  ["citation+demande",  { replyTo: "X", demandeSha: "X" }],
+  ["vote+demande",      { voteSha: "X", demandeSha: "X" }],
+  ["media+citation+vote", { mediaSha: "X", replyTo: "X", voteSha: "X" }],
+  ["les quatre",        { mediaSha: "X", replyTo: "X", voteSha: "X", demandeSha: "X" }],
 ];
 const formes = new Map();
 for (const [nom, champs] of combinaisons) {
@@ -132,4 +139,26 @@ assert.strictEqual(signablePayload(core),
   JSON.stringify([core.id, core.from, core.text, core.ts]),
   "La forme de base a changé — tout l'historique deviendrait invérifiable");
 
-console.log("✅ Interop crypto Node ↔ navigateur : 19/19 OK (AES-GCM + Ed25519 + rangs signés)");
+// 11. Étape K — les sceaux de demande et de décision, identiques des deux
+// côtés. Le préfixe est ce qui empêche qu'une décision soit rejouée en
+// demande : les deux occupent le rang 8.
+assert.strictEqual(demandeSeal("validation", "abcdef0123456789"),
+  browserCrypto.demandeSeal("validation", "abcdef0123456789"),
+  "Sceau de demande : Node et navigateur divergent");
+assert.strictEqual(decisionSeal("msg_7", "valide"),
+  browserCrypto.decisionSeal("msg_7", "valide"),
+  "Sceau de décision : Node et navigateur divergent");
+// Le DESTINATAIRE fait partie du sceau : rediriger une demande signée vers
+// quelqu'un d'autre doit casser la signature, sinon « le Directeur a
+// validé » ne prouve rien.
+assert.notStrictEqual(demandeSeal("validation", "aaaa"), demandeSeal("validation", "bbbb"),
+  "Le destinataire ne compte pas dans le sceau : une demande serait redirigeable");
+// Et l'étiquette aussi : un « pour info » ne doit pas pouvoir devenir une
+// « approbation » sans nouvelle signature.
+assert.notStrictEqual(demandeSeal("info", "aaaa"), demandeSeal("approbation", "aaaa"),
+  "L'étiquette ne compte pas dans le sceau : elle serait requalifiable");
+// Une décision ne doit pas pouvoir se faire passer pour une demande.
+assert.ok(demandeSeal("validation", "x").startsWith("dem:"));
+assert.ok(decisionSeal("msg_1", "valide").startsWith("dec:"));
+
+console.log("✅ Interop crypto Node ↔ navigateur : 26/26 OK (AES-GCM + Ed25519 + rangs signés + sceaux de demande)");

@@ -20,9 +20,11 @@ import {
   getDevice, countDevices, getDataDir, listReferencedMedia,
   setDeviceRole, listRoster, listDirectThreads,
   retireDevice, restoreDevice,
+  saveDecision, listDecisions, listDemandes,
 } from "./store.js";
 import { fingerprintFromRawPublicKey, rawFromSpkiBase64, verifyMessage,
-         voteDefinitionSeal, voteAnswerSeal } from "./identity.js";
+         voteDefinitionSeal, voteAnswerSeal,
+         demandeSeal, decisionSeal } from "./identity.js";
 import { startMobileServer } from "./mobile-server.js";
 import { existsSync } from "node:fs";
 import {
@@ -61,6 +63,15 @@ const HEARTBEAT_MS = 10000;
 // un type d'envoi ajouté plus tard sera refusé par défaut au lieu de passer
 // silencieusement. Lire, chercher et administrer restent toujours possibles.
 const TYPES_EN_LECTURE_SEULE = new Set(["join", "read", "media-get", "roster", "admin"]);
+
+// ── Étape K — vocabulaire des demandes qualifiées ──────────────────────
+// Quatre natures d'envoi, et trois issues. Ce sont les termes du circuit
+// administratif validés par l'utilisateur ; ils ne sont PAS libres, sinon
+// deux services écriraient « validé » et « validée » et rien ne serait
+// comparable. « info » n'attend aucune réponse — le serveur refuse toute
+// décision sur un message ainsi étiqueté.
+const TAGS = new Set(["info", "avis", "validation", "approbation"]);
+const ISSUES = new Set(["valide", "refuse", "reserve"]);
 
 export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, wsPort = WS_PORT, httpPort, onError, maxDevices = null, licenceState = null } = {}) {
   const etatLicence = () => {
@@ -293,6 +304,20 @@ export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, 
           }));
         }
 
+        // ── Étape K — issues des demandes qualifiées ──────────────────
+        // Même raison, même piège que pour le dépouillement des votes :
+        // une décision ne voyage pas avec les messages. Sans ce rejeu, un
+        // arrivant — ou une reconnexion, qui ne redemande que les messages
+        // récents — verrait « Validation demandée au Directeur » sans
+        // jamais savoir qu'il a répondu.
+        for (const d of listDemandes(activeRoomId, demandes)) {
+          const decisions = listDecisions(d.id);
+          if (!decisions.length) continue;
+          ws.send(encryptPayload(sessionKey, {
+            v: 1, type: "decisions", messageId: d.id, groupId: d.groupId, decisions,
+          }));
+        }
+
         // État de la licence dès l'arrivée : un utilisateur doit voir le
         // bandeau AVANT de composer un message, pas découvrir le refus
         // après avoir tapé.
@@ -348,6 +373,17 @@ export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, 
           // son existence à qui n'y a pas accès.
           const cite = payload.replyTo ? String(payload.replyTo) : null;
           if (cite && messageExists(cite, activeRoomId)) core.replyTo = cite;
+          // Étape K — demande qualifiée. L'étiquette et le destinataire
+          // désigné sont scellés ensemble (rang 8) : ni l'une ni l'autre ne
+          // peut être modifiée après signature. Un destinataire inconnu du
+          // salon est ramené à « personne en particulier » plutôt que
+          // conservé tel quel — sinon on désignerait un fantôme que
+          // personne ne pourrait lever.
+          const etiquette = TAGS.has(String(payload.tag)) ? String(payload.tag) : null;
+          const vise = etiquette && /^[0-9a-f]{16}$/.test(String(payload.destinataire || ""))
+            && isRoomMember(activeRoomId, String(payload.destinataire))
+            ? String(payload.destinataire) : null;
+          if (etiquette) core.demandeSha = demandeSeal(etiquette, vise);
           const verified = verifyMessage(core, payload.signature, device.publicKeySpki);
           const driftOk = Math.abs(now - core.ts) <= MAX_CLOCK_DRIFT_MS;
           msg = {
@@ -360,6 +396,12 @@ export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, 
             text: core.text,
             media: sanitizeMedia(payload.media),
             replyTo: core.replyTo || null,
+            // L'étiquette n'est conservée que si la signature tient : une
+            // demande de validation non signée n'engage personne, et la
+            // laisser passer donnerait une apparence d'officialité à un
+            // message dont on ne peut pas prouver l'auteur.
+            tag: verified ? etiquette : null,
+            destinataire: verified ? vise : null,
             ts: driftOk ? core.ts : now,
             deviceFp: device.fingerprint,
             signature: payload.signature,
@@ -516,6 +558,63 @@ export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, 
           v: 1, type: "vote-tally", voteId,
           groupId: vote.groupId,
           ...getVoteTally(voteId),
+        });
+        return;
+      }
+
+      // ── Étape K — décision sur une demande qualifiée ─────────────
+      // Une demande de validation n'a d'intérêt que si son issue est
+      // publique : dans l'exemple qui a motivé la fonction, un chargé de
+      // projet demande la validation du Directeur, et TOUTE l'équipe doit
+      // savoir s'il a validé. La décision est donc diffusée au fil entier,
+      // pas seulement au demandeur.
+      if (payload.type === "decision") {
+        const device = clients.get(ws)?.device || null;
+        if (!userId || !device) return;
+        const messageId = String(payload.messageId || "");
+        const issue = String(payload.issue || "");
+        if (!ISSUES.has(issue)) return;
+        const cible = getMessage(messageId, activeRoomId);
+        // La demande doit exister DANS CE SALON : répondre à une demande
+        // d'un autre salon en révélerait l'existence.
+        if (!cible || !cible.tag) return;
+        // « Pour info » n'attend aucune réponse : accepter une décision
+        // dessus laisserait fabriquer une approbation là où personne n'en
+        // avait demandé.
+        if (cible.tag === "info") return;
+        // ⚠️ Quand un destinataire est DÉSIGNÉ, lui seul décide. C'est
+        // toute l'exigence : aucune confusion sur qui valide. Sans
+        // destinataire, la demande s'adresse au fil et chacun peut se
+        // prononcer — son nom reste attaché à sa décision.
+        if (cible.destinataire && cible.destinataire !== device.fingerprint) {
+          ws.send(encryptPayload(sessionKey, {
+            v: 1, type: "decision-refused", messageId, reason: "pas-destinataire",
+          }));
+          return;
+        }
+        // Écrire dans un fil privé exige d'y appartenir — même règle que
+        // pour les messages.
+        if (isDirectGroup(cible.groupId) && !isMemberOfDirect(cible.groupId, device.fingerprint)) return;
+
+        const core = {
+          id: String(payload.id), from: userId,
+          text: String(payload.comment ?? "").slice(0, 300), ts: Number(payload.ts),
+          demandeSha: decisionSeal(messageId, issue),
+        };
+        // Une décision NON signée n'est pas enregistrée du tout. Ailleurs
+        // on accepte un message non signé en le marquant ; ici la
+        // signature EST la valeur de l'objet — « le Directeur a validé »
+        // sans preuve ne vaut pas mieux que rien.
+        if (!verifyMessage(core, payload.signature, device.publicKeySpki)) return;
+
+        saveDecision({
+          messageId, fingerprint: device.fingerprint, sender: userId,
+          issue, comment: core.text || null, ts: Date.now(),
+          signature: payload.signature,
+        });
+        broadcastToGroup(cible.groupId, {
+          v: 1, type: "decisions", messageId, groupId: cible.groupId,
+          decisions: listDecisions(messageId),
         });
         return;
       }

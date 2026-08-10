@@ -79,6 +79,7 @@ const ALLOWED_SEND = [
   "chat-send-message",
   "chat-open-vote",
   "chat-answer-vote",
+  "chat-decider",
   "chat-mark-read",
   "chat-roster",
   "chat-leave",

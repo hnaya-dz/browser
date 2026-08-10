@@ -51,10 +51,29 @@ export interface ChatMessage {
   } | null;
   deviceFp?: string | null;
   signatureValid?: boolean;
+  // Étape K — demande qualifiée. `tag` dit la nature de l'envoi et
+  // `destinataire` désigne l'empreinte de qui doit répondre (null = le fil
+  // entier). Les deux sont couverts par la signature : l'hôte les efface
+  // si elle ne tient pas, plutôt que de laisser une demande douteuse
+  // paraître officielle.
+  tag?: "info" | "avis" | "validation" | "approbation" | null;
+  destinataire?: string | null;
   // Étape J — indice de LIVRAISON, posé par client.js sur les messages du
   // rattrapage. Il ne vient pas du réseau et n'est pas persisté : il sert
   // uniquement à ne pas faire sonner une absence rattrapée.
   backlog?: boolean;
+}
+
+/** Étape K — position prise par UNE personne sur UNE demande. Le pseudo ET
+ *  l'empreinte sont portés : l'exigence est qu'il n'y ait aucune confusion
+ *  sur qui a validé, et deux personnes peuvent porter le même pseudo. */
+export interface Decision {
+  messageId: string;
+  fingerprint: string;
+  sender: string | null;
+  issue: "valide" | "refuse" | "reserve";
+  comment: string | null;
+  ts: number;
 }
 
 /** Une personne de l'annuaire du salon (étape F). Le serveur ne renvoie
@@ -164,6 +183,13 @@ export interface ChatStore {
   // Vote auquel on vient de se voir refuser un second bulletin : il faut
   // le dire, sinon la personne croit avoir voté deux fois.
   voteRefused: string | null;
+  // Étape K — issues des demandes qualifiées, par identifiant de message.
+  // Elles n'arrivent PAS avec les messages : l'hôte les diffuse à chaque
+  // prise de position, et les rejoue à la connexion.
+  decisions: Record<string, Decision[]>;
+  // Demande sur laquelle on vient de se voir refuser une décision : elle
+  // était adressée à quelqu'un d'autre. Le dire, sinon on croit à une panne.
+  decisionRefused: string | null;
   // Étape I — échéance de licence du serveur permanent. `licenceReadOnly`
   // coupe la composition côté interface ; l'hôte refuse de toute façon, mais
   // laisser taper un message pour le voir rejeté serait cruel.
@@ -263,6 +289,8 @@ export const store: ChatStore = {
   myFingerprint: null,
   voteTallies: {},
   voteRefused: null,
+  decisions: {},
+  decisionRefused: null,
   licenceNotice: null,
   licenceReadOnly: false,
   activeThread: "all",
@@ -370,8 +398,8 @@ export function startConnecting() {
   // créer un salon local laissait le bandeau — et la saisie bloquée.
   patchStore({
     status: "connecting", error: null, licenceNotice: null, licenceReadOnly: false,
-    // Les non-lus privés appartiennent au salon qu'on quitte.
-    unreadPrivate: {},
+    // Les non-lus privés et les issues appartiennent au salon qu'on quitte.
+    unreadPrivate: {}, decisions: {}, decisionRefused: null,
   });
   connectTimer = setTimeout(() => {
     connectTimer = null;
@@ -551,6 +579,17 @@ export function ensureListening() {
       }
       case "vote-refused":
         patchStore({ voteRefused: evt.voteId || null });
+        break;
+      // Étape K — issue d'une demande qualifiée. Remplacement complet de
+      // la liste : l'hôte envoie l'état courant, pas un delta.
+      case "decisions":
+        patchStore({
+          decisions: { ...store.decisions, [evt.messageId]: (evt.decisions || []) as Decision[] },
+          decisionRefused: null,
+        });
+        break;
+      case "decision-refused":
+        patchStore({ decisionRefused: evt.messageId || null });
         break;
       // Étape I — préavis d'échéance, puis lecture seule. L'hôte l'envoie
       // à la connexion ET au franchissement d'un palier : le bandeau

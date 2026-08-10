@@ -60,10 +60,18 @@ import path from "node:path";
 // tous ceux qui le précèdent sont écrits, vides au besoin. Sans cette
 // règle, deux champs différents partageraient un rang et un message
 // pourrait être rejoué en un autre AVEC LA MÊME SIGNATURE VALIDE.
-// Rangs : 5 = mediaSha, 6 = replyTo, 7 = voteSha.
-export function signablePayload({ id, from, text, ts, mediaSha, replyTo, voteSha }) {
+// Étape K — demande qualifiée : l'étiquette (pour info, avis, validation,
+// approbation) et le DESTINATAIRE désigné sont signés eux aussi. Une
+// étiquette non signée se requalifierait après coup — transformer un
+// « pour info » en « approbation », ou retirer l'étiquette d'une demande
+// pour prétendre n'avoir jamais rien demandé. Le destinataire est dans le
+// même sceau : sans lui, on pourrait rediriger une demande de validation
+// vers quelqu'un d'autre après signature.
+//
+// Rangs : 5 = mediaSha, 6 = replyTo, 7 = voteSha, 8 = demandeSha.
+export function signablePayload({ id, from, text, ts, mediaSha, replyTo, voteSha, demandeSha }) {
   const core = [String(id), String(from), String(text), Number(ts)];
-  const optionnels = [mediaSha, replyTo, voteSha];
+  const optionnels = [mediaSha, replyTo, voteSha, demandeSha];
   let dernier = -1;
   optionnels.forEach((v, i) => { if (v) dernier = i; });
   for (let i = 0; i <= dernier; i++) core.push(optionnels[i] ? String(optionnels[i]) : "");
@@ -82,6 +90,26 @@ export function voteDefinitionSeal(options, nominatif) {
 
 export function voteAnswerSeal(voteId, choice) {
   return "ans:" + String(voteId) + ":" + Number(choice);
+}
+
+// ── Étape K — attestations de demande qualifiée ────────────────────────────
+// Même règle que pour le vote : le rang 8 sert à DEUX choses — sceller la
+// demande, et sceller la décision qui y répond. Les deux sont préfixées,
+// sinon une décision pourrait être rejouée comme une demande.
+//
+// ⚠️ Ne JAMAIS retirer le destinataire du sceau de la demande. C'est lui
+// qui rend la réponse imputable : « le Directeur a validé » ne vaut que si
+// personne ne peut prétendre après coup que la demande lui était adressée.
+export function demandeSeal(tag, destinataire) {
+  const canonique = JSON.stringify([String(tag), String(destinataire || "")]);
+  return "dem:" + createHash("sha256").update(canonique).digest("hex").slice(0, 32);
+}
+
+// La décision porte sur un message PRÉCIS et une issue PRÉCISE. L'identifiant
+// du message y figure en clair : déplacer un « validé » sous une autre
+// demande casse la signature.
+export function decisionSeal(messageId, issue) {
+  return "dec:" + String(messageId) + ":" + String(issue);
 }
 
 // ── Empreinte d'appareil ───────────────────────────────────────────────────

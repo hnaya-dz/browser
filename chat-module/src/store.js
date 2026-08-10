@@ -174,6 +174,42 @@ export function initStore(dataDir = DEFAULT_DATA_DIR) {
     db.exec("ALTER TABLE devices ADD COLUMN retiredAt INTEGER");
   }
 
+  // ── Étape K — demande qualifiée ───────────────────────────────────────
+  // `tag` dit la NATURE de l'envoi (info, avis, validation, approbation) et
+  // `destinataire` DÉSIGNE nommément qui doit répondre. Les deux sont
+  // couverts par la signature (voir demandeSeal dans identity.js) : une
+  // étiquette requalifiable après coup, ou un destinataire modifiable, ne
+  // vaudrait rien dans un circuit d'approbation.
+  if (!db.prepare("PRAGMA table_info(messages)").all().some((c) => c.name === "tag")) {
+    db.exec("ALTER TABLE messages ADD COLUMN tag TEXT");
+    db.exec("ALTER TABLE messages ADD COLUMN destinataire TEXT");
+  }
+  db.exec(`
+    -- L'ISSUE d'une demande. Table distincte des messages : une décision
+    -- n'est pas un message du fil, elle qualifie un message existant.
+    --
+    -- UNE ligne par personne et par demande, la dernière écrasant la
+    -- précédente : l'état courant est ce qui compte (« a-t-il validé ? »),
+    -- et l'on veut pouvoir se rétracter. Le nom ET l'empreinte sont
+    -- conservés — l'exigence est qu'il n'y ait aucune confusion sur QUI a
+    -- validé, ce qu'un pseudo seul ne garantit pas.
+    --
+    -- ⚠️ Rien à voir avec un vote : un vote compte des voix et peut être
+    -- non nominatif ; une décision est toujours imputable, et c'est
+    -- justement son objet. Ne pas fusionner les deux tables.
+    CREATE TABLE IF NOT EXISTS message_decisions (
+      messageId   TEXT NOT NULL,
+      fingerprint TEXT NOT NULL,
+      sender      TEXT,
+      issue       TEXT NOT NULL,
+      comment     TEXT,
+      ts          INTEGER NOT NULL,
+      signature   TEXT,
+      PRIMARY KEY (messageId, fingerprint)
+    );
+    CREATE INDEX IF NOT EXISTS idx_decisions_msg ON message_decisions(messageId);
+  `);
+
   // ── Migration E : pièces jointes ──────────────────────────────────────
   // `media` = métadonnées JSON (empreinte, type, dimensions, vignette).
   // Le fichier lui-même vit sous dataDir/media/ — voir src/media.js.
@@ -220,8 +256,8 @@ export function closeStore() {
 export function saveMessage(msg) {
   const res = ensureDb()
     .prepare(`INSERT OR IGNORE INTO messages
-      (id, roomId, groupId, sender, text, ts, deviceFp, signature, signatureValid, type, extra, media, replyTo)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      (id, roomId, groupId, sender, text, ts, deviceFp, signature, signatureValid, type, extra, media, replyTo, tag, destinataire)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
     .run(
       String(msg.id),
       String(msg.roomId || "default"),
@@ -240,6 +276,8 @@ export function saveMessage(msg) {
       msg.extra ? JSON.stringify(msg.extra) : null,
       msg.media ? JSON.stringify(msg.media) : null,
       msg.replyTo ? String(msg.replyTo) : null,
+      msg.tag ? String(msg.tag) : null,
+      msg.destinataire ? String(msg.destinataire) : null,
     );
   // inserted=false ⇒ id déjà en base (doublon/rejeu) — le serveur s'en sert
   // pour ne pas rediffuser
@@ -417,7 +455,47 @@ function rowToMessage(r) {
     extra: r.extra ? safeJson(r.extra, null) : null,
     media: r.media ? safeJson(r.media, null) : null,
     replyTo: r.replyTo || null,
+    tag: r.tag || null,
+    destinataire: r.destinataire || null,
   };
+}
+
+// ── Étape K — décisions sur une demande qualifiée ──────────────────────────
+/** Enregistre (ou remplace) la décision d'UNE personne sur UNE demande.
+ *  Le remplacement est voulu : on doit pouvoir se rétracter, et c'est
+ *  l'état courant qui répond à « a-t-il validé ? ». */
+export function saveDecision({ messageId, fingerprint, sender, issue, comment, ts, signature }) {
+  ensureDb().prepare(
+    `INSERT INTO message_decisions (messageId, fingerprint, sender, issue, comment, ts, signature)
+     VALUES (?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(messageId, fingerprint) DO UPDATE SET
+       sender = excluded.sender, issue = excluded.issue, comment = excluded.comment,
+       ts = excluded.ts, signature = excluded.signature`,
+  ).run(String(messageId), String(fingerprint), sender || null, String(issue),
+        comment || null, Number(ts), signature || null);
+}
+
+/** Décisions prises sur une demande, la plus récente d'abord. */
+export function listDecisions(messageId) {
+  return ensureDb().prepare(
+    `SELECT messageId, fingerprint, sender, issue, comment, ts
+     FROM message_decisions WHERE messageId = ? ORDER BY ts DESC`,
+  ).all(String(messageId)).map((r) => ({ ...r, ts: Number(r.ts) }));
+}
+
+/** Les demandes d'un salon, dans les fils demandés. Sert à rejouer leurs
+ *  décisions à l'arrivée d'un client — même leçon que le dépouillement des
+ *  votes : une décision ne voyage PAS avec les messages, donc un arrivant
+ *  (ou une reconnexion, qui ne redemande que les messages récents) verrait
+ *  une demande de validation sans son issue. */
+export function listDemandes(roomId, groupIds) {
+  const groupes = (groupIds || []).map(String);
+  if (!groupes.length) return [];
+  const trous = groupes.map(() => "?").join(",");
+  return ensureDb().prepare(
+    `SELECT id, groupId FROM messages
+     WHERE roomId = ? AND tag IS NOT NULL AND groupId IN (${trous})`,
+  ).all(String(roomId), ...groupes);
 }
 
 /** Empreintes des pièces jointes encore citées par un message — sert au

@@ -13,7 +13,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { deriveKeyFromPin, encryptPayload, decryptPayload } from "./crypto.js";
 import { listenForSessions } from "./discovery.js";
-import { loadOrCreateIdentity, voteDefinitionSeal, voteAnswerSeal } from "./identity.js";
+import { loadOrCreateIdentity, voteDefinitionSeal, voteAnswerSeal,
+         demandeSeal, decisionSeal } from "./identity.js";
 import { CHUNK_BYTES } from "./media.js";
 
 // Répertoire par défaut de l'identité d'appareil (même défaut que store.js) ;
@@ -54,6 +55,8 @@ export function joinSession({
   onMessage,
   onVoteTally,
   onVoteRefused,
+  onDecisions,
+  onDecisionRefused,
   onLicenceNotice,
   onPresence,
   onAdminResult,
@@ -129,6 +132,11 @@ export function joinSession({
     // lecture seule. Arrive à la connexion et à chaque changement de
     // palier, sans redémarrage du serveur.
     else if (payload.type === "licence-notice") onLicenceNotice?.(payload);
+    // Étape K — l'issue d'une demande qualifiée. Comme le dépouillement
+    // d'un vote, elle arrive à part du message et se rafraîchit à chaque
+    // prise de position.
+    else if (payload.type === "decisions") onDecisions?.(payload);
+    else if (payload.type === "decision-refused") onDecisionRefused?.(payload);
     else if (payload.type === "invite-sent") onInviteSent?.(payload);
     else if (payload.type === "admin-result") onAdminResult?.(payload);
     // Étape F — annuaire : qui est inscrit, sa fonction, sa présence
@@ -170,7 +178,7 @@ export function joinSession({
     // "read" (accusés de lecture) : à relayer vers l'UI selon les besoins
   });
 
-  function send(text, groupId = "all", media = null, replyTo = null) {
+  function send(text, groupId = "all", media = null, replyTo = null, demande = null) {
     // Protocole v2 : id + horodatage générés ICI puis signés — le serveur
     // vérifie la signature avec la clé publique annoncée au join. Il ne
     // peut pas générer ces champs lui-même : la signature doit couvrir
@@ -186,6 +194,13 @@ export function joinSession({
     // demande. Voir signablePayload : quand une citation existe,
     // l'emplacement du média est écrit même vide.
     if (replyTo) core.replyTo = String(replyTo);
+    // Étape K — demande qualifiée : l'étiquette et le destinataire désigné
+    // sont scellés ensemble au rang 8. Le sceau doit être calculé sur
+    // EXACTEMENT ce que l'hôte recalculera de son côté (voir demandeSeal
+    // et le contrôle dans server.js), sinon la signature est rejetée.
+    const tag = demande?.tag || null;
+    const destinataire = demande?.destinataire || null;
+    if (tag) core.demandeSha = demandeSeal(tag, destinataire);
     ws.send(encryptPayload(sessionKey, {
       v: 2,
       type: "message",
@@ -195,8 +210,27 @@ export function joinSession({
       groupId,
       media,
       replyTo: replyTo ? String(replyTo) : null,
+      tag,
+      destinataire,
       signature: identity.signMessage(core),
     }));
+  }
+
+  /** Étape K — se prononcer sur une demande. La signature EST la valeur de
+   *  l'objet : « le Directeur a validé » ne vaut que prouvé. L'hôte refuse
+   *  une décision non signée, et n'accepte que le destinataire désigné
+   *  quand il y en a un. */
+  function decider({ messageId, issue, comment = "" }) {
+    const core = {
+      id: "dec_" + crypto.randomUUID(), from: userId,
+      text: comment ?? "", ts: Date.now(),
+      demandeSha: decisionSeal(messageId, issue),
+    };
+    ws.send(encryptPayload(sessionKey, {
+      v: 2, type: "decision", id: core.id, messageId, issue,
+      comment: core.text, ts: core.ts, signature: identity.signMessage(core),
+    }));
+    return core.id;
   }
 
   // ── Étape H — votes ─────────────────────────────────────────────────
@@ -300,6 +334,7 @@ export function joinSession({
     send,
     openVote,
     answerVote,
+    decider,
     markRead,
     requestRoster,
     sendAdmin,

@@ -1085,8 +1085,13 @@ ipcMain.on("chat-join", (event, joinParams) => {
   ensureChatWorker()?.send({ cmd: "join", ...joinParams });
 });
 
-ipcMain.on("chat-send-message", (event, { text, groupId, media, replyTo }) => {
-  chatWorker?.send({ cmd: "send-message", text, groupId, media, replyTo });
+ipcMain.on("chat-send-message", (event, { text, groupId, media, replyTo, demande }) => {
+  chatWorker?.send({ cmd: "send-message", text, groupId, media, replyTo, demande });
+});
+
+// ── Étape K — se prononcer sur une demande qualifiée ───────────────────
+ipcMain.on("chat-decider", (event, { messageId, issue, comment }) => {
+  chatWorker?.send({ cmd: "decider", messageId, issue, comment });
 });
 
 // ── Étape H — votes ────────────────────────────────────────────────────
