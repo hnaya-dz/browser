@@ -52,7 +52,7 @@ n'ont qu'à saisir le code d'accès.
 
 Le salon tourne sur une machine toujours allumée, **même sans session
 ouverte**, et survit aux redémarrages. C'est la prestation sous licence.
-Voir la section 12.
+Voir la section 13.
 
 ---
 
@@ -85,7 +85,7 @@ registre de l'administrateur.
 
 ---
 
-## 4. Écrire
+## 4. Écrire et joindre
 
 - **Message simple** : saisissez et envoyez.
 - **Répondre** : le bouton *Répondre* sous un message. La citation est
@@ -93,8 +93,7 @@ registre de l'administrateur.
   sous une autre demande.
 - **Pièce jointe** : le trombone. Images, PDF, Word, Excel, PowerPoint,
   OpenDocument, texte, CSV, ZIP, et fichiers audio.
-- **Message vocal** : le microphone (sur le poste). Depuis un téléphone,
-  la page délègue au magnétophone du système.
+- **Message vocal** : voir la section suivante.
 
 **Limites** : 25 Mo par fichier ; 200 Mo et 60 fichiers par heure et par
 appareil. Ces plafonds protègent la machine hôte, qui est souvent un poste
@@ -102,7 +101,75 @@ ordinaire.
 
 ---
 
-## 5. Conversations privées
+## 5. Les messages vocaux
+
+Dicter est souvent plus rapide qu'écrire, et cela passe mieux ce qu'un
+texte rend mal : une nuance, une réserve, une consigne à plusieurs volets.
+Sur le terrain — un chantier, un magasin, une tournée — c'est parfois le
+seul mode praticable.
+
+### Depuis un poste
+
+Le bouton **microphone**, à gauche de la zone de saisie. On enregistre, on
+arrête, et l'aperçu affiche la durée obtenue. On peut renoncer d'un clic
+avant d'envoyer. Le message part comme pièce jointe et s'écoute d'un clic
+chez le destinataire.
+
+> Dans cette version, l'aperçu **ne permet pas de se réécouter** avant
+> l'envoi : il indique la durée, pas plus. Un enregistrement raté se
+> supprime et se refait.
+
+### Depuis un téléphone
+
+Le bouton **🎤** ouvre le **magnétophone du téléphone**, pas un
+enregistreur maison. On enregistre avec l'application que l'on connaît
+déjà, on valide, et le fichier est joint.
+
+> **Pourquoi ce détour, et pourquoi il est préférable.** La page mobile est
+> servie en `http` sur une adresse privée : le navigateur refuse alors
+> l'accès au microphone, comme il refuse la biométrie et les
+> notifications. Déléguer au magnétophone du système contourne la
+> limitation — et donne au passage une meilleure qualité d'enregistrement,
+> la gestion du bruit et de la pause, et une interface que l'utilisateur
+> maîtrise déjà.
+
+### Les formats
+
+Passent tels quels : **WebM, OGG, MP3, M4A, WAV** — ce que produisent les
+magnétophones d'Android et d'iOS.
+
+Tout autre format — FLAC, AIFF, un conteneur AAC inhabituel — est
+**converti automatiquement** par le navigateur, sans aucun logiciel à
+installer. Auparavant ces fichiers étaient simplement refusés.
+
+> **Ce qu'il faut savoir sur la conversion.** Elle passe par une lecture en
+> temps réel : convertir un enregistrement de trois minutes prend environ
+> trois minutes, et une barre de progression le montre. Les formats de la
+> liste ci-dessus n'y passent pas et partent instantanément — dans l'usage
+> courant, la conversion ne se déclenche jamais.
+
+### Ce que la voix garde de la messagerie écrite
+
+Un message vocal est **signé comme n'importe quel autre**, et l'empreinte
+du fichier entre dans le périmètre signé. On peut donc établir qui a dicté
+quoi, et l'enregistrement ne peut pas être remplacé après coup sans que la
+signature s'en trouve rompue. Une consigne orale devient opposable au même
+titre qu'un écrit.
+
+La voix se combine aussi au reste : on peut **citer** un message vocal et
+**l'étiqueter** *Pour info* ou *Validation* — une consigne dictée peut donc
+appeler une validation signée en retour.
+
+> L'accusé de lecture dit que le message a été **affiché**, pas qu'il a été
+> **écouté**. Personne ne peut prouver qu'un enregistrement a réellement
+> été entendu, et le guide ne le laissera pas croire.
+
+**Limite** : 25 Mo, soit largement plus d'une heure de parole aux débits
+usuels. La durée n'est pas bornée autrement.
+
+---
+
+## 6. Conversations privées
 
 Depuis l'**Annuaire**, cliquez sur une personne pour ouvrir un fil privé.
 Aucun code à partager, aucun salon à créer.
@@ -116,7 +183,7 @@ s'affiche sur l'icône de messagerie.
 
 ---
 
-## 6. L'annuaire
+## 7. L'annuaire
 
 Chaque personne y figure avec :
 
@@ -134,7 +201,7 @@ position GPS de la prise de vue.
 
 ---
 
-## 7. Accusés de lecture
+## 8. Accusés de lecture
 
 Sous **vos propres** messages s'affiche « Vu par … », avec le nom de chaque
 lecteur et l'heure au survol.
@@ -149,7 +216,7 @@ téléphone appairé compte pour **un** lecteur.
 
 ---
 
-## 8. Qualifier un envoi : pour info, avis, validation, approbation
+## 9. Qualifier un envoi : pour info, avis, validation, approbation
 
 C'est le cœur de l'usage institutionnel.
 
@@ -186,7 +253,7 @@ personne ne compte que pour une décision même depuis deux appareils.
 
 ---
 
-## 9. Soumettre au vote
+## 10. Soumettre au vote
 
 Pour consulter plusieurs personnes à la fois : bouton **Vote**. Trois
 options par défaut — Valider, Refuser, Réserves — modifiables.
@@ -201,7 +268,7 @@ Une personne équipée d'un téléphone appairé pèse **une seule voix**.
 
 ---
 
-## 10. Annoncer une réunion
+## 11. Annoncer une réunion
 
 Bouton **Réunion** : objet, date et heure, durée, lieu.
 
@@ -221,7 +288,7 @@ aucune connexion, aucune configuration.
 
 ---
 
-## 11. Être averti
+## 12. Être averti
 
 - **Signal sonore** : deux timbres distincts, l'un pour le salon, l'autre —
   plus insistant — pour un message privé. Interrupteur dans la barre
@@ -234,7 +301,7 @@ aucune connexion, aucune configuration.
 
 ---
 
-## 12. Le serveur permanent et sa licence
+## 13. Le serveur permanent et sa licence
 
 ### Installer
 
@@ -279,7 +346,7 @@ une personne, c'est *Bloquer*.
 
 ---
 
-## 13. Administration
+## 14. Administration
 
 Code administrateur exigé. Quatre onglets :
 
@@ -296,7 +363,7 @@ Code administrateur exigé. Quatre onglets :
 
 ---
 
-## 14. Limites connues
+## 15. Limites connues
 
 Elles sont dites ici plutôt que découvertes en usage.
 
@@ -314,7 +381,7 @@ Elles sont dites ici plutôt que découvertes en usage.
 
 ---
 
-## 15. En cas de difficulté
+## 16. En cas de difficulté
 
 | Symptôme | Cause la plus fréquente |
 |---|---|
@@ -324,6 +391,8 @@ Elles sont dites ici plutôt que découvertes en usage.
 | Plus aucun message ne part | Licence échue depuis plus de 30 jours — le bandeau l'indique |
 | Un nouvel appareil est refusé | Plafond d'appareils atteint : libérez une place dans le registre |
 | Le téléphone apparaît en double dans l'annuaire | Il a rejoint sans jeton d'appairage — refaites *Ajouter mon mobile* |
+| Un vocal met longtemps à partir | Format hors liste : il est converti en temps réel. Enregistrez avec le magnétophone du téléphone, dont le format passe directement |
+| Le bouton microphone ne fait rien sur le téléphone | Aucun magnétophone n'est installé, ou l'accès au stockage a été refusé |
 
 ---
 
