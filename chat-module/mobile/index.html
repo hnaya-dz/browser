@@ -118,6 +118,28 @@
   #replyBar button { background:transparent; border:none; color:var(--muted); font-size:22px;
                      cursor:pointer; flex-shrink:0; min-width:44px; min-height:44px;
                      display:flex; align-items:center; justify-content:center; }
+  /* — Étape K : qualifier l'envoi — */
+  #tagBar { display:flex; flex-direction:column; gap:6px; padding:8px 12px 0; flex-shrink:0; }
+  .tag-choix { display:flex; gap:5px; flex-wrap:wrap; }
+  .tag-choix button { flex:1 1 auto; min-height:36px; padding:5px 8px; font-size:12px;
+                      border-radius:9px; border:1px solid var(--border);
+                      background:transparent; color:var(--muted); cursor:pointer; }
+  #tagDest { width:100%; min-height:40px; padding:6px 8px; font-size:13px;
+             border-radius:9px; border:1px solid var(--border);
+             background:var(--panel); color:var(--fg); }
+  #tagDest[hidden] { display:none; }
+  /* — Étape K : demande qualifiée — */
+  .demande { border:1px solid; border-radius:10px; padding:8px 10px; margin-bottom:6px; }
+  .demande-tete { font-size:11px; font-weight:700; letter-spacing:.4px; text-transform:uppercase; }
+  .demande-vers { color:var(--muted); font-weight:400; text-transform:none; letter-spacing:0; }
+  .demande-issue { font-size:12.5px; line-height:1.5; color:var(--muted); margin-top:4px; }
+  .demande-com { font-style:italic; padding-inline-start:10px; }
+  .demande-att { font-size:12px; color:var(--muted); margin-top:3px; }
+  .demande-actions { display:flex; gap:6px; margin-top:8px; flex-wrap:wrap; }
+  .demande-actions button { flex:1 1 30%; min-height:44px; min-width:88px; padding:6px 8px;
+                            font-size:13px; font-weight:600; border-radius:9px;
+                            border:1px solid var(--border); background:transparent;
+                            color:var(--fg); cursor:pointer; }
   /* — Étape J : messages privés en attente — */
   #priveBar { display:flex; flex-direction:column; gap:6px; padding:9px 12px; flex-shrink:0;
               border-top:1px solid rgba(255,82,82,0.45); background:rgba(255,82,82,0.13); }
@@ -290,6 +312,19 @@
       <span class="info"><span id="replyWho"></span><small id="replyTxt"></small></span>
       <button id="replyCancel" aria-label="Annuler la réponse">✕</button>
     </div>
+    <!-- Étape K — qualifier l'envoi : nature, et personne dont on attend
+         la réponse. Rien n'est coché par défaut : la plupart des messages
+         sont de simples messages, et une étiquette imposée d'office
+         cesserait d'être un signal. -->
+    <div id="tagBar">
+      <div class="tag-choix">
+        <button data-tag="info" data-i18n="tag_info">Pour info</button>
+        <button data-tag="avis" data-i18n="tag_avis">Avis</button>
+        <button data-tag="validation" data-i18n="tag_validation">Validation</button>
+        <button data-tag="approbation" data-i18n="tag_approbation">Approbation</button>
+      </div>
+      <select id="tagDest" hidden></select>
+    </div>
     <!-- Étape J — messages privés en attente. Le seul signal était un
          petit compte sur l'icône 👥 de l'en-tête : invisible sur un
          téléphone tenu à bout de bras. Ici le bandeau nomme l'expéditeur,
@@ -318,7 +353,7 @@
   </section>
 </main>
 <script type="module">
-import { deriveKeyFromPin, encryptPayload, decryptPayload, generateIdentity, identityFromPrivate, voteAnswerSeal } from "./vendor/crypto-bundle.js";
+import { deriveKeyFromPin, encryptPayload, decryptPayload, generateIdentity, identityFromPrivate, voteAnswerSeal, demandeSeal, decisionSeal } from "./vendor/crypto-bundle.js";
 
 // ── Identité d'appareil Ed25519 (étape D) ──────────────────────────────
 // Générée à la première visite, conservée en localStorage : le pseudo est
@@ -346,14 +381,26 @@ function genMsgId() {
 const I18N = {
   fr: { appTitle:"Messagerie locale", joinTitle:"Rejoindre le salon", joinSub:"Communication chiffrée sur votre réseau interne — rien ne transite par Internet.", nickname:"Pseudo", pinLabel:"Code PIN (6 chiffres, communiqué par l'hôte)", joinBtn:"Rejoindre", notice:"Gardez cette page ouverte pour recevoir les messages — les notifications d'écran verrouillé ne sont pas disponibles dans cette version.", connectionLost:"Connexion au salon perdue.", rejoin:"Reconnecter", send:"Envoyer", wrongPin:"PIN incorrect — vérifiez le code auprès de l'hôte.", cantReach:"Salon injoignable — vérifiez que vous êtes sur le même wifi.", online:"en ligne", draftPlaceholder:"Écrire un message…", connecting:"Connexion…",
         rosterTitle:"Annuaire", rosterEmpty:"Personne d'autre n'a encore rejoint ce salon.", rosterMe:"vous", rosterUnnamed:"Sans nom", rosterOnline:"En ligne", rosterJustNow:"à l'instant", threadPrivate:"Privé", threadEmpty:"Aucun message dans cette conversation privée.", roomThread:"Salon", priveWaiting:"vous a écrit en privé", soundOn:"Signal sonore activé", soundOff:"Signal sonore coupé",
+        tag_info:"Pour info", tag_avis:"Avis", tag_validation:"Validation", tag_approbation:"Approbation",
+        issue_valide:"Validé", issue_refuse:"Refusé", issue_reserve:"Réserves",
+        demandeYou:"vous", demandePending:"En attente d'une réponse", demandeAnyone:"Sans destinataire précis",
+        demandeNotForYou:"Cette demande est adressée à quelqu'un d'autre.",
         attVoice:"Message vocal", attFile:"Pièce jointe", attSave:"Ouvrir", attLoading:"Chargement…", attGone:"Pièce jointe indisponible.", attFailed:"Échec du téléchargement.",
         attSending:"Envoi…", attTooBig:"Fichier trop volumineux (25 Mo maximum).", attTypeRefused:"Ce type de fichier n'est pas autorisé.", attQuotaBytes:"Limite de volume atteinte pour cet appareil (200 Mo par heure).", attQuotaFiles:"Trop de fichiers envoyés depuis cet appareil dans la dernière heure.", attBusy:"Trop d'envois simultanés — patientez.", attSendFailed:"L'envoi de la pièce jointe a échoué.", attImageFailed:"Cette image n'a pas pu être lue. Son extension annonce un format que son contenu ne respecte pas — cas fréquent des photos d'iPhone enregistrées en « .jpg » alors qu'elles sont au format HEIC.", attCaption:"Ajouter un mot (facultatif)…", attAttachment:"Pièce jointe", roomEmpty:"Aucun message pour l'instant.", roomEmptyHint:"Écrivez le premier message du salon, ou attendez qu'un collègue s'exprime.", reply:"Répondre", replyingTo:"En réponse à", replyGone:"Message supprimé", voteLabel:"POUR VALIDATION", voteNotNamed:"non nominatif", voteAnswered:"ont répondu", votePending:"en attente", voteFinal:"Votre bulletin est définitif.", voteAlready:"Vous avez déjà voté — un vote non nominatif est définitif." },
   en: { appTitle:"Local Messaging", joinTitle:"Join the room", joinSub:"Encrypted communication over your internal network — nothing goes through the Internet.", nickname:"Nickname", pinLabel:"PIN code (6 digits, provided by the host)", joinBtn:"Join", notice:"Keep this page open to receive messages — lock-screen notifications are not available in this version.", connectionLost:"Connection to the room lost.", rejoin:"Reconnect", send:"Send", wrongPin:"Incorrect PIN — check the code with the host.", cantReach:"Room unreachable — make sure you are on the same wifi.", online:"online", draftPlaceholder:"Write a message…", connecting:"Connecting…",
         rosterTitle:"Directory", rosterEmpty:"Nobody else has joined this room yet.", rosterMe:"you", rosterUnnamed:"Unnamed", rosterOnline:"Online", rosterJustNow:"just now", threadPrivate:"Private", threadEmpty:"No messages in this private conversation yet.", roomThread:"Room", priveWaiting:"wrote to you privately", soundOn:"Sound on", soundOff:"Sound off",
+        tag_info:"For info", tag_avis:"Opinion", tag_validation:"Validation", tag_approbation:"Approval",
+        issue_valide:"Validated", issue_refuse:"Refused", issue_reserve:"Reservations",
+        demandeYou:"you", demandePending:"Awaiting a response", demandeAnyone:"No specific recipient",
+        demandeNotForYou:"This request is addressed to someone else.",
         attVoice:"Voice message", attFile:"Attachment", attSave:"Open", attLoading:"Loading…", attGone:"Attachment unavailable.", attFailed:"Download failed.",
         attSending:"Sending…", attTooBig:"File too large (25 MB maximum).", attTypeRefused:"This file type is not allowed.", attQuotaBytes:"Upload limit reached for this device (200 MB per hour).", attQuotaFiles:"Too many files sent from this device in the past hour.", attBusy:"Too many uploads at once — please wait.", attSendFailed:"Sending the attachment failed.", attImageFailed:"This image could not be read. Its extension claims a format its contents do not match — commonly an iPhone photo saved as “.jpg” while actually being HEIC.", attCaption:"Add a note (optional)…", attAttachment:"Attachment", roomEmpty:"No messages yet.", roomEmptyHint:"Write the room's first message, or wait for a colleague to speak.", reply:"Reply", replyingTo:"Replying to", replyGone:"Message deleted", voteLabel:"FOR APPROVAL", voteNotNamed:"not named", voteAnswered:"answered", votePending:"pending", voteFinal:"Your ballot is final.", voteAlready:"You have already voted — a non-nominative ballot is final." },
   ar: { appTitle:"المراسلة المحلية", joinTitle:"الانضمام إلى الغرفة", joinSub:"تواصل مشفّر عبر شبكتك الداخلية — لا شيء يمر عبر الإنترنت.", nickname:"الاسم المستعار", pinLabel:"رمز PIN (6 أرقام، يقدّمه المضيف)", joinBtn:"انضمام", notice:"أبقِ هذه الصفحة مفتوحة لاستقبال الرسائل — إشعارات شاشة القفل غير متاحة في هذا الإصدار.", connectionLost:"انقطع الاتصال بالغرفة.", rejoin:"إعادة الاتصال", send:"إرسال", wrongPin:"رمز PIN غير صحيح — تحقّق من الرمز لدى المضيف.", cantReach:"تعذّر الوصول إلى الغرفة — تأكّد أنك على نفس شبكة الواي فاي.", online:"متصل", draftPlaceholder:"اكتب رسالة…", connecting:"جارٍ الاتصال…",
         rosterTitle:"الدليل", rosterEmpty:"لم ينضم أحد آخر إلى هذه الغرفة بعد.", rosterMe:"أنت", rosterUnnamed:"بلا اسم", rosterOnline:"متصل", rosterJustNow:"الآن", threadPrivate:"خاص", threadEmpty:"لا توجد رسائل في هذه المحادثة الخاصة.", roomThread:"الغرفة", priveWaiting:"راسلك على الخاص", soundOn:"التنبيه الصوتي مفعَّل", soundOff:"التنبيه الصوتي مكتوم",
+        tag_info:"للعلم", tag_avis:"رأي", tag_validation:"مصادقة", tag_approbation:"موافقة",
+        issue_valide:"مُصادَق", issue_refuse:"مرفوض", issue_reserve:"تحفّظات",
+        demandeYou:"أنت", demandePending:"في انتظار الرد", demandeAnyone:"بلا مرسَل إليه محدَّد",
+        demandeNotForYou:"هذا الطلب موجَّه إلى شخص آخر.",
         attVoice:"رسالة صوتية", attFile:"مرفق", attSave:"فتح", attLoading:"جارٍ التحميل…", attGone:"المرفق غير متاح.", attFailed:"فشل التحميل.",
         attSending:"جارٍ الإرسال…", attTooBig:"الملف كبير جداً (25 ميغابايت كحد أقصى).", attTypeRefused:"هذا النوع من الملفات غير مسموح به.", attQuotaBytes:"بلغ هذا الجهاز حدّ الحجم المسموح (200 ميغابايت في الساعة).", attQuotaFiles:"أُرسلت ملفات كثيرة من هذا الجهاز خلال الساعة الأخيرة.", attBusy:"عمليات إرسال كثيرة في آن واحد — انتظر قليلاً.", attSendFailed:"فشل إرسال المرفق.", attImageFailed:"تعذّرت قراءة هذه الصورة. امتدادها يعلن صيغة لا يطابقها محتواها — وهي حالة شائعة في صور آيفون المحفوظة بامتداد «.jpg» بينما هي بصيغة HEIC.", attCaption:"أضف كلمة (اختياري)…", attAttachment:"مرفق", roomEmpty:"لا توجد رسائل بعد.", roomEmptyHint:"اكتب أول رسالة في الغرفة، أو انتظر أن يتحدّث زميل.", reply:"رد", replyingTo:"رداً على", replyGone:"رسالة محذوفة", voteLabel:"للمصادقة", voteNotNamed:"غير اسمي", voteAnswered:"أجابوا", votePending:"في الانتظار", voteFinal:"صوتك نهائي.", voteAlready:"لقد صوّتّ من قبل — التصويت غير الاسمي نهائي." },
 };
@@ -598,6 +645,144 @@ function voteNode(m) {
   return box;
 }
 
+// ── Étape K — demande qualifiée sur la page mobile ────────────────────
+// Un directeur valide souvent depuis son téléphone : la lecture ET la
+// décision doivent être possibles ici, pas seulement sur le poste.
+//
+// ⚠️ Une issue ne s'affiche JAMAIS sans le nom de qui l'a prise. Un
+// « Validé » anonyme dans un circuit d'approbation donne une certitude que
+// rien ne fonde — c'est l'exigence qui a motivé toute la fonction.
+const TAG_TON = { info: "#8a8a8a", avis: "#4a9eff", validation: "#00c853", approbation: "#ffa726" };
+const ISSUE_TON = { valide: "#00c853", refuse: "#ff5252", reserve: "#ffa726" };
+const decisions = {};   // messageId -> [décisions]
+
+function demandeNode(m) {
+  const ton = TAG_TON[m.tag] || "#8a8a8a";
+  const box = document.createElement("div");
+  box.className = "demande";
+  box.style.borderColor = ton + "88";
+  box.style.background = ton + "18";
+
+  const tete = document.createElement("div");
+  tete.className = "demande-tete";
+  tete.style.color = ton;
+  tete.textContent = t("tag_" + m.tag);
+  if (m.destinataire) {
+    const p = people.find((x) => x.fingerprint === m.destinataire);
+    const moi = m.destinataire === myFp;
+    const vers = document.createElement("span");
+    vers.className = "demande-vers";
+    vers.textContent = " → " + (moi ? t("demandeYou") : (p?.name || m.destinataire.slice(0, 8)));
+    tete.appendChild(vers);
+  }
+  box.appendChild(tete);
+
+  const prises = decisions[m.id] || [];
+  for (const d of prises) {
+    const l = document.createElement("div");
+    l.className = "demande-issue";
+    const badge = document.createElement("b");
+    badge.style.color = ISSUE_TON[d.issue] || "#8a8a8a";
+    badge.textContent = t("issue_" + d.issue);
+    l.appendChild(badge);
+    l.appendChild(document.createTextNode(
+      " — " + (d.sender || "?") + " · " + new Date(d.ts).toLocaleString()));
+    if (d.comment) {
+      const c = document.createElement("div");
+      c.className = "demande-com";
+      c.textContent = "« " + d.comment + " »";
+      l.appendChild(c);
+    }
+    box.appendChild(l);
+  }
+
+  if (m.tag !== "info" && !prises.length) {
+    const att = document.createElement("div");
+    att.className = "demande-att";
+    att.textContent = t("demandePending");
+    box.appendChild(att);
+  }
+
+  // Boutons : le destinataire désigné s'il y en a un, sinon tout le monde.
+  // Même règle que l'hôte — la dupliquer n'autorise rien, elle évite
+  // d'afficher des boutons qui seraient refusés.
+  const peutDecider = m.tag !== "info" && (!m.destinataire || m.destinataire === myFp);
+  if (peutDecider) {
+    const mienne = prises.find((d) => d.fingerprint === myFp);
+    const rangee = document.createElement("div");
+    rangee.className = "demande-actions";
+    for (const issue of ["valide", "refuse", "reserve"]) {
+      const b = document.createElement("button");
+      b.textContent = t("issue_" + issue);
+      if (mienne && mienne.issue === issue) {
+        b.style.borderColor = ISSUE_TON[issue];
+        b.style.color = ISSUE_TON[issue];
+        b.style.background = ISSUE_TON[issue] + "28";
+      }
+      b.onclick = () => envoyerDecision(m.id, issue);
+      rangee.appendChild(b);
+    }
+    box.appendChild(rangee);
+  }
+  return box;
+}
+
+// ── Étape K — état du sélecteur d'étiquette ───────────────────────────
+let tagChoisi = null, destinataireChoisi = "";
+
+function choisirTag(t2) {
+  tagChoisi = t2;
+  destinataireChoisi = t2 && t2 !== "info" ? destinataireChoisi : "";
+  for (const b of document.querySelectorAll(".tag-choix button")) {
+    const actif = b.dataset.tag === t2;
+    const ton = TAG_TON[b.dataset.tag];
+    b.style.borderColor = actif ? ton : "var(--border)";
+    b.style.color = actif ? ton : "var(--muted)";
+    b.style.background = actif ? ton + "28" : "transparent";
+  }
+  // Désigner quelqu'un n'a de sens que si l'on attend une réponse : un
+  // « pour info » adressé nommément laisserait croire qu'il faut agir.
+  const sel = document.getElementById("tagDest");
+  sel.hidden = !t2 || t2 === "info";
+  if (!sel.hidden) remplirDestinataires();
+}
+
+function remplirDestinataires() {
+  const sel = document.getElementById("tagDest");
+  const garde = sel.value;
+  sel.textContent = "";
+  const aucun = document.createElement("option");
+  aucun.value = ""; aucun.textContent = t("demandeAnyone");
+  sel.appendChild(aucun);
+  for (const p of people) {
+    if (p.fingerprint === myFp) continue;
+    const o = document.createElement("option");
+    o.value = p.fingerprint;
+    o.textContent = (p.name || p.fingerprint.slice(0, 8)) + (p.role ? " · " + p.role : "");
+    sel.appendChild(o);
+  }
+  sel.value = garde;
+  destinataireChoisi = sel.value;
+}
+
+for (const b of document.querySelectorAll(".tag-choix button")) {
+  b.onclick = () => choisirTag(tagChoisi === b.dataset.tag ? null : b.dataset.tag);
+}
+document.getElementById("tagDest").onchange = (e) => { destinataireChoisi = e.target.value; };
+
+function envoyerDecision(messageId, issue) {
+  if (!identity) return;
+  const core = {
+    id: "dec_" + (crypto.randomUUID ? crypto.randomUUID() : String(Date.now())),
+    from: userId, text: "", ts: Date.now(),
+    demandeSha: decisionSeal(messageId, issue),
+  };
+  ws.send(encryptPayload(key, {
+    v: 2, type: "decision", id: core.id, messageId, issue,
+    comment: "", ts: core.ts, signature: identity.signMessage(core),
+  }));
+}
+
 function messageNode(m) {
   if (m.type === "vote") return voteNode(m);
   const div = document.createElement("div");
@@ -624,6 +809,10 @@ function messageNode(m) {
     div.appendChild(bloc);
   }
   div.dataset.id = m.id || "";
+  // Étape K — demande qualifiée : nature de l'envoi, personne désignée,
+  // issues prises. Placé AVANT le texte : on doit savoir ce qu'on attend
+  // de nous avant de lire.
+  if (m.tag) div.appendChild(demandeNode(m));
   // Texte facultatif : un vocal ou une image peut partir sans un mot.
   if (m.text) { const text = document.createElement("div"); renderText(text, m.text); div.appendChild(text); }
   renderMedia(div, m);
@@ -1141,6 +1330,14 @@ async function connect() {
     // texte de l'hôte ; passé le délai de grâce, la saisie est coupée
     // plutôt que de laisser écrire un message qui sera refusé.
     else if (payload.type === "licence-notice") appliquerLicence(payload);
+    // Étape K — issue d'une demande qualifiée. Comme le dépouillement d'un
+    // vote, elle arrive à part du message : l'hôte envoie l'état courant
+    // complet, à chaque prise de position et à la connexion.
+    else if (payload.type === "decisions") {
+      decisions[payload.messageId] = payload.decisions || [];
+      renderMessages();
+    }
+    else if (payload.type === "decision-refused") showAttError(t("demandeNotForYou"));
     else if (payload.type === "presence") {
       presenceEl.textContent = `● ${payload.online.length} ${t("online")}`;
       // La présence a changé : l'annuaire affiché doit suivre, sinon la
@@ -1254,6 +1451,11 @@ function emettre(text, media) {
   // Étape G — la citation entre elle aussi dans le périmètre signé : une
   // réponse ne peut pas être déplacée sous une autre demande.
   if (replyToId) core.replyTo = String(replyToId);
+  // Étape K — étiquette et destinataire désigné, scellés ensemble au
+  // rang 8. Le sceau doit couvrir EXACTEMENT ce que l'hôte recalculera,
+  // sinon la signature est rejetée et la demande retombe en simple
+  // message : silencieusement, ce qui serait le pire des cas.
+  if (tagChoisi) core.demandeSha = demandeSeal(tagChoisi, destinataireChoisi || null);
   ws.send(encryptPayload(key, {
     v: 2,
     type: "message",
@@ -1261,6 +1463,8 @@ function emettre(text, media) {
     text: core.text,
     ts: core.ts,
     replyTo: replyToId || null,
+    tag: tagChoisi || null,
+    destinataire: destinataireChoisi || null,
     // Le message part dans le fil OUVERT : le salon, ou la conversation
     // privée en cours. Codé en dur, une réponse privée serait partie dans
     // le salon, au vu de tous.
@@ -1268,6 +1472,9 @@ function emettre(text, media) {
     media: media || null,
     signature: identity.signMessage(core),
   }));
+  // Remis à zéro après CHAQUE envoi : une étiquette qui colle ferait
+  // partir en demande de validation le message anodin qui suit.
+  choisirTag(null);
 }
 
 async function sendDraft() {
