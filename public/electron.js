@@ -562,6 +562,16 @@ app.commandLine.appendSwitch("disable-component-update");        // vérifie/té
 app.commandLine.appendSwitch("no-pings");                        // désactive l'attribut HTML <a ping> (tracking de clics natif du navigateur)
 
 app.on("ready", async () => {
+  // ⚠️ SANS CECI, AUCUNE NOTIFICATION WINDOWS N'APPARAÎT.
+  // Windows n'affiche une notification que si l'application déclare un
+  // AppUserModelID correspondant à un raccourci installé. Electron ne le
+  // fait pas tout seul : sans cet appel, `new Notification(...).show()`
+  // réussit sans erreur et il ne se passe RIEN — ni bandeau, ni son.
+  // C'est exactement ce qu'a produit le premier rappel de réunion en test
+  // réel : aucun message d'erreur, aucun indice, rien à l'écran.
+  // La valeur doit être identique à l'`appId` d'electron-builder.
+  app.setAppUserModelId("dz.hnaya.browser");
+
   // Interrupteurs confidentialité : lus AVANT createWindow pour que le
   // filtre réseau respecte le choix de l'utilisateur dès la 1re requête
   loadPrivacySettings();
@@ -1115,6 +1125,13 @@ ipcMain.on("chat-schedule-reminder", (event, { id, titre, corps, atMs } = {}) =>
         new Notification({ title: String(titre || "Réunion"), body: String(corps || "") }).show();
       }
     } catch { /* notifications refusées par le système */ }
+    // On prévient AUSSI l'interface pour qu'elle joue le signal sonore de
+    // la messagerie. La notification Windows a son propre son, mais il se
+    // tait dès que l'assistant de concentration est actif ou que les sons
+    // système sont coupés — cas fréquent sur un poste de bureau. Deux
+    // canaux valent mieux qu'un pour un rappel qu'on ne doit pas manquer.
+    try { mainWindow?.webContents.send("chat-event", { event: "meeting-reminder", id }); }
+    catch { /* fenêtre fermée */ }
   }, delai);
   rappelsReunion.set(id, timer);
 });

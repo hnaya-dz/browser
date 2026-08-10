@@ -479,6 +479,18 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
     border: `1px solid ${border}`, background: inputBg,
     color: text, fontSize: 13, outline: "none",
   };
+  // ⚠️ Une liste déroulante ne se style PAS comme un champ de saisie.
+  // `inputStyle` pose un fond translucide, très bien par-dessus le
+  // panneau — mais Windows dessine la liste ouverte lui-même, sur un fond
+  // BLANC, en héritant de la couleur de texte du thème sombre : texte
+  // blanc sur blanc, liste illisible tant qu'une ligne n'est pas
+  // survolée. Constaté en test réel sur le choix du destinataire.
+  // Fond OPAQUE obligatoire, sur le select ET sur chaque option.
+  const selectStyle: React.CSSProperties = {
+    ...inputStyle, background: bg, color: text, cursor: "pointer",
+  };
+  const optionStyle: React.CSSProperties = { background: bg, color: text };
+
   const btnStyle = (primary = false, disabled = false): React.CSSProperties => ({
     padding: "9px 16px", borderRadius: 4, border: primary ? "none" : `1px solid ${border}`,
     background: primary ? `linear-gradient(135deg,${accent},${accent}cc)` : "transparent",
@@ -1366,11 +1378,11 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
                   <select
                     value={inviteRoomId}
                     onChange={(e) => pickInviteRoom(e.target.value)}
-                    style={{ ...inputStyle, cursor: "pointer" }}
+                    style={selectStyle}
                   >
-                    <option value="">{t("Chat.inviteRoomPick")}</option>
+                    <option value="" style={optionStyle}>{t("Chat.inviteRoomPick")}</option>
                     {store.rooms.map((r) => (
-                      <option key={r.roomId} value={r.roomId}>
+                      <option key={r.roomId} value={r.roomId} style={optionStyle}>
                         {r.name}{store.hostings.some((h) => h.roomId === r.roomId) ? " ● " + t("Chat.inviteRoomOpen") : ""}
                       </option>
                     ))}
@@ -1400,15 +1412,15 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
                 <select
                   value={inviteTarget}
                   onChange={(e) => setInviteTarget(e.target.value)}
-                  style={{ ...inputStyle, cursor: "pointer" }}
+                  style={selectStyle}
                 >
                   {/* « À tous » + un choix par membre connecté (le compteur
                       lève le doute quand on est seul dans le salon) */}
-                  <option value="">
+                  <option value="" style={optionStyle}>
                     {t("Chat.inviteAll")} — {store.online.length} {t("Chat.online")}
                   </option>
                   {store.online.filter((u) => u !== store.userId).map((u) => (
-                    <option key={u} value={u}>{u}</option>
+                    <option key={u} value={u} style={optionStyle}>{u}</option>
                   ))}
                 </select>
                 <div style={{ fontSize: 9.5, color: muted, lineHeight: 1.5 }}>
@@ -1988,13 +2000,15 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
                     <select
                       value={destinataire}
                       onChange={(e) => setDestinataire(e.target.value)}
-                      style={{ ...inputStyle, padding: "3px 6px", fontSize: 10, flex: 1, minWidth: 110 }}
+                      style={{ ...selectStyle, padding: "3px 6px", fontSize: 10, flex: 1, minWidth: 110 }}
                     >
-                      <option value="">{t("Chat.demandeAnyone")}</option>
+                      <option value="" style={optionStyle}>
+                        {t("Chat.demandeAnyone")}
+                      </option>
                       {store.roster
                         .filter((p) => !p.isMe)
                         .map((p) => (
-                          <option key={p.fingerprint} value={p.fingerprint}>
+                          <option key={p.fingerprint} value={p.fingerprint} style={optionStyle}>
                             {p.name || p.fingerprint.slice(0, 8)}{p.role ? ` · ${p.role}` : ""}
                           </option>
                         ))}

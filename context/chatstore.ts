@@ -461,9 +461,11 @@ export function setPanelOpen(open: boolean) {
   if (store.activeThread !== "all") marquerFilLu(store.activeThread);
 }
 
-// ── Étape P — rappel d'une réunion ─────────────────────────────────────
-// Quinze minutes avant : assez tôt pour se déplacer, assez tard pour ne
-// pas être oublié entre-temps.
+// ── Étape P — rappels d'une réunion ────────────────────────────────────
+// DEUX rappels, et le second a été ajouté après un test réel : quinze
+// minutes avant, assez tôt pour se déplacer ; puis À L'HEURE DITE, parce
+// que c'est ce qu'on attend d'un rappel de réunion et que le premier peut
+// très bien passer inaperçu quinze minutes plus tôt.
 const PREAVIS_REUNION_MS = 15 * 60000;
 const reunionsVues = new Set<string>();
 
@@ -473,20 +475,21 @@ function programmerRappel(m: ChatMessage) {
   const e = (m.extra || {}) as { title?: string; startsAt?: number; location?: string | null };
   const debut = Number(e.startsAt) || 0;
   if (!debut) return;
-  const quand = debut - PREAVIS_REUNION_MS;
 
-  // Rappel système, tenu par le processus principal. Rien n'est programmé
-  // si l'échéance est déjà passée : une réunion rattrapée après coup ne
-  // doit pas déclencher une notification à retardement.
-  if (quand > Date.now()) {
+  const heure = new Date(debut).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const lieu = e.location ? ` · ${e.location}` : "";
+
+  // Rappels système, tenus par le processus principal. Rien n'est
+  // programmé pour une échéance déjà passée : une réunion rattrapée après
+  // coup ne doit pas déclencher une notification à retardement.
+  const poser = (suffixe: string, atMs: number, corps: string) => {
+    if (atMs <= Date.now()) return;
     getApi()?.send?.("chat-schedule-reminder", {
-      id: m.id,
-      titre: e.title || "Réunion",
-      corps: `${new Date(debut).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
-        + (e.location ? ` · ${e.location}` : ""),
-      atMs: quand,
+      id: m.id + suffixe, titre: e.title || "Réunion", corps, atMs,
     });
-  }
+  };
+  poser(":preavis", debut - PREAVIS_REUNION_MS, `Dans 15 minutes · ${heure}${lieu}`);
+  poser(":debut", debut, `C'est maintenant · ${heure}${lieu}`);
 
   // Et une entrée dans le centre, qui elle se retrouve à tout moment —
   // y compris si l'on a manqué la notification système.
@@ -708,6 +711,14 @@ export function ensureListening() {
       // l'hôte ne dit pas QUI a changé, et n'a pas à le dire.
       case "avatars-changed":
         if (store.roster.length) getApi()?.send?.("chat-roster");
+        break;
+      // Étape P — un rappel de réunion vient de se déclencher côté système.
+      // On y ajoute le signal sonore de la messagerie : la notification
+      // Windows a le sien, mais il se tait dès que l'assistant de
+      // concentration est actif ou les sons système coupés. C'est
+      // précisément le rappel qu'on ne doit pas manquer.
+      case "meeting-reminder":
+        jouerSon("private");
         break;
       // Étape N — liste complète des lecteurs d'un message, remplacée en
       // bloc : l'hôte envoie l'état, jamais un incrément.

@@ -158,6 +158,11 @@
   #tagDest { width:100%; min-height:40px; padding:6px 8px; font-size:13px;
              border-radius:9px; border:1px solid var(--border);
              background:var(--panel); color:var(--fg); }
+  /* ⚠️ Les options d'une liste déroulante sont dessinées par le système,
+     souvent sur fond blanc, en héritant de la couleur de texte du thème
+     sombre : texte blanc sur blanc, liste illisible. Constaté sur le
+     poste ; on pose les couleurs en dur ici aussi. */
+  #tagDest option { background:var(--panel); color:var(--fg); }
   #tagDest[hidden] { display:none; }
   /* — Étape K : demande qualifiée — */
   .demande { border:1px solid; border-radius:10px; padding:8px 10px; margin-bottom:6px; }
