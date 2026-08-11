@@ -20,13 +20,14 @@ import {
   getDevice, countDevices, getDataDir, listReferencedMedia,
   setDeviceRole, listRoster, listDirectThreads,
   retireDevice, restoreDevice,
-  saveDecision, listDecisions, listDemandes, listMeetings,
+  saveDecision, listDecisions, listDemandes, listMeetings, updateMeeting,
   personIdOf, linkDeviceToPerson, empreintesDeLaPersonne,
   setPersonAvatar, saveRead, listReads, readsForMyMessages,
 } from "./store.js";
 import { fingerprintFromRawPublicKey, rawFromSpkiBase64, verifyMessage,
          voteDefinitionSeal, voteAnswerSeal,
-         demandeSeal, decisionSeal, meetingSeal, verifyPairing } from "./identity.js";
+         demandeSeal, decisionSeal, meetingSeal, meetingUpdateSeal,
+         verifyPairing } from "./identity.js";
 import { startMobileServer } from "./mobile-server.js";
 import { existsSync } from "node:fs";
 import {
@@ -688,6 +689,61 @@ export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, 
         };
         if (!saveMessage(msg).inserted) return;
         broadcastToGroup(msg.groupId, msg);
+        return;
+      }
+
+      // ── Étape R — décaler ou annuler une réunion ─────────────────
+      // En entreprise, une réunion se déplace ou tombe plus souvent
+      // qu'elle ne se tient telle qu'annoncée. On ne réécrit jamais la
+      // convocation d'origine — son heure est scellée dans sa signature —
+      // on publie une mise à jour signée qui la remplace, et l'annonce
+      // initiale reste dans l'historique.
+      if (payload.type === "meeting-update") {
+        const device = clients.get(ws)?.device || null;
+        if (!userId || !device) return;
+        const cible = getMessage(String(payload.messageId || ""), activeRoomId);
+        if (!cible || cible.type !== "meeting") return;
+
+        // ⚠️ SEUL L'ORGANISATEUR déplace ou annule, et l'on compare des
+        // PERSONNES : il doit pouvoir le faire depuis son téléphone
+        // appairé aussi bien que depuis son poste.
+        if (!empreintesDeLaPersonne(device.fingerprint).includes(cible.deviceFp)) {
+          ws.send(encryptPayload(sessionKey, {
+            v: 1, type: "meeting-update-refused", messageId: cible.id, reason: "pas-organisateur",
+          }));
+          return;
+        }
+
+        const action = String(payload.action || "");
+        if (action !== "cancelled" && action !== "moved") return;
+        let debut = null, duree = null;
+        if (action === "moved") {
+          debut = Number(payload.startsAt);
+          duree = Number(payload.durationMin);
+          if (!Number.isFinite(debut) || debut < Date.now() - 60000) return;
+          // Même règle que pour l'annonce : une durée hors bornes est
+          // REFUSÉE, jamais corrigée — la corriger casserait le sceau.
+          if (!Number.isFinite(duree) || duree < 5 || duree > 24 * 60) return;
+        }
+
+        const core = {
+          id: String(payload.id), from: userId,
+          text: String(payload.reason ?? "").slice(0, 300), ts: Number(payload.ts),
+          demandeSha: meetingUpdateSeal(cible.id, action, debut || 0, duree || 0),
+        };
+        // Non signée, une annulation n'engage personne — et elle ferait
+        // manquer une réunion qui a bien lieu. On refuse.
+        if (!verifyMessage(core, payload.signature, device.publicKeySpki)) return;
+
+        updateMeeting({
+          messageId: cible.id, status: action,
+          newStartsAt: debut, newDurationMin: duree, par: userId,
+        });
+        broadcastToGroup(cible.groupId, {
+          v: 1, type: "meeting-updated", messageId: cible.id, groupId: cible.groupId,
+          status: action, startsAt: debut, durationMin: duree,
+          par: userId, ts: Date.now(), reason: core.text || null,
+        });
         return;
       }
 

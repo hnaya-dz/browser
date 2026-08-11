@@ -61,6 +61,14 @@ export interface ChatMessage {
   // paraître officielle.
   tag?: "info" | "avis" | "validation" | "approbation" | null;
   destinataire?: string | null;
+  // Étape R — ce qu'il est advenu d'une réunion. Porté À CÔTÉ de la
+  // convocation d'origine, dont l'heure reste celle qui a été annoncée et
+  // signée : les deux informations sont distinctes.
+  meetingStatus?: "moved" | "cancelled" | null;
+  meetingNewStart?: number | null;
+  meetingNewDuration?: number | null;
+  meetingUpdatedBy?: string | null;
+  meetingUpdatedAt?: number | null;
   // Étape J — indice de LIVRAISON, posé par client.js sur les messages du
   // rattrapage. Il ne vient pas du réseau et n'est pas persisté : il sert
   // uniquement à ne pas faire sonner une absence rattrapée.
@@ -512,6 +520,23 @@ export function marquerFilLu(threadId: string) {
   patchStore({ unreadPrivate: reste });
 }
 
+/** Étape Q — la réunion la plus proche qui n'est pas terminée, tous fils
+ *  confondus. Sert à l'afficher HORS de la console, à côté de l'icône de
+ *  messagerie : le dock est fermé la plupart du temps, et une réunion
+ *  épinglée à l'intérieur n'est vue que par qui regardait déjà. */
+export function prochaineReunion(): ChatMessage | null {
+  const maintenant = Date.now();
+  let meilleure: ChatMessage | null = null;
+  for (const m of store.messages) {
+    if (m.type !== "meeting") continue;
+    const e = m.extra as MeetingExtra | null;
+    if (!e?.startsAt) continue;
+    if (e.startsAt + (e.durationMin || 0) * 60000 <= maintenant) continue;
+    if (!meilleure || e.startsAt < (meilleure.extra as MeetingExtra).startsAt) meilleure = m;
+  }
+  return meilleure;
+}
+
 /** Total des messages privés non lus, tous fils confondus. */
 export function totalPrivesNonLus(): number {
   return Object.values(store.unreadPrivate).reduce((a, b) => a + b, 0);
@@ -738,6 +763,38 @@ export function ensureListening() {
       case "meeting-reminder":
         jouerSon("rappel");
         break;
+      // Étape R — une réunion vient d'être décalée ou annulée. On applique
+      // la mise à jour SUR le message d'origine, dont l'heure annoncée
+      // reste intacte : ce sont deux informations distinctes, et les
+      // confondre effacerait la trace de ce qui avait été convoqué.
+      case "meeting-updated": {
+        patchStore({
+          messages: store.messages.map((m) => (m.id === evt.messageId ? {
+            ...m,
+            meetingStatus: evt.status as "moved" | "cancelled",
+            meetingNewStart: evt.startsAt || null,
+            meetingNewDuration: evt.durationMin || null,
+            meetingUpdatedBy: evt.par || null,
+            meetingUpdatedAt: evt.ts || Date.now(),
+          } : m)),
+        });
+        // Les rappels de l'ancienne heure n'ont plus lieu d'être. On les
+        // annule, puis on reprogramme sur la nouvelle si elle existe —
+        // sinon la personne serait avertie d'une réunion qui n'a pas lieu.
+        getApi()?.send?.("chat-cancel-reminder", { id: evt.messageId + ":preavis" });
+        getApi()?.send?.("chat-cancel-reminder", { id: evt.messageId + ":debut" });
+        reunionsVues.delete(evt.messageId);
+        if (evt.status === "moved" && evt.startsAt) {
+          const m = store.messages.find((x) => x.id === evt.messageId);
+          const e = (m?.extra || {}) as MeetingExtra;
+          programmerRappel({
+            ...(m as ChatMessage),
+            extra: { ...e, startsAt: evt.startsAt, durationMin: evt.durationMin || e.durationMin },
+          });
+        }
+        jouerSon("rappel");
+        break;
+      }
       // Étape N — liste complète des lecteurs d'un message, remplacée en
       // bloc : l'hôte envoie l'état, jamais un incrément.
       case "reads":

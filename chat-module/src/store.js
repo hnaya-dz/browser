@@ -192,6 +192,19 @@ export function initStore(dataDir = DEFAULT_DATA_DIR) {
     db.exec("CREATE INDEX IF NOT EXISTS idx_devices_person ON devices(personId)");
   }
 
+  // ── Étape R — réunion décalée ou annulée ──────────────────────────────
+  // On ne réécrit JAMAIS la convocation d'origine : son heure est scellée
+  // dans sa signature, et la réécrire romprait la preuve. On note à côté
+  // ce qu'il en est advenu, avec l'auteur et la date de la mise à jour.
+  // `newStartsAt` est nul pour une annulation.
+  if (!db.prepare("PRAGMA table_info(messages)").all().some((c) => c.name === "meetingStatus")) {
+    db.exec("ALTER TABLE messages ADD COLUMN meetingStatus TEXT");
+    db.exec("ALTER TABLE messages ADD COLUMN meetingNewStart INTEGER");
+    db.exec("ALTER TABLE messages ADD COLUMN meetingNewDuration INTEGER");
+    db.exec("ALTER TABLE messages ADD COLUMN meetingUpdatedAt INTEGER");
+    db.exec("ALTER TABLE messages ADD COLUMN meetingUpdatedBy TEXT");
+  }
+
   // ── Étape N — accusé de lecture ───────────────────────────────────────
   // Choisi PLUTÔT qu'une réaction « pouce levé ». Une réaction aurait
   // introduit un second moyen de dire « d'accord », non signé et non
@@ -529,7 +542,26 @@ function rowToMessage(r) {
     replyTo: r.replyTo || null,
     tag: r.tag || null,
     destinataire: r.destinataire || null,
+    // Étape R — ce qu'il est advenu d'une réunion. Porté à côté de la
+    // convocation d'origine, jamais à sa place.
+    meetingStatus: r.meetingStatus || null,
+    meetingNewStart: r.meetingNewStart ? Number(r.meetingNewStart) : null,
+    meetingNewDuration: r.meetingNewDuration ? Number(r.meetingNewDuration) : null,
+    meetingUpdatedAt: r.meetingUpdatedAt ? Number(r.meetingUpdatedAt) : null,
+    meetingUpdatedBy: r.meetingUpdatedBy || null,
   };
+}
+
+/** Étape R — enregistre le décalage ou l'annulation d'une réunion. */
+export function updateMeeting({ messageId, status, newStartsAt, newDurationMin, par }) {
+  ensureDb().prepare(
+    `UPDATE messages
+        SET meetingStatus = ?, meetingNewStart = ?, meetingNewDuration = ?,
+            meetingUpdatedAt = ?, meetingUpdatedBy = ?
+      WHERE id = ? AND type = 'meeting'`,
+  ).run(String(status), newStartsAt ? Number(newStartsAt) : null,
+        newDurationMin ? Number(newDurationMin) : null,
+        Date.now(), String(par || ""), String(messageId));
 }
 
 // ── Étape K — décisions sur une demande qualifiée ──────────────────────────
@@ -600,9 +632,15 @@ export function listMeetings(roomId, groupIds, maintenant = Date.now()) {
   ).all(String(roomId), ...groupes)
     .map(rowToMessage)
     .filter((m) => {
+      // Étape R — une réunion ANNULÉE n'est plus épinglée : elle reste dans
+      // l'historique, barrée, mais n'occupe plus le haut du salon.
+      if (m.meetingStatus === "cancelled") return false;
       const e = m.extra || {};
-      const fin = Number(e.startsAt || 0) + Number(e.durationMin || 0) * 60000;
-      return fin > maintenant;
+      // Décalée : c'est la NOUVELLE heure qui décide, sinon une réunion
+      // repoussée à demain disparaîtrait de l'épinglage ce soir.
+      const debut = m.meetingNewStart || Number(e.startsAt || 0);
+      const duree = m.meetingNewDuration || Number(e.durationMin || 0);
+      return debut + duree * 60000 > maintenant;
     });
 }
 

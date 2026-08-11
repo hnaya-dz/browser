@@ -385,7 +385,13 @@
     "votePending": "pending",
     "voteFinal": "Your ballot is final.",
     "serverLicenceReuse": "Use the licence already on this machine",
-    "serverLicenceGone": "No licence is present on this machine."
+    "serverLicenceGone": "No licence is present on this machine.",
+    "meetingMove": "Move",
+    "meetingCancel": "Cancel",
+    "meetingMoveConfirm": "Confirm",
+    "meetingCancelled": "Meeting cancelled",
+    "meetingMoved": "Meeting moved",
+    "meetingWas": "Was set for"
   },
   "Privacy": {
     "title": "Privacy",

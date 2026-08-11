@@ -152,6 +152,17 @@ export function meetingSeal(titre, debutMs, dureeMin) {
   return "mtg:" + Array.from(h.subarray(0, 16)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+// ── Étape R — décaler ou annuler ─────────────────────────────────────
+// L'heure d'une réunion est scellée : on ne la modifie pas, on publie une
+// mise à jour signée qui la remplace. Quatrième préfixe du rang 8.
+export function meetingUpdateSeal(meetingId, action, debutMs, dureeMin) {
+  const canonique = JSON.stringify([
+    String(meetingId), String(action), Number(debutMs) || 0, Number(dureeMin) || 0,
+  ]);
+  const h = sha256(new TextEncoder().encode(canonique));
+  return "mup:" + Array.from(h.subarray(0, 16)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 export function identityFromPrivate(privateKeyB64) {
   const priv = b64decode(privateKeyB64);
   if (priv.length !== 32) throw new Error("Clé privée Ed25519 invalide");

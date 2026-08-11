@@ -12,8 +12,8 @@
 
 import { useEffect, useState } from "react";
 import { useTranslation } from "@/hooks/useTranslation";
-import { CalendarClock, MapPin, Download } from "lucide-react";
-import { getApi, type ChatMessage } from "@/context/chatstore";
+import { CalendarClock, MapPin, Download, X } from "lucide-react";
+import { getApi, store, type ChatMessage } from "@/context/chatstore";
 import { composerIcs, nomFichierIcs } from "@/context/ics";
 
 interface Props {
@@ -43,8 +43,15 @@ function restant(debut: number, dureeMin: number, t: (k: string) => string): str
 export default function ChatMeetingCard({ message, accent, muted, border, compact }: Props) {
   const { t } = useTranslation();
   const e = (message.extra || {}) as { title?: string; startsAt?: number; durationMin?: number; location?: string | null };
-  const debut = Number(e.startsAt) || 0;
-  const duree = Number(e.durationMin) || 60;
+  // Étape R — une réunion décalée garde son heure ANNONCÉE dans l'extra
+  // signé ; c'est la mise à jour, à côté, qui porte la nouvelle. On
+  // affiche la nouvelle, on garde l'ancienne visible en dessous : effacer
+  // ce qui avait été convoqué priverait le fil de sa trace.
+  const annulee = message.meetingStatus === "cancelled";
+  const decalee = message.meetingStatus === "moved";
+  const debutAnnonce = Number(e.startsAt) || 0;
+  const debut = decalee && message.meetingNewStart ? message.meetingNewStart : debutAnnonce;
+  const duree = (decalee && message.meetingNewDuration) || Number(e.durationMin) || 60;
 
   // Rafraîchi à la minute : la carte doit vieillir toute seule, sinon
   // « dans 5 min » resterait affiché une heure après.
@@ -60,6 +67,20 @@ export default function ChatMeetingCard({ message, accent, muted, border, compac
   // rencontré en test réel. L'utilisateur doit toujours pouvoir mettre la
   // main sur le fichier.
   const [fichierIcs, setFichierIcs] = useState<string | null>(null);
+  const [reportOuvert, setReportOuvert] = useState(false);
+  const [nouvelleDate, setNouvelleDate] = useState("");
+
+  // L'organisateur se reconnaît par sa PERSONNE, pas par son pseudo : deux
+  // collègues peuvent porter le même prénom, et lui-même écrit depuis deux
+  // appareils. L'annuaire fait le lien empreinte → personne → « c'est moi ».
+  const jeSuisOrganisateur = !!message.deviceFp
+    && !!store.roster.find((p) => p.isMe && p.fingerprint === message.deviceFp);
+
+  const bouton: React.CSSProperties = {
+    display: "flex", alignItems: "center", gap: 3, fontSize: 10,
+    background: "transparent", border: "1px solid", borderRadius: 4,
+    color: "inherit", cursor: "pointer", padding: "3px 7px",
+  };
 
   const exporter = async () => {
     const contenu = composerIcs({
@@ -126,6 +147,24 @@ export default function ChatMeetingCard({ message, accent, muted, border, compac
           <> · <MapPin size={9} style={{ display: "inline", verticalAlign: -1 }} /> {e.location}</>
         )}
       </div>
+      {/* Étape R — ce qu'il est advenu de la convocation. L'heure d'origine
+          reste lisible : une réunion déplacée trois fois doit se relire,
+          et « annulée » sans dire par qui ni quand ne vaut rien. */}
+      {(annulee || decalee) && (
+        <div style={{
+          fontSize: 10.5, marginTop: 5, padding: "4px 7px", borderRadius: 4, lineHeight: 1.5,
+          color: annulee ? "#ff8080" : "#ffcf8a",
+          background: annulee ? "rgba(255,80,80,0.12)" : "rgba(255,180,60,0.12)",
+          border: `1px solid ${annulee ? "rgba(255,80,80,0.35)" : "rgba(255,180,60,0.3)"}`,
+        }}>
+          <b>{annulee ? t("Chat.meetingCancelled") : t("Chat.meetingMoved")}</b>
+          {message.meetingUpdatedBy ? ` — ${message.meetingUpdatedBy}` : ""}
+          {message.meetingUpdatedAt ? ` · ${new Date(message.meetingUpdatedAt).toLocaleString()}` : ""}
+          <div style={{ opacity: 0.75, textDecoration: "line-through" }}>
+            {t("Chat.meetingWas")} {new Date(debutAnnonce).toLocaleString()}
+          </div>
+        </div>
+      )}
       {message.text && !compact && (
         <div style={{ fontSize: 11.5, marginTop: 4, lineHeight: 1.5 }}>{message.text}</div>
       )}
@@ -145,6 +184,67 @@ export default function ChatMeetingCard({ message, accent, muted, border, compac
           <Download size={10} /> {t("Chat.meetingExport")}
         </button>
       </div>
+      {/* Réservé à l'ORGANISATEUR. On compare la personne, pas le pseudo :
+          il doit pouvoir décaler depuis son téléphone appairé. L'hôte
+          applique de toute façon la même règle — ces boutons évitent
+          seulement d'en proposer une qui serait refusée. */}
+      {jeSuisOrganisateur && !annulee && (
+        <div style={{ display: "flex", gap: 5, marginTop: 6, flexWrap: "wrap" }}>
+          {!reportOuvert ? (
+            <>
+              <button
+                onClick={() => {
+                  const d = new Date(debut);
+                  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+                  setNouvelleDate(d.toISOString().slice(0, 16));
+                  setReportOuvert(true);
+                }}
+                style={{ ...bouton, borderColor: border }}
+              >
+                <CalendarClock size={10} /> {t("Chat.meetingMove")}
+              </button>
+              <button
+                onClick={() => {
+                  getApi()?.send?.("chat-update-meeting", { messageId: message.id, action: "cancelled" });
+                }}
+                style={{ ...bouton, borderColor: "rgba(255,82,82,0.5)", color: "#ff8080" }}
+              >
+                <X size={10} /> {t("Chat.meetingCancel")}
+              </button>
+            </>
+          ) : (
+            <>
+              <input
+                type="datetime-local"
+                value={nouvelleDate}
+                onChange={(ev) => setNouvelleDate(ev.target.value)}
+                style={{
+                  flex: 1, minWidth: 130, fontSize: 10, padding: "3px 5px",
+                  borderRadius: 4, border: `1px solid ${border}`,
+                  background: "transparent", color: "inherit",
+                }}
+              />
+              <button
+                onClick={() => {
+                  const quand = new Date(nouvelleDate).getTime();
+                  if (!Number.isFinite(quand)) return;
+                  getApi()?.send?.("chat-update-meeting", {
+                    messageId: message.id, action: "moved",
+                    startsAt: quand, durationMin: duree,
+                  });
+                  setReportOuvert(false);
+                }}
+                style={{ ...bouton, borderColor: accent, color: accent }}
+              >
+                {t("Chat.meetingMoveConfirm")}
+              </button>
+              <button onClick={() => setReportOuvert(false)} style={{ ...bouton, borderColor: border }}>
+                {t("Chat.inviteClose")}
+              </button>
+            </>
+          )}
+        </div>
+      )}
       {fichierIcs && (
         <div style={{ fontSize: 9.5, color: muted, marginTop: 4, lineHeight: 1.45 }}>
           {t("Chat.meetingIcsDone")}{" "}

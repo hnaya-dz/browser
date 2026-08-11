@@ -269,6 +269,9 @@ function handleCommand(msg) {
         onAvatarsChanged: () => process.send({ event: "avatars-changed" }),
         // Étape N — qui a lu ce message
         onReads: (r) => process.send({ event: "reads", messageId: r.messageId, reads: r.reads }),
+        // Étape R — réunion décalée ou annulée
+        onMeetingUpdated: (u) => process.send({ event: "meeting-updated", ...u }),
+        onMeetingUpdateRefused: (r) => process.send({ event: "meeting-update-refused", ...r }),
         // Étape L — un appareil vient d'être rattaché à cette personne
         onDevicePaired: (p) => process.send({
           event: "device-paired", fingerprint: p.fingerprint, nickname: p.nickname,
@@ -335,6 +338,17 @@ function handleCommand(msg) {
       clientHandle.openMeeting({
         title: msg.title, startsAt: msg.startsAt, durationMin: msg.durationMin,
         location: msg.location || "", text: msg.text || "", groupId: msg.groupId,
+      });
+      break;
+    }
+
+    // ── Étape R — décaler ou annuler une réunion ──────────────────
+    case "update-meeting": {
+      if (!clientHandle) { process.send({ event: "disconnected" }); break; }
+      clientHandle.updateMeeting({
+        messageId: msg.messageId, action: msg.action,
+        startsAt: msg.startsAt || 0, durationMin: msg.durationMin || 0,
+        reason: msg.reason || "",
       });
       break;
     }

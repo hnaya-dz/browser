@@ -42,7 +42,7 @@ import { createPrivateKey, sign as nodeSign } from "node:crypto";
 import {
   loadOrCreateIdentity, verifyMessage as nodeVerify,
   fingerprintFromRawPublicKey, rawFromSpkiBase64, signablePayload,
-  demandeSeal, decisionSeal, meetingSeal,
+  demandeSeal, decisionSeal, meetingSeal, meetingUpdateSeal,
 } from "../src/identity.js";
 
 const core = { id: "msg_interop1", from: "Téléphone-Test", text: "توقيع interop é€", ts: 1789000000000 };
@@ -175,4 +175,20 @@ assert.notStrictEqual(meetingSeal("Conseil", 1800000000000, 60),
   meetingSeal("Conseil", 1800000000000, 90),
   "La durée ne compte pas dans le sceau");
 
-console.log("✅ Interop crypto Node ↔ navigateur : 31/31 OK (AES-GCM + Ed25519 + rangs signés + sceaux demande/décision/réunion)");
+
+// Étape R — quatrième préfixe du rang 8 : décaler ou annuler.
+assert.strictEqual(meetingUpdateSeal("mtg_1", "moved", 1800000000000, 45),
+  browserCrypto.meetingUpdateSeal("mtg_1", "moved", 1800000000000, 45),
+  "Sceau de mise a jour : Node et navigateur divergent");
+assert.ok(meetingUpdateSeal("mtg_1", "cancelled", 0, 0).startsWith("mup:"));
+// Annuler et decaler ne doivent pas produire le meme sceau : sans cela,
+// une annulation signee serait rejouable en report.
+assert.notStrictEqual(meetingUpdateSeal("mtg_1", "cancelled", 0, 0),
+  meetingUpdateSeal("mtg_1", "moved", 0, 0),
+  "Annulation et report partagent un sceau : l un se rejoue en l autre");
+// La NOUVELLE heure est scellee : un report signe n est pas redeplaçable.
+assert.notStrictEqual(meetingUpdateSeal("mtg_1", "moved", 1800000000000, 45),
+  meetingUpdateSeal("mtg_1", "moved", 1800003600000, 45),
+  "La nouvelle heure ne compte pas dans le sceau");
+
+console.log("✅ Interop crypto Node ↔ navigateur : 35/35 OK (AES-GCM + Ed25519 + rangs signés + sceaux demande/décision/réunion)");

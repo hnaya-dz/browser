@@ -385,7 +385,13 @@
     "votePending": "في الانتظار",
     "voteFinal": "صوتك نهائي.",
     "serverLicenceReuse": "استخدام الرخصة الموجودة على هذا الجهاز",
-    "serverLicenceGone": "لا توجد رخصة على هذا الجهاز."
+    "serverLicenceGone": "لا توجد رخصة على هذا الجهاز.",
+    "meetingMove": "تأجيل",
+    "meetingCancel": "إلغاء",
+    "meetingMoveConfirm": "تأكيد",
+    "meetingCancelled": "أُلغي الاجتماع",
+    "meetingMoved": "أُجّل الاجتماع",
+    "meetingWas": "كان مقرَّرًا في"
   },
   "Privacy": {
     "title": "الخصوصية",

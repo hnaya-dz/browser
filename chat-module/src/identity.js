@@ -123,6 +123,23 @@ export function meetingSeal(titre, debutMs, dureeMin) {
   return "mtg:" + createHash("sha256").update(canonique).digest("hex").slice(0, 32);
 }
 
+// ── Étape R — décaler ou annuler une réunion ───────────────────────────
+// En entreprise, une réunion se déplace ou tombe plus souvent qu'elle ne
+// se tient telle qu'annoncée. Mais l'heure est SCELLÉE : on ne modifie
+// donc jamais la convocation d'origine — on publie une mise à jour, signée
+// elle aussi, qui la remplace. L'annonce initiale reste dans l'historique,
+// et l'on peut établir qui a déplacé quoi, et quand.
+//
+// Quatrième préfixe du rang 8, après dem:, dec: et mtg:. La nouvelle heure
+// entre dans le sceau : une mise à jour n'est pas plus modifiable que ce
+// qu'elle remplace.
+export function meetingUpdateSeal(meetingId, action, debutMs, dureeMin) {
+  const canonique = JSON.stringify([
+    String(meetingId), String(action), Number(debutMs) || 0, Number(dureeMin) || 0,
+  ]);
+  return "mup:" + createHash("sha256").update(canonique).digest("hex").slice(0, 32);
+}
+
 // ── Étape L — jeton d'appairage d'un second appareil ───────────────────────
 // « Ajouter mon mobile » ne transportait que le pseudo : le téléphone
 // arrivait avec sa propre clé, donc une seconde fiche, donc un doublon

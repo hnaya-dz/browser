@@ -385,7 +385,13 @@
     "votePending": "en attente",
     "voteFinal": "Votre bulletin est définitif.",
     "serverLicenceReuse": "Utiliser la licence déjà sur ce poste",
-    "serverLicenceGone": "Aucune licence n'est présente sur ce poste."
+    "serverLicenceGone": "Aucune licence n'est présente sur ce poste.",
+    "meetingMove": "Décaler",
+    "meetingCancel": "Annuler",
+    "meetingMoveConfirm": "Confirmer",
+    "meetingCancelled": "Réunion annulée",
+    "meetingMoved": "Réunion décalée",
+    "meetingWas": "Était prévue le"
   },
   "Privacy": {
     "title": "Confidentialité",

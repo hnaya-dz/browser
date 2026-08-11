@@ -15,6 +15,7 @@ import { setTutorialActive, useTutorialSnapshot } from "@/context/tutorialStore"
 
 const PrivacyPanel = dynamic(() => import("./PrivacyPanel"), { ssr: false });
 const NotificationCenter = dynamic(() => import("./NotificationCenter"), { ssr: false });
+const ChatMeetingChip = dynamic(() => import("./ChatMeetingChip"), { ssr: false });
 
 const HNAYA_NAV = [
   { key: "home",    url: "https://hnaya.dz",                 labels: { ar: "حنايا",       fr: "Accueil",        en: "Home"           } },
@@ -104,6 +105,9 @@ export const Navbar = () => {
             ) : null;
           })()}
         </button>
+        {/* Étape Q — prochaine réunion, visible depuis l'accueil aussi */}
+        <ChatMeetingChip />
+
         {/* Centre de notifications — même surface que dans la barre
             d'adresse : ce qui demande une suite doit se retrouver depuis
             n'importe quel écran, y compris l'accueil. */}

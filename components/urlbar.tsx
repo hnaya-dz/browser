@@ -17,6 +17,7 @@ const VaultPanel = dynamic(() => import("./VaultPanel"), { ssr: false });
 const FavoritesPanel = dynamic(() => import("./FavoritesPanel"), { ssr: false });
 const PrivacyPanel = dynamic(() => import("./PrivacyPanel"), { ssr: false });
 const NotificationCenter = dynamic(() => import("./NotificationCenter"), { ssr: false });
+const ChatMeetingChip = dynamic(() => import("./ChatMeetingChip"), { ssr: false });
 
 const HINT_DL_KEY    = "hnaya-hint-download-seen";
 const HINT_VAULT_KEY = "hnaya-hint-vault-seen";
@@ -391,6 +392,11 @@ export default function URLBar() {
             return chat.unreadCount > 0 ? <span className="chat-unread-dot" /> : null;
           })()}
         </button>
+
+        {/* Étape Q — prochaine réunion, hors de la console. Le dock est
+            fermé la plupart du temps ; une réunion épinglée à l'intérieur
+            n'est vue que par qui regardait déjà. */}
+        <ChatMeetingChip compact />
 
         {/* Centre de notifications — surface COMMUNE, hors du dock de
             messagerie : elle accueillera les outils de productivité à

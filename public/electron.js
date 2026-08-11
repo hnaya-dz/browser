@@ -1182,6 +1182,11 @@ ipcMain.on("chat-reveal-file", (event, { path: p } = {}) => {
   try { if (p) shell.showItemInFolder(String(p)); } catch { /* fichier disparu */ }
 });
 
+// ── Étape R — décaler ou annuler une réunion annoncée
+ipcMain.on("chat-update-meeting", (event, params = {}) => {
+  chatWorker?.send({ cmd: "update-meeting", ...params });
+});
+
 // ── Étape M — photo de profil : déclarer l'empreinte déjà téléversée
 ipcMain.on("chat-set-avatar", (event, { sha256 } = {}) => {
   chatWorker?.send({ cmd: "set-avatar", sha256: sha256 || null });

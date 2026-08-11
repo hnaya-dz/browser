@@ -14,7 +14,7 @@ import { fileURLToPath } from "node:url";
 import { deriveKeyFromPin, encryptPayload, decryptPayload } from "./crypto.js";
 import { listenForSessions } from "./discovery.js";
 import { loadOrCreateIdentity, voteDefinitionSeal, voteAnswerSeal,
-         demandeSeal, decisionSeal, meetingSeal } from "./identity.js";
+         demandeSeal, decisionSeal, meetingSeal, meetingUpdateSeal } from "./identity.js";
 import { CHUNK_BYTES } from "./media.js";
 
 // Répertoire par défaut de l'identité d'appareil (même défaut que store.js) ;
@@ -65,6 +65,8 @@ export function joinSession({
   onDevicePaired,
   onAvatarsChanged,
   onReads,
+  onMeetingUpdated,
+  onMeetingUpdateRefused,
   pairing,
 }) {
   const sessionKey = deriveKeyFromPin(pin);
@@ -156,6 +158,10 @@ export function joinSession({
     // Étape N — qui a lu ce message. Liste complète et non incrément :
     // l'expéditeur veut savoir QUI, pas recomposer la liste lui-même.
     else if (payload.type === "reads") onReads?.(payload);
+    // Étape R — une réunion vient d'être décalée ou annulée. Diffusé à
+    // tout le fil : c'est l'information que personne ne doit manquer.
+    else if (payload.type === "meeting-updated") onMeetingUpdated?.(payload);
+    else if (payload.type === "meeting-update-refused") onMeetingUpdateRefused?.(payload);
     else if (payload.type === "invite-sent") onInviteSent?.(payload);
     else if (payload.type === "admin-result") onAdminResult?.(payload);
     // Étape F — annuaire : qui est inscrit, sa fonction, sa présence
@@ -246,6 +252,24 @@ export function joinSession({
     ws.send(encryptPayload(sessionKey, {
       v: 2, type: "meeting", id: core.id, text: core.text, ts: core.ts,
       title, startsAt, durationMin, location, groupId,
+      signature: identity.signMessage(core),
+    }));
+    return core.id;
+  }
+
+  /** Étape R — décaler ou annuler une réunion qu'on a annoncée.
+   *  `action` vaut "moved" (avec startsAt et durationMin) ou "cancelled".
+   *  On ne modifie jamais la convocation d'origine : cette mise à jour est
+   *  signée à part et vient s'y ajouter. */
+  function updateMeeting({ messageId, action, startsAt = 0, durationMin = 0, reason = "" }) {
+    const core = {
+      id: "mup_" + crypto.randomUUID(), from: userId,
+      text: reason ?? "", ts: Date.now(),
+      demandeSha: meetingUpdateSeal(messageId, action, startsAt, durationMin),
+    };
+    ws.send(encryptPayload(sessionKey, {
+      v: 2, type: "meeting-update", id: core.id, messageId, action,
+      startsAt, durationMin, reason: core.text, ts: core.ts,
       signature: identity.signMessage(core),
     }));
     return core.id;
@@ -371,6 +395,7 @@ export function joinSession({
     answerVote,
     decider,
     openMeeting,
+    updateMeeting,
     /** Étape L — jeton à glisser dans le QR « Ajouter mon mobile ». Signé
      *  par CET appareil : c'est ce qui prouve le rattachement. */
     makePairingToken: (dureeMs) => identity.makePairingToken(dureeMs),

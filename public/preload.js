@@ -84,6 +84,7 @@ const ALLOWED_SEND = [
   "chat-decider",
   "chat-set-avatar",
   "chat-open-meeting",
+  "chat-update-meeting",
   "chat-schedule-reminder",
   "chat-cancel-reminder",
   "chat-reveal-file",
