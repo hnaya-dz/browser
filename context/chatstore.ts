@@ -630,6 +630,22 @@ export function ensureListening() {
         const prive = groupe.startsWith("dm:");
         const sousLesYeux = store.panelOpen && groupe === store.activeThread;
         const desAutres = evt.message.from !== store.userId;
+
+        // ── Étape P — rappel de réunion ───────────────────────────────
+        // ⚠️ HORS de la condition ci-dessous, et c'est tout le sujet.
+        // Ce rappel était programmé à l'intérieur du bloc « message d'un
+        // AUTRE, pas sous les yeux » — si bien qu'une réunion qu'on
+        // annonçait SOI-MÊME n'en programmait aucun. Et c'est le cas le
+        // plus courant : celui qui convoque est aussi celui qui veut être
+        // rappelé. En test réel, rien ne s'est produit ni à T-15 ni à
+        // l'heure dite, et Hnaya n'apparaissait même pas dans la liste des
+        // applications de notification de Windows — la preuve qu'aucune
+        // notification n'avait jamais été demandée.
+        // Un rappel ne dépend ni de l'auteur, ni de ce qu'on regarde :
+        // il dépend de l'heure. Programmé aussi pour le rattrapage, une
+        // réunion annoncée pendant une absence devant rappeler quand même.
+        if (evt.message.type === "meeting") programmerRappel(evt.message);
+
         if (desAutres && !sousLesYeux) {
           // ⚠️ Le RATTRAPAGE ne compte pas, pas plus qu'il ne sonne.
           // Le poste redemande aujourd'hui l'historique depuis zéro à
@@ -660,13 +676,6 @@ export function ensureListening() {
           const pourMoi = evt.message.tag
             && evt.message.destinataire
             && evt.message.destinataire === store.myFingerprint;
-          // Étape P — une réunion annoncée : rappel système ET entrée dans
-          // le centre. Programmé même pour le RATTRAPAGE, contrairement au
-          // son : une réunion annoncée pendant qu'on était absent doit
-          // quand même rappeler. C'est le processus principal qui tient la
-          // minuterie — Chromium ralentit celles d'une fenêtre en
-          // arrière-plan, c'est-à-dire précisément quand le rappel sert.
-          if (evt.message.type === "meeting") programmerRappel(evt.message);
           if (!evt.message.backlog && (prive || pourMoi)) {
             const fil = groupe;
             publierNotif({
