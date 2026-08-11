@@ -77,7 +77,7 @@ function note(ac: AudioContext, freq: number, depart: number, duree: number, gai
   osc.stop(t0 + duree + 0.02);
 }
 
-export type GenreSon = "room" | "private";
+export type GenreSon = "room" | "private" | "rappel";
 
 /** Joue le signal correspondant. Silencieux si l'utilisateur a coupé le
  *  son, si le navigateur refuse l'audio, ou hors navigateur. Ne lève
@@ -88,7 +88,19 @@ export function jouerSon(genre: GenreSon) {
   const ac = contexte();
   if (!ac) return;
   try {
-    if (genre === "private") {
+    if (genre === "rappel") {
+      // ⚠️ Le rappel de réunion ne sonne PAS comme un message.
+      // Il empruntait le timbre du message privé, jugé trop discret en
+      // usage réel — et à juste titre : un message privé se rattrape, une
+      // réunion manquée non. Quatre notes, plus fortes et plus longues,
+      // avec une reprise d'octave à la fin : de quoi se retourner. Il ne
+      // sonnera que deux fois par réunion, on peut se permettre d'être
+      // franc.
+      note(ac, 784, 0,    0.20, 0.26);   // sol
+      note(ac, 988, 0.18, 0.20, 0.26);   // si
+      note(ac, 1175, 0.36, 0.22, 0.26);  // ré
+      note(ac, 1568, 0.58, 0.42, 0.24);  // sol, une octave plus haut
+    } else if (genre === "private") {
       // Deux notes montantes : plus long, plus haut, on ne le confond pas
       // avec le salon et on l'entend depuis le couloir.
       note(ac, 660, 0, 0.16, 0.16);

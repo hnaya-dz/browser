@@ -82,11 +82,18 @@ export function composerIcs(r: Reunion): string {
 }
 
 /** Nom de fichier sûr, dérivé du titre. Windows refuse \ / : * ? " < > | */
-export function nomFichierIcs(titre: string): string {
+export function nomFichierIcs(titre: string, debut?: number): string {
   const base = String(titre || "reunion")
     .replace(/[\\/:*?"<>|]/g, "-")
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, 60);
-  return (base || "reunion") + ".ics";
+  // La date dans le nom : deux réunions du même intitulé ne se recouvrent
+  // pas dans le dossier, et le fichier reste reconnaissable une fois
+  // sorti de l'application. Un « 16.ics » ne dit rien à personne.
+  const d = debut ? new Date(debut) : null;
+  const jour = d
+    ? ` ${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+    : "";
+  return (base || "reunion") + jour + ".ics";
 }

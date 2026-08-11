@@ -86,6 +86,7 @@ const ALLOWED_SEND = [
   "chat-open-meeting",
   "chat-schedule-reminder",
   "chat-cancel-reminder",
+  "chat-reveal-file",
   "chat-mark-read",
   "chat-roster",
   "chat-leave",

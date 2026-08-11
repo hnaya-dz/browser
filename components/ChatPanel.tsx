@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 // ✅ Icônes vectorielles (lucide, déjà dans les dépendances) plutôt
 // qu'emoji : les emoji sont rendus par la police du système et diffèrent
 // visuellement entre Windows 10 et 11 — incohérent d'un poste à l'autre.
-import { MessageSquare, Shield, Lock, Smartphone, KeyRound, Eye, EyeOff, Send, History, DoorOpen, Trash2, KeySquare, Users, ArrowLeft, CornerUpLeft, X, CheckCircle2, AlertTriangle, Volume2, VolumeX, CalendarClock } from "lucide-react";
+import { MessageSquare, Shield, Lock, Smartphone, KeyRound, Eye, EyeOff, Send, History, DoorOpen, Trash2, KeySquare, Users, ArrowLeft, CornerUpLeft, X, CheckCircle2, AlertTriangle, Volume2, VolumeX, CalendarClock, MoreHorizontal, ChevronUp } from "lucide-react";
 import ChatAdminPanel from "./ChatAdminPanel";
 import ChatServerSetup from "./ChatServerSetup";
 import ChatComposerMedia, { MediaPreview, type PreparedMedia } from "./ChatComposerMedia";
@@ -183,6 +183,15 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
   // Étape J — interrupteur du signal sonore. Lu paresseusement : le
   // localStorage n'existe pas au rendu serveur.
   const [son, setSon] = useState(() => sonActif());
+  // Codes du salon : dépliés par défaut — on en a besoin à la création —
+  // puis repliés définitivement dès que l'utilisateur les a notés.
+  const [codesVisibles, setCodesVisibles] = useState(() => {
+    if (typeof window === "undefined") return true;
+    return localStorage.getItem("hnaya-chat-codes") !== "0";
+  });
+  // Actions secondaires, regroupées. Elles restaient toutes en ligne et
+  // débordaient sur deux ou trois rangées.
+  const [plusOuvert, setPlusOuvert] = useState(false);
   // Étape K — nature du prochain envoi, et personne désignée. Remis à zéro
   // après chaque envoi : une étiquette qui « colle » ferait partir en
   // demande de validation le message anodin qui suit.
@@ -1200,7 +1209,32 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
             {/* D.2 — les DEUX PINs de l'hôte, masqués par défaut avec œil
                 individuel : montrer le PIN d'accès à un collègue n'expose
                 jamais le PIN admin */}
-            {store.joinedRoomIsHosted && store.pin && !showAdmin && (
+            {/* Présence ET accès aux codes sur UNE SEULE ligne.
+                Les deux occupaient chacune la leur, et le bloc des codes
+                restait déplié en permanence — trois lignes de chrome pour
+                une information qu'on note une fois et qu'on ne relit
+                jamais. Dans un dock de 340 px, cela se prend directement
+                sur la zone de lecture, que l'usage réel a signalée comme
+                trop courte. Le choix est mémorisé : replié une fois,
+                replié pour toujours. */}
+            <div style={{ fontSize: 11, color: muted, display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+              <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#00c853", flexShrink: 0 }} />
+              <span style={{ flex: 1 }}>{store.online.length} {t("Chat.online")}</span>
+              {store.joinedRoomIsHosted && store.pin && !showAdmin && (
+                <button
+                  onClick={() => { const v = !codesVisibles; setCodesVisibles(v); try { localStorage.setItem("hnaya-chat-codes", v ? "1" : "0"); } catch {} }}
+                  style={{
+                    background: "transparent", border: `1px solid ${border}`, borderRadius: 4,
+                    color: "inherit", cursor: "pointer", fontSize: 9.5, padding: "2px 7px",
+                    display: "flex", alignItems: "center", gap: 3, flexShrink: 0,
+                  }}
+                >
+                  <KeyRound size={10} /> {t("Chat.codes")}
+                </button>
+              )}
+            </div>
+
+            {store.joinedRoomIsHosted && store.pin && !showAdmin && codesVisibles && (
               <div style={{
                 background: `${accent}18`, border: `1px solid ${accent}40`, borderRadius: 8,
                 padding: "8px 10px", flexShrink: 0, display: "flex", flexDirection: "column", gap: 4,
@@ -1212,13 +1246,6 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
                 <div style={{ fontSize: 9, color: muted, textAlign: "center" }}>{t("Chat.pinHint")}</div>
               </div>
             )}
-
-            {/* La présence est un ÉTAT, pas une action : elle occupe sa
-                propre ligne au lieu de disputer la place aux boutons. */}
-            <div style={{ fontSize: 11, color: muted, display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-              <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#00c853", flexShrink: 0 }} />
-              <span style={{ flex: 1 }}>{store.online.length} {t("Chat.online")}</span>
-            </div>
 
             {/* ⚠️ flexWrap est INDISPENSABLE ici. Ces cinq boutons portent
                 tous flexShrink:0 (leur libellé ne doit pas être tronqué) et
@@ -1233,7 +1260,7 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
               {/* Inviter un téléphone : QR vers la page mobile servie par
                   l'hôte — visible pour tous les participants (l'URL pointe
                   toujours vers l'hôte), masqué si le poste n'a pas de LAN */}
-              {store.inviteUrl && !showAdmin && (
+              {store.inviteUrl && !showAdmin && plusOuvert && (
                 <>
                   {/* Lier SON PROPRE téléphone : le QR emporte le pseudo, le
                       mobile rejoint sous la même identité sans en inventer
@@ -1341,7 +1368,7 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
                 </button>
               )}
               {/* D.2 — inviter les membres vers un autre salon (sous-salon) */}
-              {!showAdmin && (
+              {!showAdmin && plusOuvert && (
                 <button
                   onClick={() => (showInvitePanel ? setShowInvitePanel(false) : openInvitePanel())}
                   style={{
@@ -1356,7 +1383,7 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
               )}
               {/* Administration (étape D) : registre des appareils,
                   historique, réglages — protégé par le PIN admin */}
-              {!showInvitePanel && (
+              {!showInvitePanel && (plusOuvert || showAdmin) && (
                 <button
                   onClick={toggleAdmin}
                   style={{
@@ -1367,6 +1394,30 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
                 >
                   <KeyRound size={12} />
                   {showAdmin ? t("Chat.inviteClose") : t("Chat.admin")}
+                </button>
+              )}
+              {/* ⚠️ « Plus » est un BOUTON VISIBLE, pas un menu caché.
+                  La leçon de l'étape précédente tient toujours : trois
+                  actions inatteignables sans découvrir un défilement que
+                  rien ne signalait, et un utilisateur pouvait ignorer
+                  qu'elles existaient. Un bouton étiqueté se voit ; ce qui
+                  était invisible, c'était le hors-champ.
+                  Restent en ligne les actions du quotidien — annuaire,
+                  son, réunion, vote. Passent derrière « Plus » celles
+                  qu'on utilise une fois par salon : lier son téléphone,
+                  inviter, administrer. Une rangée gagnée, prise sur le
+                  chrome et rendue à la lecture. */}
+              {!showAdmin && (
+                <button
+                  onClick={() => setPlusOuvert((v) => !v)}
+                  style={{
+                    ...btnStyle(plusOuvert), padding: "4px 8px", fontSize: 10,
+                    display: "flex", alignItems: "center", gap: 4, flexShrink: 0,
+                  }}
+                  title={t("Chat.moreActions")}
+                >
+                  {plusOuvert ? <ChevronUp size={12} /> : <MoreHorizontal size={12} />}
+                  {plusOuvert ? t("Chat.inviteClose") : t("Chat.moreActions")}
                 </button>
               )}
             </div>

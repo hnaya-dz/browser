@@ -1161,12 +1161,25 @@ ipcMain.handle("chat-export-ics", async (event, { filename, content } = {}) => {
     // openPath renvoie une CHAÎNE : vide si tout va bien, le message
     // d'erreur sinon. Aucune exception n'est levée quand aucune
     // application n'est associée aux .ics — d'où le test explicite.
+    // ⚠️ openPath réussit même quand l'ouverture ne donne RIEN.
+    // Sur le poste de test, le gestionnaire .ics enregistré est l'ancienne
+    // application Courrier et Calendrier de Windows, retirée par Microsoft
+    // fin 2024 : Windows lui transmet le fichier, elle n'existe plus, et
+    // openPath renvoie quand même une chaîne vide — donc « succès ».
+    // On ne peut pas détecter ce cas. On rend donc TOUJOURS le chemin à
+    // l'interface, qui propose d'afficher le fichier : l'utilisateur garde
+    // un moyen d'agir même quand rien ne s'est ouvert.
     const souci = await shell.openPath(chemin);
-    if (souci) return { ok: false, error: souci, path: chemin };
-    return { ok: true, path: chemin };
+    return { ok: true, path: chemin, ouvert: !souci, erreur: souci || null };
   } catch (e) {
     return { ok: false, error: e?.message || "ics" };
   }
+});
+
+// Afficher un fichier dans l'Explorateur, sélectionné. Recours quand
+// l'ouverture n'a rien donné — voir chat-export-ics.
+ipcMain.on("chat-reveal-file", (event, { path: p } = {}) => {
+  try { if (p) shell.showItemInFolder(String(p)); } catch { /* fichier disparu */ }
 });
 
 // ── Étape M — photo de profil : déclarer l'empreinte déjà téléversée

@@ -54,21 +54,61 @@ export default function ChatMeetingCard({ message, accent, muted, border, compac
     return () => clearInterval(id);
   }, []);
 
+  // Chemin du .ics une fois produit. On le garde affiché : l'ouverture
+  // peut « réussir » sans que rien n'apparaisse — le gestionnaire .ics de
+  // Windows peut pointer vers une application retirée du système, cas
+  // rencontré en test réel. L'utilisateur doit toujours pouvoir mettre la
+  // main sur le fichier.
+  const [fichierIcs, setFichierIcs] = useState<string | null>(null);
+
   const exporter = async () => {
     const contenu = composerIcs({
       id: message.id, title: e.title || "", startsAt: debut, durationMin: duree,
       location: e.location, description: message.text || null, organisateur: message.from,
     });
-    await getApi()?.invoke?.("chat-export-ics", {
-      filename: nomFichierIcs(e.title || "reunion"), content: contenu,
+    const r = await getApi()?.invoke?.("chat-export-ics", {
+      filename: nomFichierIcs(e.title || "reunion", debut), content: contenu,
     });
+    if (r?.ok && r.path) setFichierIcs(String(r.path));
   };
 
   const imminent = debut - Date.now() < 15 * 60000 && Date.now() < debut + duree * 60000;
 
+  // ⚠️ ÉPINGLÉE = UNE SEULE LIGNE.
+  // La version épinglée reprenait la carte entière — titre, date, lieu,
+  // ordre du jour, auteur, bouton d'export : trois à quatre lignes en
+  // permanence en tête du fil, au point de rendre les échanges illisibles
+  // dans un dock de 340 px. Signalé en usage réel.
+  // L'épingle n'est qu'un rappel : l'objet et le temps restant. Tout le
+  // reste, y compris l'export, vit dans la carte du fil, où la réunion
+  // figure de toute façon. Le survol donne le détail.
+  if (compact) {
+    return (
+      <div
+        title={`${e.title}\n${new Date(debut).toLocaleString()} · ${duree} min${e.location ? " · " + e.location : ""}`}
+        style={{
+          alignSelf: "stretch", display: "flex", alignItems: "center", gap: 6,
+          borderRadius: 6, padding: "4px 8px", cursor: "default",
+          background: imminent ? "rgba(0,200,83,0.16)" : `${accent}12`,
+          border: `1px solid ${imminent ? "rgba(0,200,83,0.55)" : accent + "44"}`,
+        }}
+      >
+        <CalendarClock size={11} style={{ color: accent, flexShrink: 0 }} />
+        <b style={{
+          fontSize: 10.5, flex: 1, minWidth: 0,
+          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+        }}>{e.title}</b>
+        <span style={{
+          fontSize: 9.5, fontWeight: 700, flexShrink: 0,
+          color: imminent ? "#00c853" : muted,
+        }}>{restant(debut, duree, t)}</span>
+      </div>
+    );
+  }
+
   return (
     <div style={{
-      alignSelf: "stretch", borderRadius: 8, padding: compact ? "7px 9px" : "9px 11px",
+      alignSelf: "stretch", borderRadius: 8, padding: "9px 11px",
       background: imminent ? "rgba(0,200,83,0.16)" : `${accent}12`,
       border: `1px solid ${imminent ? "rgba(0,200,83,0.55)" : accent + "44"}`,
     }}>
@@ -105,6 +145,20 @@ export default function ChatMeetingCard({ message, accent, muted, border, compac
           <Download size={10} /> {t("Chat.meetingExport")}
         </button>
       </div>
+      {fichierIcs && (
+        <div style={{ fontSize: 9.5, color: muted, marginTop: 4, lineHeight: 1.45 }}>
+          {t("Chat.meetingIcsDone")}{" "}
+          <button
+            onClick={() => getApi()?.send?.("chat-reveal-file", { path: fichierIcs })}
+            style={{
+              background: "transparent", border: "none", color: accent,
+              cursor: "pointer", padding: 0, fontSize: 9.5, textDecoration: "underline",
+            }}
+          >
+            {t("Chat.meetingIcsShow")}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

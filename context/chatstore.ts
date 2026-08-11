@@ -736,7 +736,7 @@ export function ensureListening() {
       // concentration est actif ou les sons système coupés. C'est
       // précisément le rappel qu'on ne doit pas manquer.
       case "meeting-reminder":
-        jouerSon("private");
+        jouerSon("rappel");
         break;
       // Étape N — liste complète des lecteurs d'un message, remplacée en
       // bloc : l'hôte envoie l'état, jamais un incrément.
