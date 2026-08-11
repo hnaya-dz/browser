@@ -548,12 +548,27 @@ export function saveDecision({ messageId, fingerprint, sender, issue, comment, t
       `DELETE FROM message_decisions WHERE messageId = ? AND fingerprint IN (${trous})`,
     ).run(String(messageId), ...autres);
   }
+  // ⚠️ L'HORODATAGE NE BOUGE QUE SI LA POSITION CHANGE.
+  // Réaffirmer la même décision est presque toujours une inattention —
+  // on reclique sur « Validé » sans se rappeler l'avoir déjà fait. Faire
+  // repartir la date à cet instant réécrirait l'histoire : la trace dirait
+  // que le Directeur a validé à 16 h alors qu'il l'avait fait à 9 h.
+  // Dans un circuit d'approbation, c'est la date de la DÉCISION qui
+  // compte, pas celle du dernier clic. Signalé en test réel.
   ensureDb().prepare(
     `INSERT INTO message_decisions (messageId, fingerprint, sender, issue, comment, ts, signature)
      VALUES (?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(messageId, fingerprint) DO UPDATE SET
-       sender = excluded.sender, issue = excluded.issue, comment = excluded.comment,
-       ts = excluded.ts, signature = excluded.signature`,
+       sender    = excluded.sender,
+       issue     = excluded.issue,
+       comment   = excluded.comment,
+       signature = excluded.signature,
+       ts        = CASE
+                     WHEN message_decisions.issue IS excluded.issue
+                      AND message_decisions.comment IS excluded.comment
+                     THEN message_decisions.ts
+                     ELSE excluded.ts
+                   END`,
   ).run(String(messageId), String(fingerprint), sender || null, String(issue),
         comment || null, Number(ts), signature || null);
 }

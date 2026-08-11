@@ -631,7 +631,16 @@ export function ensureListening() {
         const sousLesYeux = store.panelOpen && groupe === store.activeThread;
         const desAutres = evt.message.from !== store.userId;
         if (desAutres && !sousLesYeux) {
-          if (prive) {
+          // ⚠️ Le RATTRAPAGE ne compte pas, pas plus qu'il ne sonne.
+          // Le poste redemande aujourd'hui l'historique depuis zéro à
+          // chaque connexion : compter le rattrapage faisait renaître, à
+          // chaque retour dans le salon, des pastilles sur des messages
+          // privés déjà lus — et les ouvrir ne servait à rien puisqu'elles
+          // revenaient au retour suivant. Constaté en test réel.
+          // La pastille signale ce qui est arrivé pendant qu'on regardait
+          // ailleurs, dans CETTE session ; elle n'est pas un compteur
+          // d'historique.
+          if (prive && !evt.message.backlog) {
             patch.unreadPrivate = {
               ...store.unreadPrivate,
               [groupe]: (store.unreadPrivate[groupe] || 0) + 1,

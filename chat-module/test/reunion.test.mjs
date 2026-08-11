@@ -125,10 +125,40 @@ const chezElle = sTardif.messages.find((m) => m.type === "meeting" && m.extra?.t
 assert.ok(chezElle, "un arrivant doit recevoir la réunion dans son rattrapage");
 assert.equal(chezElle.extra.startsAt, debut, "avec son heure intacte");
 
+
+// ── 8. Quitter le salon et revenir NE DOIT PAS dépingler ───────────────
+// Constaté en test réel, et l'utilisateur a fait le lien avant moi : une
+// réunion annoncée hier est plus ancienne que le point de reprise, donc
+// absente du rattrapage. Elle disparaissait de l'épinglage au retour — et
+// comme c'est son arrivée qui programme le rappel, le rappel partait avec.
+let recuAuRetour = [];
+const revenant = joinSession({
+  address: "127.0.0.1", wsPort: PORT, pin: PIN, userId: "Karim",
+  dataDir: path.join(dataDir, "id-equipe"), groups: ["all"],
+  lastSeenTs: Date.now() + 60000,   // « j'ai déjà tout lu »
+  onMessage: (m) => recuAuRetour.push(m), onPresence: () => {},
+});
+await new Promise((r) => revenant.raw.on("open", r));
+await dodo(1400);
+const rejouee = recuAuRetour.find((m) => m.type === "meeting" && m.extra?.title === "Conseil de direction");
+assert.ok(rejouee, "une réunion à venir doit être rejouée même sans rattrapage de messages");
+assert.equal(rejouee.extra.startsAt, debut, "avec son heure intacte");
+assert.ok(rejouee.backlog, "marquée comme rattrapage : elle ne doit ni sonner ni compter");
+// SEULES les réunions à venir repassent : les deux acceptées, et rien de
+// plus. Le haut du salon ne doit pas se remplir de convocations périmées
+// ni de celles que l'hôte a refusées.
+const reunionsRejouees = recuAuRetour.filter((m) => m.type === "meeting");
+assert.equal(reunionsRejouees.length, 2,
+  "exactement les deux réunions à venir, pas les refusées ni les terminées");
+assert.deepEqual(new Set(reunionsRejouees.map((m) => m.extra.title)),
+  new Set(["Conseil de direction", "Point rapide"]));
+revenant.close();
+await dodo(300);
+
 organisateur.close(); equipe.close(); tardif.close();
 await dodo(300);
 await host.stop();
 closeStore();
 fs.rmSync(dataDir, { recursive: true, force: true });
-console.log("✅ reunion.test.mjs : 16 assertions PASSÉES (heure scellée, épinglage borné dans le temps, refus des antidatées et des durées hors bornes)");
+console.log("✅ reunion.test.mjs : 19 assertions PASSÉES (heure scellée, épinglage borné dans le temps, refus des antidatées et des durées hors bornes)");
 process.exit(0);

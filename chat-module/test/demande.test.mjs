@@ -100,6 +100,29 @@ const apres = listDecisions(idDemande);
 assert.equal(apres.length, 1, "une personne pèse UNE décision, la dernière");
 assert.equal(apres[0].issue, "reserve", "sa dernière position prévaut");
 
+// ── 4 bis. Réaffirmer la MÊME position ne rajeunit pas la date ─────────
+// Recliquer sur « Réserves » sans se rappeler l'avoir déjà fait est une
+// inattention courante. Faire repartir la date à cet instant réécrirait
+// l'histoire : la trace dirait que le Directeur s'est prononcé à 16 h
+// alors qu'il l'avait fait à 9 h. Dans un circuit d'approbation, c'est la
+// date de la DÉCISION qui compte, pas celle du dernier clic.
+// Signalé en test réel.
+const dateInitiale = listDecisions(idDemande)[0].ts;
+await dodo(1100);
+directeur.decider({ messageId: idDemande, issue: "reserve", comment: "Finalement, des réserves." });
+await dodo(800);
+assert.equal(listDecisions(idDemande)[0].ts, dateInitiale,
+  "réaffirmer la même position ne doit pas déplacer l'horodatage");
+// Un vrai CHANGEMENT, lui, redate — c'est le moment où l'avis a bougé.
+directeur.decider({ messageId: idDemande, issue: "refuse" });
+await dodo(800);
+assert.notEqual(listDecisions(idDemande)[0].ts, dateInitiale,
+  "changer de position redate : c'est une nouvelle décision");
+assert.equal(listDecisions(idDemande)[0].issue, "refuse");
+// On remet la position attendue par la suite du fichier.
+directeur.decider({ messageId: idDemande, issue: "reserve", comment: "Finalement, des réserves." });
+await dodo(700);
+
 // ── 5. « Pour info » n'attend aucune réponse ───────────────────────────
 charge.send("Compte rendu de la réunion", "all", null, null, { tag: "info" });
 await dodo(700);
@@ -155,5 +178,5 @@ await dodo(300);
 await host.stop();
 closeStore();
 fs.rmSync(dataDir, { recursive: true, force: true });
-console.log("✅ demande.test.mjs : 22 assertions PASSÉES (étiquette signée, destinataire opposable, issue publique et rejouée)");
+console.log("✅ demande.test.mjs : 26 assertions PASSÉES (étiquette signée, destinataire opposable, issue publique et rejouée)");
 process.exit(0);

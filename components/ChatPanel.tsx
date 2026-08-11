@@ -22,6 +22,20 @@ const TAG_TON: Record<string, string> = {
   info: "#8a8a8a", avis: "#4a9eff", validation: "#00c853", approbation: "#ffa726",
 };
 
+/** Heure d'un message : l'heure seule dans la journée, la date devant dès
+ *  qu'on change de jour. Un fil qui n'affiche que « 14:32 » ne dit pas si
+ *  l'on regarde ce matin ou la semaine dernière. Le survol donne la date
+ *  et l'heure complètes. */
+function heureCourte(ts: number): string {
+  const d = new Date(ts);
+  const heure = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const aujourdhui = new Date();
+  const memeJour = d.getFullYear() === aujourdhui.getFullYear()
+    && d.getMonth() === aujourdhui.getMonth()
+    && d.getDate() === aujourdhui.getDate();
+  return memeJour ? heure : `${d.toLocaleDateString()} ${heure}`;
+}
+
 const VOTE_OPTIONS =["voteApprove", "voteReject", "voteReserve"] as const;
 import ChatMediaBubble from "./ChatMediaBubble";
 import ChatRoster from "./ChatRoster";
@@ -1696,7 +1710,22 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
                       >
                         <CornerUpLeft size={11} />
                       </button>
-                      {!isMine && <div style={{ fontSize: 10, color: muted, fontWeight: 700 }}>{m.from}</div>}
+                      {/* Auteur et HEURE. L'heure manquait côté poste alors
+                          que la page mobile l'affichait : sans elle, on ne
+                          sait pas si l'on lit un échange de ce matin ou de
+                          la semaine dernière — signalé en usage réel.
+                          Elle est portée par la même ligne que l'auteur, et
+                          seule quand le message est de nous : ajouter une
+                          ligne par message aurait encore réduit la place
+                          disponible, déjà comptée. */}
+                      <div style={{
+                        display: "flex", alignItems: "baseline", gap: 6,
+                        fontSize: 10, color: muted,
+                        justifyContent: isMine ? "flex-end" : "flex-start",
+                      }}>
+                        {!isMine && <span style={{ fontWeight: 700 }}>{m.from}</span>}
+                        <span title={new Date(m.ts).toLocaleString()}>{heureCourte(m.ts)}</span>
+                      </div>
                       {/* Étape G — message cité. On le relit dans le fil
                           plutôt que d'en avoir gardé une copie : après une
                           purge de rétention, la cible a pu disparaître, et

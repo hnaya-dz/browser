@@ -20,7 +20,7 @@ import {
   getDevice, countDevices, getDataDir, listReferencedMedia,
   setDeviceRole, listRoster, listDirectThreads,
   retireDevice, restoreDevice,
-  saveDecision, listDecisions, listDemandes,
+  saveDecision, listDecisions, listDemandes, listMeetings,
   personIdOf, linkDeviceToPerson, empreintesDeLaPersonne,
   setPersonAvatar, saveRead, listReads, readsForMyMessages,
 } from "./store.js";
@@ -329,6 +329,23 @@ export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, 
           }
         }
         const missed = demandes.flatMap((g) => getMessagesSince(g, since, activeRoomId));
+
+        // ── Étape P — les réunions À VENIR repassent TOUJOURS ─────────
+        // Même piège que le dépouillement d'un vote et que les décisions,
+        // sous une autre forme : une réunion annoncée hier est plus
+        // ancienne que `since`, donc absente du rattrapage. Elle
+        // disparaissait de l'épinglage dès qu'on quittait le salon et
+        // qu'on y revenait — et, comme c'est son arrivée qui programme le
+        // rappel, le rappel disparaissait avec elle. Constaté en test
+        // réel : l'utilisateur a fait le lien entre les deux avant moi.
+        // On les rejoue tant qu'elles ne sont pas terminées ; la
+        // déduplication par identifiant côté client évite le doublon
+        // quand elles figurent déjà dans le rattrapage.
+        const dejaLa = new Set(missed.map((m) => m.id));
+        for (const r of listMeetings(activeRoomId, demandes)) {
+          if (!dejaLa.has(r.id)) missed.push(r);
+        }
+        missed.sort((a, b) => Number(a.ts) - Number(b.ts));
         ws.send(encryptPayload(sessionKey, { v: 1, type: "backlog", messages: missed }));
 
         // ⚠️ Le dépouillement ne voyage PAS avec les messages : il n'est
