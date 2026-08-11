@@ -170,6 +170,14 @@ export interface DiscoveredSession {
   // Port de la page d'invitation mobile — absent des beacons émis par les
   // versions antérieures à l'accès mobile (repli : 4803)
   httpPort?: number | null;
+  // Un serveur peut servir PLUSIEURS salons derrière une même écoute
+  // (rooms-host.js). Le beacon les annonce alors tous ; le dock en fait
+  // une entrée par salon, car c'est un salon qu'on rejoint, pas un
+  // serveur. Absent chez un hôte à salon unique.
+  rooms?: { roomId: string; name: string; path?: string }[] | null;
+  // Salon retenu, une fois l'entrée dépliée. Voyage jusqu'au raccordement :
+  // sans lui, on atterrit sur le salon principal de l'hôte.
+  roomId?: string | null;
 }
 
 export type ChatStatus =

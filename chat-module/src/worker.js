@@ -253,6 +253,9 @@ function handleCommand(msg) {
         address: msg.address,
         wsPort: msg.wsPort,
         pin: msg.pin,
+        // Salon visé sur un hôte qui en sert plusieurs derrière un même
+        // port (rooms-host.js). Absent : le salon principal.
+        roomId: msg.roomId || null,
         userId: msg.userId,
         groups: msg.groups || ["all"],
         lastSeenTs: msg.lastSeenTs || 0,

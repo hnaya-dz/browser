@@ -387,8 +387,15 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
   // Le code se remplit tout seul si l'utilisateur l'a fait retenir, et
   // une case propose de le retenir après une connexion RÉUSSIE (jamais
   // avant : on n'enregistre pas un code erroné).
+  // Clé de mémorisation du code d'accès dans le coffre.
+  // ⚠️ Le salon entre dans la clé quand il y en a plusieurs derrière le
+  // même port : sans lui, Direction et DRH partageraient une entrée, et
+  // le code de l'une ouvrirait le formulaire de l'autre — un code faux,
+  // proposé avec l'assurance d'un code juste. Sans salon, la clé reste
+  // TELLE QU'AVANT : les codes déjà enregistrés continuent d'être
+  // retrouvés.
   const roomKeyOf = (s: DiscoveredSession | null) =>
-    s ? `${s.address}:${s.wsPort}` : null;
+    s ? `${s.address}:${s.wsPort}${s.roomId ? `/${s.roomId}` : ""}` : null;
   const [pinFromVault, setPinFromVault] = useState(false);
   const [rememberPin, setRememberPin] = useState(false);
 
@@ -631,6 +638,17 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
       const info = await fetch(`http://${address}:${httpPort}/info.json`, { signal: ctrl.signal }).then((r) => r.json());
       clearTimeout(timer);
       if (info?.sessionName) sessionName = String(info.sessionName);
+      // Serveur multi-salons : demander le code d'accès sans avoir demandé
+      // LEQUEL enverrait sur le salon principal, silencieusement. On
+      // affiche donc le choix — c'est un salon qu'on rejoint.
+      if (Array.isArray(info?.rooms) && info.rooms.length > 1) {
+        const carte = new Map(store.discovered);
+        carte.set(`${address}:${wsPort}`, {
+          sessionName, address, wsPort, httpPort, hostname: address, rooms: info.rooms,
+        });
+        patchStore({ discovered: carte, status: "discovering" });
+        return;
+      }
     } catch { /* serveur sans page mobile ou délai — l'IP fera l'affaire */ }
     handlePickSession({
       sessionName, address, wsPort, httpPort, hostname: address,
@@ -662,6 +680,9 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
     api.send("chat-join", {
       address: store.selectedSession.address,
       wsPort: store.selectedSession.wsPort,
+      // Sans lui, on atterrirait sur le salon principal de l'hôte, quel
+      // que soit celui qu'on a désigné dans la liste.
+      roomId: store.selectedSession.roomId || null,
       pin: pinInput,
       userId: store.userId,
       groups: ["all"],
@@ -770,7 +791,16 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
     setPinInput("");
   };
 
-  const discoveredList = Array.from(store.discovered.values());
+  // On rejoint un SALON, pas un serveur. Un hôte qui en sert plusieurs
+  // derrière une même écoute (rooms-host.js) les annonce tous : on déplie
+  // donc son annonce en une entrée par salon. Chacune porte son roomId,
+  // qui voyagera jusqu'au raccordement. Un hôte à salon unique n'annonce
+  // pas de liste et reste une entrée, exactement comme avant.
+  const discoveredList = Array.from(store.discovered.values()).flatMap((s) =>
+    Array.isArray(s.rooms) && s.rooms.length > 0
+      ? s.rooms.map((r) => ({ ...s, sessionName: r.name, roomId: r.roomId, rooms: null }))
+      : [s],
+  );
   // La barre d'onglets latérale occupe déjà les 200px de droite quand elle
   // est active — le dock se place alors juste à sa gauche.
   const rightOffset = position === "right" ? 200 : 0;
@@ -1047,7 +1077,7 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
             ) : (
               discoveredList.map((s) => (
                 <button
-                  key={`${s.address}:${s.wsPort}`}
+                  key={`${s.address}:${s.wsPort}/${s.roomId || ""}`}
                   onClick={() => handlePickSession(s)}
                   style={{
                     ...btnStyle(), width: "100%", textAlign: isRTL ? "right" : "left",
