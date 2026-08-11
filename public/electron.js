@@ -1144,15 +1144,26 @@ ipcMain.on("chat-cancel-reminder", (event, { id } = {}) => {
 // dépendance, aucune authentification, aucun compte Microsoft, et cela
 // fonctionne hors ligne. Le contenu est composé par le renderer ; ici on
 // ne fait que demander où l'enregistrer.
+// ⚠️ On OUVRE le fichier, on ne demande pas où l'enregistrer.
+// La première version affichait un sélecteur d'emplacement : le fichier
+// atterrissait n'importe où et il fallait ensuite le retrouver pour
+// l'ouvrir. Sur téléphone, le même .ics ouvre directement l'application
+// d'agenda — et c'est cette différence que l'usage réel a fait ressortir.
+// On écrit donc dans un dossier temporaire et on laisse Windows lancer
+// l'application d'agenda par défaut, qui proposera elle-même d'ajouter
+// l'événement. Le fichier ne sert qu'au passage de relais.
 ipcMain.handle("chat-export-ics", async (event, { filename, content } = {}) => {
   try {
-    const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
-      defaultPath: join(app.getPath("documents"), String(filename || "reunion.ics")),
-      filters: [{ name: "Calendrier (iCalendar)", extensions: ["ics"] }],
-    });
-    if (canceled || !filePath) return { ok: false, error: "canceled" };
-    writeFileSync(filePath, String(content), "utf8");
-    return { ok: true, path: filePath };
+    const dossier = join(app.getPath("temp"), "hnaya-agenda");
+    mkdirSync(dossier, { recursive: true });
+    const chemin = join(dossier, String(filename || "reunion.ics"));
+    writeFileSync(chemin, String(content), "utf8");
+    // openPath renvoie une CHAÎNE : vide si tout va bien, le message
+    // d'erreur sinon. Aucune exception n'est levée quand aucune
+    // application n'est associée aux .ics — d'où le test explicite.
+    const souci = await shell.openPath(chemin);
+    if (souci) return { ok: false, error: souci, path: chemin };
+    return { ok: true, path: chemin };
   } catch (e) {
     return { ok: false, error: e?.message || "ics" };
   }

@@ -931,6 +931,12 @@ function telechargerIcs(m) {
   ];
   if (e.location) lignes.push("LOCATION:" + echapperIcs(e.location));
   if (m.text) lignes.push("DESCRIPTION:" + echapperIcs(m.text));
+  // Rappel à quinze minutes, aligné sur celui de la messagerie : sans
+  // VALARM, l'agenda applique son propre défaut (trente minutes sur le
+  // téléphone testé) et l'on reçoit deux rappels décalés sans savoir
+  // lequel vient d'où. Doit rester identique à context/ics.ts.
+  lignes.push("BEGIN:VALARM", "TRIGGER:-PT15M", "ACTION:DISPLAY",
+              "DESCRIPTION:" + echapperIcs(e.title), "END:VALARM");
   lignes.push("END:VEVENT", "END:VCALENDAR");
   // CRLF exigé par la RFC : Outlook rejette un fichier en LF seuls.
   const blob = new Blob([lignes.join("\r\n") + "\r\n"], { type: "text/calendar" });

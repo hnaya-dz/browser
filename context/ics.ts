@@ -66,6 +66,17 @@ export function composerIcs(r: Reunion): string {
   const desc = [r.description, r.organisateur ? `Annoncée par ${r.organisateur}` : null]
     .filter(Boolean).join("\n");
   if (desc) lignes.push(`DESCRIPTION:${echapper(desc)}`);
+  // Rappel à quinze minutes, aligné sur celui de la messagerie. Sans
+  // VALARM, l'agenda applique SON défaut — trente minutes sur le
+  // téléphone testé — et l'utilisateur reçoit deux rappels à des moments
+  // différents sans comprendre lequel vient d'où.
+  lignes.push(
+    "BEGIN:VALARM",
+    "TRIGGER:-PT15M",
+    "ACTION:DISPLAY",
+    `DESCRIPTION:${echapper(r.title)}`,
+    "END:VALARM",
+  );
   lignes.push("END:VEVENT", "END:VCALENDAR");
   return lignes.join("\r\n") + "\r\n";
 }
