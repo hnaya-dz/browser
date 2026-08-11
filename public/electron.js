@@ -6,6 +6,28 @@ import { existsSync, createReadStream, statSync, readFileSync, writeFileSync, mk
 import http from "http";
 // ✅ PATCH 1 — import depuis shared/ (supprime la duplication avec urlbar.tsx)
 import { isDownloadableUrl } from "./shared/supportedHosts.js";
+
+// ⚠️ EN DÉVELOPPEMENT, ELECTRON N'A PAS LE MÊME PROFIL QUE L'APPLICATION
+// INSTALLÉE — et c'est invisible tant qu'on ne le cherche pas.
+// `yarn dev` lance `electron public/electron.js`. Electron déduit le nom de
+// l'application du package.json trouvé dans le répertoire de l'application
+// — ici `public/`, qui n'en a pas. Il retombe donc sur son nom par défaut,
+// « Electron », et écrit dans %APPDATA%\Electron : autre historique, autre
+// identité d'appareil, autre licence, autres réglages.
+// Symptôme constaté en usage réel : « la version de développement n'a pas
+// d'historique et ne crée pas de salon ». Deux mondes parallèles, sans le
+// moindre message pour l'expliquer.
+// On force donc le nom hors paquet. En paquet, Electron le lit déjà
+// correctement : on n'y touche pas.
+//
+// ⚠️ Ne PAS lancer la version installée et la version de développement en
+// même temps : elles écriraient dans la même base.
+if (!app.isPackaged) app.setName("hnaya-dz-browser");
+
+// URL du rendu en développement. Configurable : le port 3000 est parfois
+// déjà pris par un autre serveur, et une URL codée en dur envoyait alors
+// la fenêtre vers l'application d'à côté — sans que rien ne le signale.
+const URL_DEV = process.env.HNAYA_DEV_URL || "http://localhost:3000";
 import { registerVaultIpc } from "./vault-ipc.js";
 import {
   getChatSession, saveChatSession, forgetChatSession,
@@ -539,7 +561,7 @@ mainWindow = new BrowserWindow({
     // staticServerUrl est prêt (démarré dans app.on("ready") avant createWindow)
     mainWindow.loadURL(staticServerUrl);
   } else {
-    mainWindow.loadURL("http://localhost:3000");
+    mainWindow.loadURL(URL_DEV);
     mainWindow.webContents.on("did-fail-load", () => mainWindow.webContents.reloadIgnoringCache());
   }
   mainWindow.on("closed", () => { mainWindow = null; });
