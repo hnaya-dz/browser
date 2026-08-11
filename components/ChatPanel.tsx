@@ -875,7 +875,7 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
               <input
                 style={{
                   ...inputStyle,
-                  borderColor: nickname.trim() ? border : `${accent}80`,
+                  border: `1px solid ${nickname.trim() ? border : `${accent}80`}`,
                 }}
                 value={nickname}
                 onChange={(e) => saveNickname(e.target.value)}
@@ -938,7 +938,7 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
                     <div style={{ display: "flex", gap: 6 }}>
                       <button
                         onClick={() => handleDeleteRoom(confirmDelete)}
-                        style={{ ...btnStyle(), flex: 1, padding: "6px 8px", fontSize: 10.5, color: "#ff5252", borderColor: "#ff525260" }}
+                        style={{ ...btnStyle(), flex: 1, padding: "6px 8px", fontSize: 10.5, color: "#ff5252", border: "1px solid #ff525260" }}
                       >
                         {t("Chat.deleteYes")}
                       </button>
@@ -980,7 +980,7 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
                           style={{
                             ...btnStyle(), padding: "0 9px", flexShrink: 0,
                             color: confirmDelete === r.roomId ? "#ff5252" : muted,
-                            borderColor: confirmDelete === r.roomId ? "#ff525260" : border,
+                            border: `1px solid ${confirmDelete === r.roomId ? "#ff525260" : border}`,
                           }}
                         >
                           <Trash2 size={13} />

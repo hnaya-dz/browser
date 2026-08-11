@@ -1338,19 +1338,30 @@ ipcMain.on("chat-admin", (event, params) => {
 // Export admin (JSON/CSV) : le renderer fournit le contenu, l'utilisateur
 // choisit l'emplacement. writeFileSync après validation du dialogue.
 ipcMain.handle("chat-admin-export", async (event, { filename, content }) => {
+  // ⚠️ L'ORDRE DES FILTRES DÉCIDE DE L'EXTENSION.
+  // Windows applique le filtre ACTIF au nom de fichier, et le filtre actif
+  // est le premier de la liste. JSON figurant toujours en tête, un export
+  // CSV proposé sous `…​.csv` repartait en `.json` : contenu CSV, extension
+  // JSON, tableur incapable de l'ouvrir. Signalé en usage réel
+  // (« les deux envoient un fichier JSON »). On met donc en tête le filtre
+  // correspondant à ce qui a réellement été demandé.
+  const estCsv = String(filename || "").toLowerCase().endsWith(".csv");
+  const fJson = { name: "JSON", extensions: ["json"] };
+  const fCsv = { name: "CSV", extensions: ["csv"] };
   const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
     title: nativeT("adminExportTitle"),
     defaultPath: join(app.getPath("documents"), String(filename || "export.json")),
     filters: [
-      { name: "JSON", extensions: ["json"] },
-      { name: "CSV", extensions: ["csv"] },
+      ...(estCsv ? [fCsv, fJson] : [fJson, fCsv]),
       { name: nativeT("allFiles"), extensions: ["*"] },
     ],
   });
   if (canceled || !filePath) return { saved: false };
   const { writeFileSync } = await import("fs");
-  // BOM UTF-8 (﻿) pour que l'arabe s'affiche correctement dans Excel
-  writeFileSync(filePath, String(filename).endsWith(".csv") ? "﻿" + content : content, "utf8");
+  // BOM UTF-8 (﻿) pour que l'arabe s'affiche correctement dans Excel.
+  // On se fie au chemin RETENU, pas au nom proposé : l'utilisateur peut
+  // avoir changé l'extension dans la boîte de dialogue.
+  writeFileSync(filePath, filePath.toLowerCase().endsWith(".csv") ? "﻿" + content : content, "utf8");
   return { saved: true, filePath };
 });
 
@@ -1619,7 +1630,17 @@ ipcMain.handle("chat-server-get-info", async () => {
   // pas, c'est voulu) : l'interface peut alors proposer de la réutiliser
   // au lieu d'obliger à retrouver le fichier d'origine.
   const licenceSurDisque = existsSync(join(chatServerDataDir, "licence.hnaya-lic"));
-  return { supported: true, installed, running, dataDir: chatServerDataDir, licence, licenceSurDisque };
+  // Salon du serveur permanent. Il vit dans SA base, hors du profil
+  // utilisateur : il n'apparaît donc pas dans « ouvrir un salon de ce
+  // poste », et l'on peut le croire perdu. On le nomme ici, à partir de
+  // l'état que le serveur publie à son démarrage (voir serve.js).
+  // Absent = serveur jamais démarré depuis cette version ; on n'invente
+  // rien plutôt que d'afficher un nom faux.
+  let salon = null;
+  try {
+    salon = JSON.parse(readFileSync(join(chatServerDataDir, "salon-actif.json"), "utf8"));
+  } catch { /* pas encore publié */ }
+  return { supported: true, installed, running, dataDir: chatServerDataDir, licence, licenceSurDisque, salon };
 });
 
 ipcMain.handle("chat-server-pick-licence", async () => {

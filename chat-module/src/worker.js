@@ -40,6 +40,19 @@
 
 import os from "node:os";
 import { readFileSync, writeFileSync, unlinkSync } from "node:fs";
+
+// ⚠️ CHAMPS QUE LA COMMANDE « admin » TRANSPORTE.
+// Cette liste doit couvrir tout ce que lit le switch admin de server.js.
+// Elle était recopiée champ par champ et `role` y manquait : la fonction
+// (DRH, DGA…) arrivait `undefined` au serveur, qui écrivait NULL. Le
+// changement n'était donc pas ignoré — il était EFFACÉ, en silence, alors
+// que l'étiquette juste au-dessous s'enregistrait. Constaté en usage réel.
+// Toute nouvelle action admin qui transporte un champ doit l'ajouter ici.
+const CHAMPS_ADMIN = [
+  "adminPin", "action", "reqId",
+  "fingerprint", "label", "role",
+  "filters", "key", "value", "newPin", "locked",
+];
 import { startHost } from "./server.js";
 import { discoverSessions, joinSession } from "./client.js";
 import { initStore, listRooms, deleteRoom } from "./store.js";
@@ -176,7 +189,9 @@ async function startHostAsync(msg) {
     pin: handle.pin,
     adminPin: handle.adminPin,
     roomId: handle.roomId,
-    sessionName: msg.sessionName || undefined,
+    // Le nom vient du salon, pas de la demande : une réouverture n'en
+    // fournit aucun (voir handle.name dans server.js).
+    sessionName: handle.name || msg.sessionName || undefined,
     wsPort: handle.wsPort,
     httpPort: handle.httpPort,
     lanIp,
@@ -194,7 +209,7 @@ function handleCommand(msg) {
         const lanIp = getLanAddress();
         process.send({
           event: "host-started", pin: already.pin, adminPin: already.adminPin,
-          roomId: already.roomId, sessionName: msg.sessionName || undefined,
+          roomId: already.roomId, sessionName: already.name || msg.sessionName || undefined,
           wsPort: already.wsPort, httpPort: already.httpPort, lanIp,
           inviteUrl: lanIp ? `http://${lanIp}:${already.httpPort}` : null,
         });
@@ -475,18 +490,9 @@ function handleCommand(msg) {
       // Panneau admin du dock — passthrough vers le salon (le serveur
       // vérifie le PIN admin, la réponse revient par "admin-result")
       if (!clientHandle) { process.send({ event: "disconnected" }); break; }
-      clientHandle.sendAdmin({
-        adminPin: msg.adminPin,
-        action: msg.action,
-        reqId: msg.reqId,
-        fingerprint: msg.fingerprint,
-        label: msg.label,
-        filters: msg.filters,
-        key: msg.key,
-        value: msg.value,
-        newPin: msg.newPin,
-        locked: msg.locked,
-      });
+      clientHandle.sendAdmin(Object.fromEntries(
+        CHAMPS_ADMIN.filter((k) => msg[k] !== undefined).map((k) => [k, msg[k]]),
+      ));
       break;
     }
 

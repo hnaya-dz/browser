@@ -347,7 +347,7 @@ export default function ChatComposerMedia({ accent, muted, border, disabled, onP
       <button
         onClick={toggleRecord}
         disabled={disabled}
-        style={{ ...btn, color: recording ? "#ff5252" : muted, borderColor: recording ? "#ff5252" : border }}
+        style={{ ...btn, color: recording ? "#ff5252" : muted, border: `1px solid ${recording ? "#ff5252" : border}` }}
         title={recording ? t("Chat.mediaStopRecording") : t("Chat.mediaRecord")}
         aria-label={recording ? t("Chat.mediaStopRecording") : t("Chat.mediaRecord")}
       >

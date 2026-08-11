@@ -391,7 +391,9 @@
     "meetingMoveConfirm": "تأكيد",
     "meetingCancelled": "أُلغي الاجتماع",
     "meetingMoved": "أُجّل الاجتماع",
-    "meetingWas": "كان مقرَّرًا في"
+    "meetingWas": "كان مقرَّرًا في",
+    "serverRoomServed": "الغرفة المُقدَّمة:",
+    "serverRoomNotListed": "هذه الغرفة تابعة للخادم لا لهذا المتصفّح: لا تظهر ضمن «فتح غرفة من هذا الجهاز». للكتابة فيها، انضمّ إليها كما تفعل أي محطة أخرى."
   },
   "Privacy": {
     "title": "الخصوصية",

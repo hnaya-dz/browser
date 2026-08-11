@@ -391,7 +391,9 @@
     "meetingMoveConfirm": "Confirm",
     "meetingCancelled": "Meeting cancelled",
     "meetingMoved": "Meeting moved",
-    "meetingWas": "Was set for"
+    "meetingWas": "Was set for",
+    "serverRoomServed": "Room served:",
+    "serverRoomNotListed": "This room belongs to the server, not to this browser: it does not appear under “open a room from this computer”. To post in it, join it as any other computer would."
   },
   "Privacy": {
     "title": "Privacy",

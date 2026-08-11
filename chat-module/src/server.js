@@ -1023,14 +1023,23 @@ export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, 
             case "devices":
               reply({ ok: true, data: listDevices(activeRoomId) });
               break;
+            // ⚠️ Un champ ABSENT n'est pas un champ VIDE.
+            // Effacer une étiquette ou une fonction se demande
+            // explicitement, avec null. Traiter l'absence comme un vide
+            // transformait le moindre oubli d'acheminement en perte de
+            // donnée silencieuse — c'est exactement ce qui est arrivé à
+            // `role`, omis de la liste des champs transportés par le
+            // worker. On refuse plutôt que d'écraser.
             case "label":
+              if (!("label" in payload)) { reply({ ok: false, error: "champ-absent" }); break; }
               setDeviceLabel(String(payload.fingerprint || ""), payload.label ?? null);
               reply({ ok: true, data: listDevices(activeRoomId) });
               break;
             case "role":
               // Fonction dans l'organisation (DRH, DGA…) — décrit la
               // PERSONNE, là où « label » nomme l'APPAREIL.
-              setDeviceRole(payload.fingerprint, payload.role);
+              if (!("role" in payload)) { reply({ ok: false, error: "champ-absent" }); break; }
+              setDeviceRole(payload.fingerprint, payload.role ?? null);
               reply({ ok: true, data: listDevices(activeRoomId) });
               break;
 
@@ -1235,6 +1244,13 @@ export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, 
     pin: roomPin,
     adminPin: currentAdminPin,
     roomId: activeRoomId,
+    // Nom RÉEL du salon, tel qu'il est en base. À la réouverture, l'appelant
+    // ne fournit pas de nom (il ne veut pas renommer) : l'interface, qui
+    // n'avait que la demande à se mettre sous la dent, retombait alors sur
+    // « Hnaya Chat » et affichait deux salons ouverts sous le même nom,
+    // impossibles à distinguer avant d'y entrer. Le nom se lit ici, à la
+    // source.
+    name: room.name,
     wsPort,
     httpPort: mobileServer.httpPort,
     /** Rediffuse l'état de licence à tout le monde — appelé par serve.js
@@ -1261,7 +1277,9 @@ export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, 
       const wssClosed = new Promise((resolve) => {
         try { wss.close(() => resolve()); } catch { resolve(); }
       });
-      console.log(`[hnaya-chat] Salon "${sessionName}" fermé.`);
+      // room.name et non sessionName : à la réouverture, l'appelant ne
+      // fournit pas de nom et le journal affichait « Salon "null" fermé ».
+      console.log(`[hnaya-chat] Salon "${room.name}" fermé.`);
       return Promise.all([mobileClosed, wssClosed]);
     },
   };

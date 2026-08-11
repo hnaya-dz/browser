@@ -21,7 +21,7 @@
 // cloisonnement de l'information est physique, pas logiciel.
 
 import path from "node:path";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { startHost } from "./server.js";
 import { initStore, getConfig, setConfig, closeStore, getRoom } from "./store.js";
@@ -163,6 +163,31 @@ export function startPermanentServer({ name, pin, data, adminPin, wsPort, httpPo
   hote = host;
   setConfig("current_room_id", host.roomId);
   const sessionName = getRoom(host.roomId).name;
+
+  // ── État lisible de l'extérieur ────────────────────────────────────────
+  // Le serveur permanent tient SA base, dans SON répertoire (un service,
+  // souvent sous un autre compte). Le navigateur, lui, lit la base du
+  // profil utilisateur : le salon permanent n'apparaissait donc nulle part
+  // dans « ouvrir un salon de ce poste », et l'on cherchait en vain un
+  // salon pourtant bien vivant. Constaté en usage réel après installation
+  // d'un serveur : « je ne le retrouve pas ».
+  // Plutôt que de faire ouvrir une seconde base au navigateur — verrous
+  // croisés, droits d'accès, WAL d'un autre processus —, le serveur dépose
+  // ici ce qu'il faut pour le NOMMER. Un simple fichier, lisible partout,
+  // Windows comme Linux.
+  // ⚠️ Aucun PIN dans ce fichier : il donnerait l'accès au salon à qui sait
+  // lire un répertoire de données.
+  try {
+    writeFileSync(path.join(dataDir || MODULE_DATA_DIR, "salon-actif.json"), JSON.stringify({
+      roomId: host.roomId, name: sessionName,
+      wsPort: host.wsPort, httpPort: host.httpPort,
+      depuis: Date.now(),
+    }, null, 2), "utf8");
+  } catch (err) {
+    // Non bloquant : un serveur qui tourne vaut mieux qu'un serveur qui
+    // refuse de démarrer parce qu'il n'a pas pu écrire un fichier d'agrément.
+    console.warn(`[hnaya-serve] État non publié (${err.message}).`);
+  }
 
   console.log(`[hnaya-serve] Salon permanent "${sessionName}"`);
   console.log(`[hnaya-serve] Données : ${dataDir || "(répertoire du module)"}`);

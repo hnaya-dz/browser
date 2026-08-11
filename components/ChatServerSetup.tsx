@@ -31,6 +31,13 @@ interface ServerInfo {
   installed: boolean;
   running: boolean;
   dataDir: string;
+  // Salon servi par le serveur permanent. Il ne figure PAS dans « ouvrir un
+  // salon de ce poste » : cette liste-là ne montre que les salons du profil
+  // utilisateur, alors que le service tient sa propre base. Sans ce rappel,
+  // le salon créé à l'installation paraît avoir disparu.
+  // null tant que le serveur n'a pas redémarré depuis la version qui publie
+  // son état.
+  salon?: { roomId: string; name: string; wsPort?: number; httpPort?: number } | null;
   licence: {
     org: string; expires: string; maxDevices: number; daysLeft: number;
     // `valid` = EN COURS DE VALIDITÉ (mode "active"), pas « bien signée ».
@@ -170,6 +177,14 @@ export default function ChatServerSetup({ accent, muted, border, inputStyle, btn
                   }} />
                   <b>{info.running ? t("Chat.serverRunning") : t("Chat.serverInstalledNotRunning")}</b>
                 </div>
+                {info.salon && (
+                  <div style={{ color: muted, marginTop: 3 }}>
+                    {t("Chat.serverRoomServed")} <b style={{ color: "inherit" }}>{info.salon.name}</b>
+                    <div style={{ fontSize: 9.5, marginTop: 2, lineHeight: 1.45 }}>
+                      {t("Chat.serverRoomNotListed")}
+                    </div>
+                  </div>
+                )}
                 {info.licence && (
                   <div style={{ color: muted, marginTop: 3 }}>
                     {info.licence.org} — {info.licence.maxDevices} {t("Chat.serverDevices")} ·{" "}
@@ -244,7 +259,7 @@ export default function ChatServerSetup({ accent, muted, border, inputStyle, btn
                     inputMode="numeric"
                   />
                   <input
-                    style={{ ...inputStyle, direction: "ltr", textAlign: "start", borderColor: nameOk ? undefined : "#ff8080" }}
+                    style={{ ...inputStyle, direction: "ltr", textAlign: "start", ...(nameOk ? {} : { border: "1px solid #ff8080" }) }}
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder={t("Chat.serverNamePlaceholder")}

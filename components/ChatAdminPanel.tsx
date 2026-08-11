@@ -280,7 +280,16 @@ export default function ChatAdminPanel({ accent, muted, border, inputBg, inputSt
                   {t("Chat.adminSave")}
                 </button>
                 {/* D.2 — blocage : expulsion immédiate + refus au retour ;
-                    outil d'exception (le verrou gère le quotidien) */}
+                    outil d'exception (le verrou gère le quotidien)
+
+                    ⚠️ `border` complet, jamais `borderColor` seul. Les styles
+                    de base posent le raccourci ; React avertit alors qu'on
+                    retire une propriété détaillée pendant qu'un raccourci
+                    concurrent subsiste, et l'ordre d'application cesse d'être
+                    garanti d'un rendu à l'autre. Le message est apparu en
+                    console au basculement Bloquer ↔ Débloquer : les deux
+                    boutons occupent la même position, React réutilise donc le
+                    même nœud. */}
                 {store.adminBans.includes(d.fingerprint) ? (
                   <button
                     onClick={() => admin({ action: "unban", fingerprint: d.fingerprint })}
@@ -292,7 +301,7 @@ export default function ChatAdminPanel({ accent, muted, border, inputBg, inputSt
                 ) : (
                   <button
                     onClick={() => admin({ action: "ban", fingerprint: d.fingerprint })}
-                    style={{ ...btnStyle(), padding: "5px 8px", fontSize: 10.5, color: "#ff5252", borderColor: "#ff525260", display: "flex", alignItems: "center", gap: 3 }}
+                    style={{ ...btnStyle(), padding: "5px 8px", fontSize: 10.5, color: "#ff5252", border: "1px solid #ff525260", display: "flex", alignItems: "center", gap: 3 }}
                     title={t("Chat.adminBan")}
                   >
                     <Ban size={11} /> {t("Chat.adminBan")}

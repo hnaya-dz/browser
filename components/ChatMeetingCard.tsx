@@ -76,11 +76,18 @@ export default function ChatMeetingCard({ message, accent, muted, border, compac
   const jeSuisOrganisateur = !!message.deviceFp
     && !!store.roster.find((p) => p.isMe && p.fingerprint === message.deviceFp);
 
+  // ⚠️ Pas de `border` ici : chaque bouton pose le raccourci COMPLET.
+  // Le style de base portait `border: "1px solid"` et chaque appel ajoutait
+  // `borderColor`. React avertit alors qu'une propriété détaillée disparaît
+  // pendant qu'un raccourci concurrent subsiste — cas réel ici, où les
+  // boutons changent au basculement « Décaler » ↔ formulaire de report et
+  // réutilisent les mêmes nœuds.
   const bouton: React.CSSProperties = {
     display: "flex", alignItems: "center", gap: 3, fontSize: 10,
-    background: "transparent", border: "1px solid", borderRadius: 4,
+    background: "transparent", borderRadius: 4,
     color: "inherit", cursor: "pointer", padding: "3px 7px",
   };
+  const bordure = (couleur: string): React.CSSProperties => ({ border: `1px solid ${couleur}` });
 
   const exporter = async () => {
     const contenu = composerIcs({
@@ -94,6 +101,16 @@ export default function ChatMeetingCard({ message, accent, muted, border, compac
   };
 
   const imminent = debut - Date.now() < 15 * 60000 && Date.now() < debut + duree * 60000;
+
+  // Une réunion passée ne se décale ni ne s'annule : l'heure est écoulée,
+  // il n'y a plus rien à prévenir. Laisser les boutons donnait à croire
+  // qu'on pouvait encore agir sur une convocation périmée (retour terrain :
+  // « les annonces fermées ont toujours les options décaler et annuler »).
+  // Pour reprogrammer, on annonce une nouvelle réunion — la trace de
+  // l'ancienne reste dans le fil, ce qui vaut mieux qu'un report qui
+  // effacerait le fait qu'elle n'a pas eu lieu.
+  // Recalculé à chaque tic (30 s), la carte vieillit donc toute seule.
+  const terminee = Date.now() >= debut + duree * 60000;
 
   // ⚠️ ÉPINGLÉE = UNE SEULE LIGNE.
   // La version épinglée reprenait la carte entière — titre, date, lieu,
@@ -188,7 +205,7 @@ export default function ChatMeetingCard({ message, accent, muted, border, compac
           il doit pouvoir décaler depuis son téléphone appairé. L'hôte
           applique de toute façon la même règle — ces boutons évitent
           seulement d'en proposer une qui serait refusée. */}
-      {jeSuisOrganisateur && !annulee && (
+      {jeSuisOrganisateur && !annulee && !terminee && (
         <div style={{ display: "flex", gap: 5, marginTop: 6, flexWrap: "wrap" }}>
           {!reportOuvert ? (
             <>
@@ -199,7 +216,7 @@ export default function ChatMeetingCard({ message, accent, muted, border, compac
                   setNouvelleDate(d.toISOString().slice(0, 16));
                   setReportOuvert(true);
                 }}
-                style={{ ...bouton, borderColor: border }}
+                style={{ ...bouton, ...bordure(border) }}
               >
                 <CalendarClock size={10} /> {t("Chat.meetingMove")}
               </button>
@@ -207,7 +224,7 @@ export default function ChatMeetingCard({ message, accent, muted, border, compac
                 onClick={() => {
                   getApi()?.send?.("chat-update-meeting", { messageId: message.id, action: "cancelled" });
                 }}
-                style={{ ...bouton, borderColor: "rgba(255,82,82,0.5)", color: "#ff8080" }}
+                style={{ ...bouton, ...bordure("rgba(255,82,82,0.5)"), color: "#ff8080" }}
               >
                 <X size={10} /> {t("Chat.meetingCancel")}
               </button>
@@ -234,11 +251,11 @@ export default function ChatMeetingCard({ message, accent, muted, border, compac
                   });
                   setReportOuvert(false);
                 }}
-                style={{ ...bouton, borderColor: accent, color: accent }}
+                style={{ ...bouton, ...bordure(accent), color: accent }}
               >
                 {t("Chat.meetingMoveConfirm")}
               </button>
-              <button onClick={() => setReportOuvert(false)} style={{ ...bouton, borderColor: border }}>
+              <button onClick={() => setReportOuvert(false)} style={{ ...bouton, ...bordure(border) }}>
                 {t("Chat.inviteClose")}
               </button>
             </>

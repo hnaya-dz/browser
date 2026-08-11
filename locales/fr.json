@@ -391,7 +391,9 @@
     "meetingMoveConfirm": "Confirmer",
     "meetingCancelled": "Réunion annulée",
     "meetingMoved": "Réunion décalée",
-    "meetingWas": "Était prévue le"
+    "meetingWas": "Était prévue le",
+    "serverRoomServed": "Salon servi :",
+    "serverRoomNotListed": "Ce salon appartient au serveur, pas à ce navigateur : il ne figure pas dans « ouvrir un salon de ce poste ». Pour y écrire, rejoignez-le comme les autres postes."
   },
   "Privacy": {
     "title": "Confidentialité",
