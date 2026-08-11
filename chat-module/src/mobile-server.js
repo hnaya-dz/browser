@@ -42,7 +42,7 @@ const MIME = {
  * @param {number} opts.wsPort port WebSocket du salon (la page s'y connecte)
  * @returns {{ httpPort: number, stop: () => void }}
  */
-export function startMobileServer({ sessionName = "Hnaya", wsPort = 4802, httpPort = MOBILE_HTTP_PORT } = {}) {
+export function startMobileServer({ sessionName = "Hnaya", wsPort = 4802, httpPort = MOBILE_HTTP_PORT, rooms = null } = {}) {
   const server = http.createServer((req, res) => {
     const urlPath = (req.url || "/").split("?")[0];
 
@@ -57,7 +57,14 @@ export function startMobileServer({ sessionName = "Hnaya", wsPort = 4802, httpPo
         "Cache-Control": "no-store",
         "Access-Control-Allow-Origin": "*",
       });
-      res.end(JSON.stringify({ sessionName, wsPort }));
+      // `rooms` : plusieurs salons derrière la même écoute (rooms-host.js).
+      // La page mobile propose alors le choix. Absent chez un hôte à salon
+      // unique — un téléphone d'une version antérieure ignore le champ et
+      // se raccorde comme avant, sur le salon principal.
+      res.end(JSON.stringify({
+        sessionName, wsPort,
+        rooms: Array.isArray(rooms) && rooms.length > 1 ? rooms : null,
+      }));
       return;
     }
 

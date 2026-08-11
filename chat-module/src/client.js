@@ -48,6 +48,9 @@ export function joinSession({
   address,
   wsPort,
   pin,
+  // Salon visé sur un hôte qui en sert plusieurs derrière un même port.
+  // Absent : le salon principal (et l'unique, chez un hôte classique).
+  roomId = null,
   userId,
   groups = ["all"],
   lastSeenTs = 0,
@@ -74,7 +77,12 @@ export function joinSession({
   // stable en dessous. Le join annonce la clé publique + le nom de machine ;
   // chaque message est signé (traçabilité admin, voir identity.js).
   const identity = loadOrCreateIdentity(dataDir);
-  const ws = new WebSocket(`ws://${address}:${wsPort}`);
+  // Le salon visé se désigne par le CHEMIN, pas dans le protocole : la
+  // première trame est déjà chiffrée avec la clé du salon (voir
+  // rooms-host.js). Sans roomId, « / » → salon principal de l'hôte, ce qui
+  // est aussi le comportement des hôtes à salon unique.
+  const chemin = roomId ? `/r/${encodeURIComponent(roomId)}` : "";
+  const ws = new WebSocket(`ws://${address}:${wsPort}${chemin}`);
 
   ws.on("open", () => {
     ws.send(encryptPayload(sessionKey, {

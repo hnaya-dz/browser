@@ -76,7 +76,12 @@ const TYPES_EN_LECTURE_SEULE = new Set(["join", "read", "media-get", "roster", "
 const TAGS = new Set(["info", "avis", "validation", "approbation"]);
 const ISSUES = new Set(["valide", "refuse", "reserve"]);
 
-export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, wsPort = WS_PORT, httpPort, onError, maxDevices = null, licenceState = null } = {}) {
+export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, wsPort = WS_PORT, httpPort, onError, maxDevices = null, licenceState = null,
+  // Services fournis par une façade multi-salons (voir rooms-host.js) :
+  // l'écoute WebSocket, la page mobile et le signal de découverte sont
+  // alors MUTUALISÉS — un seul port, une seule annonce, quel que soit le
+  // nombre de salons. Absents, chaque salon monte les siens, comme avant.
+  wss, servicesPartages = false } = {}) {
   const etatLicence = () => {
     if (!licenceState) return { mode: "active", notice: null };
     try { return licenceState() || { mode: "active", notice: null }; }
@@ -139,13 +144,28 @@ export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, 
   // jusqu'à 100 Mio par trame — un poste du réseau pourrait saturer la
   // mémoire de l'hôte d'un seul envoi. Les pièces jointes voyagent en
   // morceaux de 64 Ko (voir src/media.js), largement sous ce plafond.
-  const wss = new WebSocketServer({ port: wsPort, maxPayload: 1024 * 1024 });
-  console.log(`[hnaya-chat] Salon "${sessionName}" ouvert sur le port ${wsPort} — PIN : ${roomPin}`);
+  // ── SERVEUR WEBSOCKET : le nôtre, ou celui qu'on nous confie ───────────
+  // Un salon = une clé de chiffrement, dérivée de SON code d'accès. La
+  // toute première trame est déjà chiffrée : impossible, donc, de lire un
+  // « à quel salon vas-tu ? » avant de connaître la clé. C'est pourquoi
+  // plusieurs salons ne peuvent pas se partager une écoute « à l'aveugle ».
+  // La façade multi-salons (rooms-host.js) résout cela en amont, par le
+  // CHEMIN de la connexion : elle possède l'écoute, aiguille chaque
+  // raccordement vers le bon salon, et nous remet un serveur déjà dédié.
+  // Chaque salon garde ainsi sa clé, son état et sa logique — intacts.
+  // Sans injection, comportement d'origine : on écoute nous-mêmes.
+  const wssFourni = !!wss;
+  wss = wss || new WebSocketServer({ port: wsPort, maxPayload: 1024 * 1024 });
+  if (!wssFourni) {
+    console.log(`[hnaya-chat] Salon "${sessionName}" ouvert sur le port ${wsPort} — PIN : ${roomPin}`);
+  }
 
   // ✅ Étape D — plus de crash brut sur EADDRINUSE (un salon tourne déjà
   // sur ce poste) : nettoyage puis remontée d'une erreur lisible. Sans ce
   // gestionnaire, l'événement "error" non écouté TUE le process entier.
-  wss.on("error", (err) => {
+  // Écoute confiée = ce n'est pas à nous de traiter ses erreurs de port :
+  // la façade les remonte une seule fois, pas une fois par salon.
+  if (!wssFourni) wss.on("error", (err) => {
     const friendly = err?.code === "EADDRINUSE"
       ? `Le port ${wsPort} est déjà utilisé — un salon est probablement déjà ouvert sur ce poste.`
       : (err?.message || String(err));
@@ -1216,8 +1236,16 @@ export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, 
   // ✅ Accès mobile (C-bis) : page web servie aux téléphones du même wifi.
   // httpPort est annoncé dans le beacon pour que les postes déjà connectés
   // puissent aussi afficher le QR d'invitation (URL = adresse de l'hôte).
-  const mobileServer = startMobileServer({ sessionName, wsPort, httpPort });
-  const stopBeacon = startBeacon({ sessionName, wsPort, httpPort: mobileServer.httpPort });
+  // Mutualisés par la façade multi-salons : une seule page mobile et un
+  // seul signal de découverte pour l'ensemble des salons. En annoncer un
+  // par salon ferait apparaître autant de serveurs distincts sur le réseau
+  // là où il n'y en a qu'un.
+  const mobileServer = servicesPartages
+    ? { httpPort, stop: () => Promise.resolve() }
+    : startMobileServer({ sessionName, wsPort, httpPort });
+  const stopBeacon = servicesPartages
+    ? () => {}
+    : startBeacon({ sessionName, wsPort, httpPort: mobileServer.httpPort });
   // Étape E — la purge de rétention efface les MESSAGES ; les fichiers
   // joints qu'ils citaient deviennent alors orphelins et resteraient sur
   // le disque indéfiniment. On enchaîne donc systématiquement les deux.
@@ -1274,7 +1302,9 @@ export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, 
       for (const { ws } of clients.values()) {
         try { ws.close(1001, "host-closed"); } catch { /* déjà fermée */ }
       }
-      const wssClosed = new Promise((resolve) => {
+      // On ne ferme QUE ce qu'on possède. Fermer une écoute confiée par la
+      // façade couperait les autres salons servis sur le même port.
+      const wssClosed = wssFourni ? Promise.resolve() : new Promise((resolve) => {
         try { wss.close(() => resolve()); } catch { resolve(); }
       });
       // room.name et non sessionName : à la réouverture, l'appelant ne
