@@ -393,7 +393,16 @@
     "meetingMoved": "Meeting moved",
     "meetingWas": "Was set for",
     "serverRoomServed": "Room served:",
-    "serverRoomNotListed": "This room belongs to the server, not to this browser: it does not appear under “open a room from this computer”. To post in it, join it as any other computer would."
+    "serverRoomNotListed": "This room belongs to the server, not to this browser: it does not appear under “open a room from this computer”. To post in it, join it as any other computer would.",
+    "adminRooms": "Rooms",
+    "adminRoomsHint": "Set up a room’s access before its members connect. Assigning opens nothing: the room code is still required, and its administrator holds it.",
+    "adminRoomsPick": "Choose a room…",
+    "adminRoomsMembers": "Have access",
+    "adminRoomsDirectory": "Server directory",
+    "adminRoomsAdd": "Add",
+    "adminRoomsRemove": "Remove",
+    "adminRoomsEmpty": "Nobody yet.",
+    "adminRoomsAllIn": "Everyone in the directory already has access."
   },
   "Privacy": {
     "title": "Privacy",

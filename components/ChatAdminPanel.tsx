@@ -22,9 +22,18 @@ interface Props {
   inputBg: string;
   inputStyle: React.CSSProperties;
   btnStyle: (primary?: boolean, disabled?: boolean) => React.CSSProperties;
+  // ⚠️ Une liste déroulante NE se style PAS avec inputStyle.
+  // `inputBg` est translucide — très bien par-dessus le panneau, mais
+  // Windows dessine la liste OUVERTE lui-même, sur fond blanc, en héritant
+  // de la couleur de texte du thème sombre : blanc sur blanc, illisible.
+  // Déjà constaté en usage réel sur le choix du destinataire. Ces deux
+  // styles portent un fond OPAQUE et sont la correction éprouvée : on les
+  // réutilise au lieu d'en refaire une variante.
+  selectStyle: React.CSSProperties;
+  optionStyle: React.CSSProperties;
 }
 
-export default function ChatAdminPanel({ accent, muted, border, inputBg, inputStyle, btnStyle }: Props) {
+export default function ChatAdminPanel({ accent, muted, border, inputBg, inputStyle, btnStyle, selectStyle, optionStyle }: Props) {
   const { t } = useTranslation();
   // Le PIN vit UNIQUEMENT dans cet état local — jamais en localStorage.
   // Pré-rempli pour l'hôte (il vient de lui être affiché par host-started).
@@ -74,7 +83,7 @@ export default function ChatAdminPanel({ accent, muted, border, inputBg, inputSt
     });
     if (res?.ok) { setVaultHasPin(true); setVaultSaved(true); }
   };
-  const [tab, setTab] = useState<"devices" | "history" | "settings">("devices");
+  const [tab, setTab] = useState<"devices" | "history" | "settings" | "salons">("devices");
   const [labelDrafts, setLabelDrafts] = useState<Record<string, string>>({});
   const [roleDrafts, setRoleDrafts] = useState<Record<string, string>>({});
   const [q, setQ] = useState("");
@@ -90,6 +99,25 @@ export default function ChatAdminPanel({ accent, muted, border, inputBg, inputSt
     // Étape I — places de licence occupées. Sans ce chiffre, l'admin ne
     // sait pas s'il lui reste de la marge avant d'atteindre le plafond.
     sendAdminCommand({ adminPin, action: "licence-places" });
+    // Sonde : seul le salon PRINCIPAL d'un hôte multi-salons répond. Un
+    // refus (« reserve-salon-principal ») est une réponse normale, traitée
+    // comme telle par le store — l'onglet de composition n'apparaît alors
+    // tout simplement pas, sans bandeau d'erreur.
+    sendAdminCommand({ adminPin, action: "salons" });
+  };
+
+  // ── Composition d'un salon (salon principal uniquement) ─────────────
+  const composer = (roomId: string) => {
+    patchStore({ adminSalonCompose: roomId });
+    admin({ action: "composition", roomId });
+    // L'annuaire du serveur est la réserve dans laquelle on puise. Demandé
+    // ici et non à l'authentification : inutile de le charger chez les
+    // admins qui n'y ont pas droit.
+    admin({ action: "annuaire-serveur" });
+  };
+  const affecter = (fingerprint: string, present: boolean) => {
+    if (!store.adminSalonCompose) return;
+    admin({ action: "affecter", roomId: store.adminSalonCompose, fingerprint, present });
   };
 
 
@@ -187,6 +215,11 @@ export default function ChatAdminPanel({ accent, muted, border, inputBg, inputSt
         {tabBtn("devices", t("Chat.adminDevices"))}
         {tabBtn("history", t("Chat.adminHistory"))}
         {tabBtn("settings", t("Chat.adminSettings"))}
+        {/* N'apparaît que chez l'admin du salon PRINCIPAL d'un hôte qui
+            sert plusieurs salons. Ailleurs, la sonde a reçu un refus et
+            l'onglet n'existe pas — plutôt qu'un onglet grisé, qui laisserait
+            croire à un droit qu'on n'a pas. */}
+        {store.adminPeutAffecter && store.adminSalons.length > 1 && tabBtn("salons", t("Chat.adminRooms"))}
       </div>
 
       {store.adminError && store.adminError !== "admin-pin" && (
@@ -340,6 +373,84 @@ export default function ChatAdminPanel({ accent, muted, border, inputBg, inputSt
               </div>
             </div>
           ))
+        )}
+
+        {/* ── Composition des salons ──────────────────────────────────
+            Réservé au salon PRINCIPAL. On compose ici l'accès d'un salon
+            AVANT que quiconque s'y connecte : plus besoin de l'ouvrir à
+            tous le temps que les bonnes personnes arrivent.
+
+            ⚠️ Ce que cet écran ne fait PAS, et qu'il faut avoir en tête :
+            affecter n'ouvre rien. La clé de chiffrement d'un salon dérive
+            de SON code d'accès. Inscrire quelqu'un dans la composition de
+            la DRH ne lui permet pas d'y lire une ligne sans le code de la
+            DRH, que détient son admin. On compose une liste, on ne
+            distribue pas des clés. */}
+        {tab === "salons" && (
+          <>
+            <div style={{ fontSize: 10.5, color: muted, lineHeight: 1.5, flexShrink: 0 }}>
+              {t("Chat.adminRoomsHint")}
+            </div>
+            <select
+              value={store.adminSalonCompose || ""}
+              onChange={(e) => e.target.value && composer(e.target.value)}
+              style={{ ...selectStyle, fontSize: 11, padding: "6px 8px" }}
+            >
+              <option value="" style={optionStyle}>{t("Chat.adminRoomsPick")}</option>
+              {store.adminSalons.map((s) => (
+                <option key={s.roomId} value={s.roomId} style={optionStyle}>{s.name}</option>
+              ))}
+            </select>
+
+            {store.adminSalonCompose && (() => {
+              const membres = new Set(store.adminComposition.map((m) => m.fingerprint));
+              const nom = (d: { lastNickname?: string | null; label?: string | null; role?: string | null; fingerprint: string }) =>
+                d.lastNickname || d.label || d.fingerprint.slice(0, 8);
+              const ligne = (
+                d: { fingerprint: string; lastNickname?: string | null; label?: string | null; role?: string | null },
+                dedans: boolean,
+              ) => (
+                <div key={d.fingerprint} style={{
+                  display: "flex", alignItems: "center", gap: 6, padding: "5px 7px",
+                  border: `1px solid ${border}`, borderRadius: 6, background: inputBg,
+                }}>
+                  <span style={{ fontSize: 11, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {nom(d)}
+                    {d.role && <span style={{ color: muted, fontSize: 9.5 }}> · {d.role}</span>}
+                  </span>
+                  <button
+                    onClick={() => affecter(d.fingerprint, !dedans)}
+                    style={{
+                      ...btnStyle(!dedans), padding: "3px 8px", fontSize: 10,
+                      ...(dedans ? { color: "#ff8080", border: "1px solid rgba(255,82,82,0.5)" } : {}),
+                    }}
+                  >
+                    {dedans ? t("Chat.adminRoomsRemove") : t("Chat.adminRoomsAdd")}
+                  </button>
+                </div>
+              );
+              // L'annuaire du serveur, moins ceux qui sont déjà dedans :
+              // une liste où l'on ne voit que ce qu'il reste à faire.
+              const disponibles = store.adminAnnuaire.filter((d) => !membres.has(d.fingerprint));
+              return (
+                <>
+                  <div style={{ fontSize: 10, color: muted, fontWeight: 700, marginTop: 2 }}>
+                    {t("Chat.adminRoomsMembers")} ({store.adminComposition.length})
+                  </div>
+                  {store.adminComposition.length === 0 ? (
+                    <div style={{ fontSize: 10.5, color: muted, padding: 6 }}>{t("Chat.adminRoomsEmpty")}</div>
+                  ) : store.adminComposition.map((m) => ligne(m, true))}
+
+                  <div style={{ fontSize: 10, color: muted, fontWeight: 700, marginTop: 6 }}>
+                    {t("Chat.adminRoomsDirectory")} ({disponibles.length})
+                  </div>
+                  {disponibles.length === 0 ? (
+                    <div style={{ fontSize: 10.5, color: muted, padding: 6 }}>{t("Chat.adminRoomsAllIn")}</div>
+                  ) : disponibles.map((d) => ligne(d, false))}
+                </>
+              );
+            })()}
+          </>
         )}
 
         {/* ── Historique ── */}

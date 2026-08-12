@@ -299,6 +299,19 @@ export interface ChatStore {
   // Confirmation visuelle du changement de PIN admin (retour terrain :
   // « le bouton n'a pas cliqué » — la commande passait, sans le dire)
   adminPinChanged: boolean;
+  // ── Composition des salons (salon PRINCIPAL uniquement) ──────────────
+  // Un hôte peut servir plusieurs salons derrière une même écoute. Seul
+  // l'admin du salon principal peut les composer ; les admins de service
+  // gardent leur cloisonnement.
+  // `adminPeutAffecter` : null tant qu'on n'a pas demandé, puis false si
+  // l'hôte a répondu que c'est réservé au salon principal. Ce refus est
+  // une RÉPONSE NORMALE, pas une panne — il ne doit pas allumer de bandeau
+  // d'erreur, sans quoi tout admin de service en verrait un à l'ouverture.
+  adminPeutAffecter: boolean | null;
+  adminSalons: { roomId: string; name: string; path?: string }[];
+  adminAnnuaire: AdminDevice[];
+  adminComposition: { fingerprint: string; lastNickname?: string | null; label?: string | null; role?: string | null }[];
+  adminSalonCompose: string | null;
 }
 
 export interface AdminDevice {
@@ -369,6 +382,11 @@ export const store: ChatStore = {
   roomsLanIp: null,
   inviteFeedback: null,
   adminPinChanged: false,
+  adminPeutAffecter: null,
+  adminSalons: [],
+  adminAnnuaire: [],
+  adminComposition: [],
+  adminSalonCompose: null,
 };
 
 /** Envoie une commande admin au salon (réponse via l'événement
@@ -379,20 +397,27 @@ export function sendAdminCommand(params: {
   // transite jamais par cette page (voir public/vault-ipc.js).
   adminPin?: string;
   vaultRoomKey?: string;
-  action: "devices" | "label" | "search" | "config-get" | "config-set"
+  action: "devices" | "label" | "role" | "search" | "config-get" | "config-set"
     | "ban" | "unban" | "bans" | "set-locked" | "room-info" | "set-admin-pin"
     // Étape I — places de licence : « retirer » rend la place d'un appareil
     // qui n'existe plus, sans effacer sa fiche ni ses messages. À ne pas
     // confondre avec « bloquer », qui exclut une personne.
-    | "retire-device" | "restore-device" | "licence-places";
+    | "retire-device" | "restore-device" | "licence-places"
+    // Composition des salons — réservé au salon PRINCIPAL d'un hôte qui en
+    // sert plusieurs. Affecter n'ouvre rien : la clé d'un salon dérive de
+    // son propre code d'accès (voir le bloc « affectation » de server.js).
+    | "annuaire-serveur" | "salons" | "composition" | "affecter";
   reqId?: string;
   fingerprint?: string;
   label?: string | null;
+  role?: string | null;
   filters?: Record<string, unknown>;
   key?: string;
   value?: unknown;
   locked?: boolean;
   newPin?: string;
+  roomId?: string;
+  present?: boolean;
 }) {
   getApi()?.send("chat-admin", params);
 }
@@ -403,6 +428,8 @@ export function resetAdminState() {
     adminAuthed: false, adminError: null, adminDevices: [], adminSearch: [],
     adminRetention: null, adminBans: [], adminPlaces: null, adminLocked: null,
     adminPinChanged: false,
+    adminSalons: [], adminAnnuaire: [], adminComposition: [],
+    adminSalonCompose: null, adminPeutAffecter: null,
   });
 }
 
@@ -846,12 +873,25 @@ export function ensureListening() {
       case "admin-result": {
         const r = evt.result || {};
         if (!r.ok) {
+          // ⚠️ « réservé au salon principal » n'est PAS une panne : c'est la
+          // réponse attendue quand on administre un salon de service. Le
+          // panneau s'en sert pour savoir s'il propose la composition. En
+          // faire une erreur allumerait un bandeau rouge à l'ouverture du
+          // panneau chez tout admin de service.
+          if (r.error === "reserve-salon-principal") {
+            patchStore({ adminPeutAffecter: false });
+            break;
+          }
           // "admin-pin" → retour à la saisie du PIN ; autre erreur → bandeau
           patchStore({ adminError: r.error || "admin-error", ...(r.error === "admin-pin" ? { adminAuthed: false } : {}) });
           break;
         }
         const patch: Partial<ChatStore> = { adminError: null, adminAuthed: true };
-        if (r.action === "devices" || r.action === "label") patch.adminDevices = r.data || [];
+        // `role` renvoie le registre au même titre que `label` : sans lui
+        // ici, la fonction enregistrée n'était jamais relue depuis l'hôte
+        // et l'affichage ne tenait qu'au brouillon local — impossible de
+        // distinguer un enregistrement réussi d'un enregistrement perdu.
+        if (r.action === "devices" || r.action === "label" || r.action === "role") patch.adminDevices = r.data || [];
         else if (r.action === "search") patch.adminSearch = r.data || [];
         else if (r.action === "config-get" || r.action === "config-set") {
           patch.adminRetention = r.data?.retention_days ?? null;
@@ -871,6 +911,16 @@ export function ensureListening() {
         else if (r.action === "licence-places") patch.adminPlaces = r.data || null;
         else if (r.action === "set-locked") patch.adminLocked = !!r.data?.locked;
         else if (r.action === "set-admin-pin") patch.adminPinChanged = true;
+        // Composition des salons. `salons` sert aussi de sonde : y répondre
+        // signifie qu'on administre le salon principal.
+        else if (r.action === "salons") {
+          patch.adminSalons = r.data || [];
+          patch.adminPeutAffecter = true;
+        }
+        else if (r.action === "annuaire-serveur") patch.adminAnnuaire = r.data || [];
+        else if (r.action === "composition" || r.action === "affecter") {
+          patch.adminComposition = r.data || [];
+        }
         else if (r.action === "room-info") {
           patch.adminLocked = !!r.data?.locked;
           patch.adminRetention = r.data?.retention_days ?? null;

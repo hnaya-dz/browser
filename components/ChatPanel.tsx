@@ -1545,6 +1545,8 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
                 inputBg={inputBg}
                 inputStyle={inputStyle}
                 btnStyle={btnStyle}
+                selectStyle={selectStyle}
+                optionStyle={optionStyle}
               />
             )}
 

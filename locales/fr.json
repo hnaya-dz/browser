@@ -393,7 +393,16 @@
     "meetingMoved": "Réunion décalée",
     "meetingWas": "Était prévue le",
     "serverRoomServed": "Salon servi :",
-    "serverRoomNotListed": "Ce salon appartient au serveur, pas à ce navigateur : il ne figure pas dans « ouvrir un salon de ce poste ». Pour y écrire, rejoignez-le comme les autres postes."
+    "serverRoomNotListed": "Ce salon appartient au serveur, pas à ce navigateur : il ne figure pas dans « ouvrir un salon de ce poste ». Pour y écrire, rejoignez-le comme les autres postes.",
+    "adminRooms": "Salons",
+    "adminRoomsHint": "Composez l’accès d’un salon avant que ses membres s’y connectent. Affecter n’ouvre rien : il faut aussi le code du salon, que détient son administrateur.",
+    "adminRoomsPick": "Choisir un salon…",
+    "adminRoomsMembers": "Ont accès",
+    "adminRoomsDirectory": "Annuaire du serveur",
+    "adminRoomsAdd": "Ajouter",
+    "adminRoomsRemove": "Retirer",
+    "adminRoomsEmpty": "Personne pour l’instant.",
+    "adminRoomsAllIn": "Tout l’annuaire a déjà accès."
   },
   "Privacy": {
     "title": "Confidentialité",

@@ -62,6 +62,11 @@ async function libre(port) {
   return (await ecoutable(port, "::")) && (await ecoutable(port, "0.0.0.0"));
 }
 
+// Vrai seulement quand le port a été TROUVÉ, pas quand il a été demandé :
+// annoncer « 3000 occupé, on prend le 3002 » à quelqu'un qui a écrit
+// --port 3002 lui décrit une mécanique qui n'a pas eu lieu.
+let portAutomatique = false;
+
 async function choisirPort() {
   const demande = argPort();
   if (demande !== null) {
@@ -72,7 +77,7 @@ async function choisirPort() {
     process.exit(1);
   }
   for (let p = PREMIER_PORT; p <= DERNIER_PORT; p++) {
-    if (await libre(p)) return p;
+    if (await libre(p)) { portAutomatique = true; return p; }
   }
   console.error(`✗ Aucun port libre entre ${PREMIER_PORT} et ${DERNIER_PORT}.`);
   process.exit(1);
@@ -124,7 +129,9 @@ for (const p of [4802, 4803]) {
 
 const port = await choisirPort();
 const url = `http://localhost:${port}`;
-if (port !== PREMIER_PORT) console.log(`ℹ Port ${PREMIER_PORT} occupé — on prend le ${port}.`);
+if (portAutomatique && port !== PREMIER_PORT) {
+  console.log(`ℹ Port ${PREMIER_PORT} occupé — on prend le ${port}.`);
+}
 console.log(`▸ Next  ${url}`);
 
 const next = spawn(process.execPath, [require.resolve("next/dist/bin/next"), "dev", "-p", String(port)], {
