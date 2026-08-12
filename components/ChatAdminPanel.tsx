@@ -86,6 +86,52 @@ export default function ChatAdminPanel({ accent, muted, border, inputBg, inputSt
   const [tab, setTab] = useState<"devices" | "history" | "settings" | "salons">("devices");
   const [labelDrafts, setLabelDrafts] = useState<Record<string, string>>({});
   const [roleDrafts, setRoleDrafts] = useState<Record<string, string>>({});
+
+  // ── Rendre l'enregistrement CONSTATABLE ──────────────────────────────
+  // ⚠️ Le défaut n'était pas dans l'écriture, il était dans le silence.
+  // Le champ affichait `brouillon ?? valeur du serveur` : après le clic, le
+  // brouillon restait, donc rien ne bougeait à l'écran — succès et échec
+  // avaient exactement la même apparence. Un utilisateur a conclu, à
+  // raison, que « la Fonction ne s'enregistre pas », alors que la base la
+  // portait bien.
+  // Correction : on efface le brouillon à l'envoi. Le champ retombe alors
+  // sur la valeur du SERVEUR, et se met à jour quand la réponse arrive.
+  // Enregistré → la nouvelle valeur s'affiche ; refusé → l'ancienne
+  // revient. L'écran cesse de mentir dans les deux sens.
+  const [confirme, setConfirme] = useState<Record<string, number>>({});
+  const [attendu, setAttendu] = useState<Record<string, string | null>>({});
+
+  useEffect(() => {
+    const cles = Object.keys(attendu);
+    if (cles.length === 0) return;
+    const restant: Record<string, string | null> = {};
+    const vus: Record<string, number> = {};
+    for (const cle of cles) {
+      const [fp, champ] = cle.split("|");
+      const d = store.adminDevices.find((x) => x.fingerprint === fp) as Record<string, unknown> | undefined;
+      const actuel = d ? ((d[champ] as string | null) ?? null) : undefined;
+      if (d && actuel === attendu[cle]) vus[cle] = Date.now();
+      else restant[cle] = attendu[cle];
+    }
+    if (Object.keys(vus).length === 0) return;
+    setConfirme((c) => ({ ...c, ...vus }));
+    setAttendu(restant);
+    const minuteur = setTimeout(() => {
+      setConfirme((c) => {
+        const suite = { ...c };
+        for (const k of Object.keys(vus)) delete suite[k];
+        return suite;
+      });
+    }, 2500);
+    return () => clearTimeout(minuteur);
+  }, [store.adminDevices, attendu]);
+
+  const enregistrerChamp = (fingerprint: string, champ: "role" | "label", valeur: string | null) => {
+    admin({ action: champ, fingerprint, [champ]: valeur });
+    setAttendu((a) => ({ ...a, [`${fingerprint}|${champ}`]: valeur }));
+    if (champ === "role") setRoleDrafts((s) => { const n = { ...s }; delete n[fingerprint]; return n; });
+    else setLabelDrafts((s) => { const n = { ...s }; delete n[fingerprint]; return n; });
+  };
   const [q, setQ] = useState("");
   const [author, setAuthor] = useState("");
   const [retentionDraft, setRetentionDraft] = useState<string | null>(null);
@@ -255,8 +301,17 @@ export default function ChatAdminPanel({ accent, muted, border, inputBg, inputSt
             <div key={d.fingerprint} style={{ border: `1px solid ${border}`, borderRadius: 6, padding: 8, background: inputBg }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 {(d.platform || "").startsWith("mobile-web") ? <PhoneIcon size={13} /> : <Laptop size={13} />}
-                <span style={{ fontSize: 12, fontWeight: 700, flex: 1 }}>
+                {/* ⚠️ L'étiquette NE REMPLACE PLUS le pseudo.
+                    Elle le masquait : poser « Bureau 33 » sur un appareil
+                    faisait disparaître « Directeur » de l'en-tête, et l'on
+                    croyait avoir renommé la personne. Or l'étiquette nomme
+                    l'APPAREIL, le pseudo désigne QUI écrit — les deux
+                    doivent rester lisibles ensemble. */}
+                <span style={{ fontSize: 12, fontWeight: 700, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {d.label || d.lastNickname || t("Chat.adminUnnamed")}
+                  {d.label && d.lastNickname && (
+                    <span style={{ fontWeight: 400, color: muted, fontSize: 10.5 }}> · {d.lastNickname}</span>
+                  )}
                 </span>
                 <span style={{ fontSize: 9, color: muted, fontFamily: "monospace", direction: "ltr" }}>{d.fingerprint.slice(0, 8)}</span>
               </div>
@@ -293,10 +348,10 @@ export default function ChatAdminPanel({ accent, muted, border, inputBg, inputSt
                   onChange={(e) => setRoleDrafts((s) => ({ ...s, [d.fingerprint]: e.target.value }))}
                 />
                 <button
-                  onClick={() => admin({ action: "role", fingerprint: d.fingerprint, role: (roleDrafts[d.fingerprint] ?? d.role ?? "").trim() || null })}
+                  onClick={() => enregistrerChamp(d.fingerprint, "role", (roleDrafts[d.fingerprint] ?? d.role ?? "").trim() || null)}
                   style={{ ...btnStyle(true), padding: "5px 10px", fontSize: 10.5 }}
                 >
-                  {t("Chat.adminSave")}
+                  {confirme[`${d.fingerprint}|role`] ? "✓" : t("Chat.adminSave")}
                 </button>
               </div>
               <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
@@ -307,10 +362,10 @@ export default function ChatAdminPanel({ accent, muted, border, inputBg, inputSt
                   onChange={(e) => setLabelDrafts((s) => ({ ...s, [d.fingerprint]: e.target.value }))}
                 />
                 <button
-                  onClick={() => admin({ action: "label", fingerprint: d.fingerprint, label: (labelDrafts[d.fingerprint] ?? d.label ?? "").trim() || null })}
+                  onClick={() => enregistrerChamp(d.fingerprint, "label", (labelDrafts[d.fingerprint] ?? d.label ?? "").trim() || null)}
                   style={{ ...btnStyle(true), padding: "5px 10px", fontSize: 10.5 }}
                 >
-                  {t("Chat.adminSave")}
+                  {confirme[`${d.fingerprint}|label`] ? "✓" : t("Chat.adminSave")}
                 </button>
                 {/* D.2 — blocage : expulsion immédiate + refus au retour ;
                     outil d'exception (le verrou gère le quotidien)
