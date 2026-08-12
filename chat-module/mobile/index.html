@@ -1491,7 +1491,17 @@ threadBack.onclick = backToRoom;
 // (même cause que crypto.subtle, d'où la crypto embarquée). On délègue
 // donc l'enregistrement au magnétophone du téléphone via un champ
 // fichier `capture` — qui, lui, ne demande aucun contexte sécurisé.
-const micSupporte = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+//
+// Conséquence à connaître : ouverte depuis un PC, cette page fait ouvrir
+// l'EXPLORATEUR DE FICHIERS au bouton 🎤, faute d'application
+// d'enregistrement associée au champ. Ce n'est pas une panne, c'est le
+// système qui répond ce qu'il peut. Le vocal enregistré sur place, avec
+// réécoute avant envoi, vit dans le dock du poste (ChatComposerMedia),
+// qui n'a pas cette contrainte de contexte.
+//
+// Un `micSupporte` traînait ici, calculé puis jamais consulté : la page
+// n'a jamais eu de chemin MediaRecorder à activer. Retiré — une capacité
+// mesurée mais inutilisée laisse croire à un choix qui n'existe pas.
 
 const fileInput = $("fileInput"), audioInput = $("audioInput"),
   attBtn = $("attBtn"), micBtn = $("micBtn"), attPreview = $("attPreview"),
