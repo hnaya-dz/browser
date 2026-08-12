@@ -189,17 +189,25 @@ export default function ChatMeetingCard({ message, accent, muted, border, compac
         <span style={{ fontSize: 9.5, color: muted, flex: 1 }}>
           {t("Chat.meetingBy")} {message.from}
         </span>
-        <button
-          onClick={exporter}
-          title={t("Chat.meetingExportHelp")}
-          style={{
-            display: "flex", alignItems: "center", gap: 4, fontSize: 10,
-            background: "transparent", border: `1px solid ${border}`, borderRadius: 4,
-            color: "inherit", cursor: "pointer", padding: "3px 7px",
-          }}
-        >
-          <Download size={10} /> {t("Chat.meetingExport")}
-        </button>
+        {/* Une réunion ANNULÉE ne s'ajoute pas à un agenda : on y inscrirait
+            un rendez-vous qui n'aura pas lieu, et l'agenda deviendrait le
+            dernier endroit où l'annulation n'est pas parvenue. Signalé en
+            usage réel — le bouton survivait à l'annulation.
+            Une réunion PASSÉE, en revanche, garde le sien : on archive
+            volontiers ce qui a eu lieu. */}
+        {!annulee && (
+          <button
+            onClick={exporter}
+            title={t("Chat.meetingExportHelp")}
+            style={{
+              display: "flex", alignItems: "center", gap: 4, fontSize: 10,
+              background: "transparent", border: `1px solid ${border}`, borderRadius: 4,
+              color: "inherit", cursor: "pointer", padding: "3px 7px",
+            }}
+          >
+            <Download size={10} /> {t("Chat.meetingExport")}
+          </button>
+        )}
       </div>
       {/* Réservé à l'ORGANISATEUR. On compare la personne, pas le pseudo :
           il doit pouvoir décaler depuis son téléphone appairé. L'hôte

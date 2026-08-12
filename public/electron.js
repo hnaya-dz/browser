@@ -1176,7 +1176,22 @@ ipcMain.on("chat-cancel-reminder", (event, { id } = {}) => {
 // l'événement. Le fichier ne sert qu'au passage de relais.
 ipcMain.handle("chat-export-ics", async (event, { filename, content } = {}) => {
   try {
-    const dossier = join(app.getPath("temp"), "hnaya-agenda");
+    // ⚠️ PAS DANS %TEMP%.
+    // Le fichier n'y valait que comme relais vers l'application d'agenda.
+    // Quand aucune n'est associée — le cas sur un Windows dont Courrier et
+    // Calendrier a été retiré —, il restait dans un dossier que personne ne
+    // pense à ouvrir et que Windows purge de lui-même. « Ajouter à mon
+    // agenda » produisait alors un fichier introuvable le lendemain.
+    // Documents\Hnaya\Agenda : on le retrouve, on le rouvre, on l'envoie
+    // par courriel à qui de droit. Repli sur le temporaire si le dossier
+    // Documents est indisponible (profil itinérant, poste verrouillé).
+    let dossier;
+    try {
+      dossier = join(app.getPath("documents"), "Hnaya", "Agenda");
+      mkdirSync(dossier, { recursive: true });
+    } catch {
+      dossier = join(app.getPath("temp"), "hnaya-agenda");
+    }
     mkdirSync(dossier, { recursive: true });
     const chemin = join(dossier, String(filename || "reunion.ics"));
     writeFileSync(chemin, String(content), "utf8");
