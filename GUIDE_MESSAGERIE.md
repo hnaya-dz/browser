@@ -54,6 +54,29 @@ Le salon tourne sur une machine toujours allumée, **même sans session
 ouverte**, et survit aux redémarrages. C'est la prestation sous licence.
 Voir la section 13.
 
+#### Plusieurs salons sur un seul serveur
+
+Un même serveur sert plusieurs salons — Salon général, Direction, DRH —
+derrière **une seule adresse** :
+
+```
+node src/serve.js --rooms "Salon général,Direction,DRH" --data /var/lib/hnaya
+```
+
+Un service à installer, une base à sauvegarder, un annuaire commun, une
+seule règle de pare-feu. Chaque salon garde en revanche **son propre code
+d'accès** : c'est ce code qui chiffre les échanges, deux salons ne peuvent
+donc pas le partager sans cesser d'être cloisonnés.
+
+À la connexion, les postes et les téléphones voient la liste et
+choisissent. Le premier salon nommé est le **salon principal** : c'est
+celui qu'on rejoint par défaut, et le seul depuis lequel on peut composer
+les autres (section 14).
+
+> Au redémarrage, les salons se retrouvent par leur **nom**. Retirer un nom
+> de la liste ferme ce salon sans jamais le supprimer : son historique
+> revient intact si vous le redemandez plus tard.
+
 ---
 
 ## 3. Rejoindre depuis un téléphone
@@ -281,10 +304,30 @@ même si le navigateur est en arrière-plan.
 
 **Ajouter à mon agenda** : le bouton produit un fichier `.ics` standard,
 qu'Outlook, Thunderbird ou Google Agenda savent ouvrir. Aucun compte,
-aucune connexion, aucune configuration.
+aucune connexion, aucune configuration. Le fichier est déposé dans
+**Documents\Hnaya\Agenda** : si aucune application d'agenda ne s'ouvre —
+cela arrive sur les Windows dont Courrier et Calendrier a été retiré — le
+fichier reste là, à portée, et un lien vous y conduit.
 
-> Un `.ics` dit « ajoutez ceci à votre agenda » ; il ne synchronise pas. Si
-> la réunion se déplace, annoncez-la de nouveau.
+> Un `.ics` dit « ajoutez ceci à votre agenda » ; il ne synchronise pas.
+
+### Décaler ou annuler
+
+Une réunion se déplace et s'annule — c'est le quotidien d'un service.
+**L'organisateur seul** dispose des boutons **Décaler** et **Annuler**, et
+il les garde depuis n'importe lequel de ses appareils appairés.
+
+Ce qui avait été convoqué **reste lisible** : la carte affiche la nouvelle
+heure, barre l'ancienne, et indique qui a décidé du changement et quand.
+Effacer la convocation d'origine priverait le fil de sa trace.
+
+Les rappels suivent : celui de l'ancienne heure est annulé, un nouveau est
+programmé. Une réunion annulée ne propose plus d'être ajoutée à un agenda
+— on n'inscrit pas un rendez-vous qui n'aura pas lieu.
+
+Passé l'horaire, les boutons disparaissent : pour reprogrammer, annoncez
+une nouvelle réunion. L'ancienne demeure dans le fil, avec le fait qu'elle
+n'a pas eu lieu.
 
 ---
 
@@ -360,6 +403,33 @@ Code administrateur exigé. Quatre onglets :
 - **Verrou** — une fois le salon verrouillé, plus aucun nouvel appareil
   n'entre, même avec le bon code. Les membres déjà inscrits circulent
   librement.
+- **Salons** — composer l'accès des autres salons. Cet onglet n'apparaît
+  que sur le **salon principal** d'un serveur qui en sert plusieurs.
+
+### Composer un salon avant que ses membres s'y connectent
+
+Trois façons de constituer un salon, et vous n'êtes tenu par aucune :
+
+1. **Ouvert** — le code circule, qui l'a entre. Convient au salon général.
+2. **Ouvert puis verrouillé** — les bonnes personnes entrent une fois, on
+   verrouille. La composition se fait par l'usage.
+3. **Composé d'avance** — l'onglet **Salons** permet de désigner les
+   membres depuis l'annuaire, avant toute connexion. Le salon naît fermé.
+
+Personne n'a besoin d'une invitation nominative. Il faut seulement s'être
+présenté **une fois** : ici une identité est une clé cryptographique
+portée par un appareil, pas un nom sur une liste. Le salon général reste
+donc ouvert — c'est lui qui remplit l'annuaire — et les salons de service
+se composent ensuite à partir de cet annuaire.
+
+> **Affecter n'est pas ouvrir.** Le code d'accès d'un salon est aussi sa
+> clé de chiffrement. Inscrire quelqu'un dans la composition de la DRH ne
+> lui permet pas d'y lire une seule ligne sans le code de la DRH, que
+> détient son administrateur. Deux pouvoirs distincts, volontairement.
+
+Retirer quelqu'un lui ôte l'accès au prochain raccordement, sans toucher à
+ce qu'il a écrit : un mouvement de personnel n'est pas une réécriture des
+archives.
 
 ---
 
