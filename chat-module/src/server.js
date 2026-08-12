@@ -16,7 +16,7 @@ import {
   listDevices, setDeviceLabel, searchMessages, getConfig, setConfig,
   createRoom, getRoom, touchRoom, setRoomAdminPin, setRoomPin,
   banDevice, unbanDevice, isBanned, listBans,
-  addRoomMember, isRoomMember, setRoomLocked,
+  addRoomMember, isRoomMember, setRoomLocked, removeRoomMember, listRoomMembers,
   getDevice, countDevices, getDataDir, listReferencedMedia,
   setDeviceRole, listRoster, listDirectThreads,
   retireDevice, restoreDevice,
@@ -81,7 +81,12 @@ export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, 
   // l'écoute WebSocket, la page mobile et le signal de découverte sont
   // alors MUTUALISÉS — un seul port, une seule annonce, quel que soit le
   // nombre de salons. Absents, chaque salon monte les siens, comme avant.
-  wss, servicesPartages = false } = {}) {
+  wss, servicesPartages = false,
+  // Capacité remise au seul salon PRINCIPAL par la façade multi-salons :
+  // { estPrincipal, listerSalons() }. Elle autorise la composition des
+  // AUTRES salons depuis celui-ci — voir le bloc « affectation » dans le
+  // switch admin. Absente : un salon ordinaire, qui ne voit que le sien.
+  portee = null } = {}) {
   const etatLicence = () => {
     if (!licenceState) return { mode: "active", notice: null };
     try { return licenceState() || { mode: "active", notice: null }; }
@@ -1136,6 +1141,58 @@ export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, 
             case "room-info": {
               const r = getRoom(activeRoomId);
               reply({ ok: true, data: { name: r.name, locked: !!r.locked, retention_days: Number(getConfig("retention_days", 90)) } });
+              break;
+            }
+
+            // ── Affectation depuis le SALON PRINCIPAL ────────────────────
+            // Composer un salon avant que quiconque s'y connecte suppose de
+            // voir des personnes qui n'y sont pas encore — donc de franchir
+            // le cloisonnement du registre, qui veut qu'un admin de service
+            // ne découvre pas les appareils des autres directions.
+            // Ce franchissement est confié au seul salon PRINCIPAL, et il
+            // lui est remis comme une capacité (`portee`) : ce fichier ne
+            // sait toujours rien des autres salons, il reçoit le droit d'y
+            // toucher. Les admins de service, eux, gardent exactement la
+            // vue qu'ils avaient.
+            //
+            // ⚠️ AFFECTER N'EST PAS OUVRIR. La clé de chiffrement d'un salon
+            // dérive de SON code d'accès : inscrire une empreinte dans la
+            // composition de la DRH ne permet pas d'y lire une seule trame
+            // sans le code de la DRH, que détient son admin. Deux pouvoirs
+            // distincts, et c'est ce qui rend cette porte acceptable.
+            case "annuaire-serveur":
+            case "salons":
+            case "composition":
+            case "affecter": {
+              if (!portee?.estPrincipal) { reply({ ok: false, error: "reserve-salon-principal" }); break; }
+              const connus = new Set(portee.listerSalons().map((s) => s.roomId));
+              if (payload.action === "annuaire-serveur") {
+                // Sans roomId : TOUS les appareils connus du serveur. C'est
+                // l'annuaire dans lequel on puise pour composer.
+                reply({ ok: true, data: listDevices() });
+                break;
+              }
+              if (payload.action === "salons") {
+                reply({ ok: true, data: portee.listerSalons() });
+                break;
+              }
+              const cible = String(payload.roomId || "");
+              // Un salon que cet hôte ne sert pas n'est pas le sien à
+              // composer, même pour l'admin principal.
+              if (!connus.has(cible)) { reply({ ok: false, error: "salon-inconnu" }); break; }
+              if (payload.action === "composition") {
+                reply({ ok: true, data: listRoomMembers(cible) });
+                break;
+              }
+              const fp = String(payload.fingerprint || "");
+              if (!fp || !getDevice(fp)) { reply({ ok: false, error: "appareil-inconnu" }); break; }
+              // `present` absent ne vaut pas `false` : un champ oublié en
+              // chemin retirerait quelqu'un d'un salon sans que personne
+              // l'ait demandé (même défaut que `role`, corrigé plus haut).
+              if (!("present" in payload)) { reply({ ok: false, error: "champ-absent" }); break; }
+              if (payload.present) addRoomMember(cible, fp);
+              else removeRoomMember(cible, fp);
+              reply({ ok: true, data: listRoomMembers(cible) });
               break;
             }
             case "set-admin-pin": {

@@ -119,11 +119,35 @@ const bloc = worker.match(/const CHAMPS_ADMIN = \[([\s\S]*?)\];/);
 assert.ok(bloc, "CHAMPS_ADMIN doit exister dans worker.js");
 const transportes = new Set([...bloc[1].matchAll(/"([^"]+)"/g)].map((m) => m[1]));
 
-// Champs lus par le switch admin du serveur, entre `switch (payload.action)`
-// et la fin de la fonction qui le porte.
+// Champs lus par le switch admin du serveur.
+//
+// ⚠️ SURTOUT PAS UNE FENÊTRE DE TAILLE FIXE.
+// La première version de ce test lisait « les 6 000 caractères suivant le
+// switch ». Le switch a grandi ; les actions ajoutées ensuite sont tombées
+// au-delà, et le test a continué de passer au vert en ne contrôlant plus
+// qu'une partie de ce qu'il prétendait couvrir. Un garde-fou qui rétrécit
+// tout seul est pire que pas de garde-fou : il rassure.
+// On délimite donc le bloc par ses ACCOLADES, et l'on vérifie ensuite que
+// la dernière action du switch est bien dedans — sans quoi le découpage
+// serait faux sans le dire.
 const debut = serveur.indexOf("switch (payload.action)");
 assert.ok(debut > 0, "le switch admin doit être repérable dans server.js");
-const zone = serveur.slice(debut, debut + 6000);
+const ouvrante = serveur.indexOf("{", debut);
+let profondeur = 0, fin = -1;
+for (let i = ouvrante; i < serveur.length; i++) {
+  if (serveur[i] === "{") profondeur++;
+  else if (serveur[i] === "}" && --profondeur === 0) { fin = i; break; }
+}
+assert.ok(fin > ouvrante, "le bloc du switch admin doit se refermer");
+const zone = serveur.slice(debut, fin);
+
+// Canari : la dernière action déclarée dans le switch doit se trouver dans
+// la zone découpée. Si un jour elle n'y est plus, c'est le DÉCOUPAGE qui
+// est cassé, et le test doit le dire au lieu de vérifier le vide.
+const actions = [...zone.matchAll(/case "([a-z-]+)":/g)].map((m) => m[1]);
+assert.ok(actions.length >= 10, `découpage suspect : seulement ${actions.length} actions vues`);
+assert.ok(actions.includes("set-admin-pin"), "le découpage doit atteindre la fin du switch");
+
 const lus = new Set([...zone.matchAll(/payload\.(\w+)/g)].map((m) => m[1]));
 
 const manquants = [...lus].filter((c) => !transportes.has(c));

@@ -52,6 +52,9 @@ const CHAMPS_ADMIN = [
   "adminPin", "action", "reqId",
   "fingerprint", "label", "role",
   "filters", "key", "value", "newPin", "locked",
+  // Affectation depuis le salon principal : le salon visé et le sens de
+  // l'opération (présent ou retiré).
+  "roomId", "present",
 ];
 import { startHost } from "./server.js";
 import { discoverSessions, joinSession } from "./client.js";

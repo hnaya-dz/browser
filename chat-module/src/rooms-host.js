@@ -92,9 +92,29 @@ export function startRoomsHost({
     else console.error(`[hnaya-chat] Erreur serveur : ${lisible}`);
   });
 
+  // Déclaré AVANT la boucle, et non plus après : la capacité ci-dessous le
+  // référence, et une dépendance en avant ne tient que tant que personne
+  // ne l'appelle trop tôt. Ce projet a déjà payé deux fois ce genre de
+  // pari (applyLang, sonActif) — on supprime le piège au lieu de compter
+  // dessus. `hotes` est vide ici et se remplit au fil de la boucle : la
+  // liste est donc lue à l'appel, jamais figée.
+  const listeSalons = () => [...hotes.values()].map((h) => ({
+    roomId: h.roomId, name: h.name, path: cheminSalon(h.roomId),
+  }));
+
+  // Capacité d'affectation, remise au SEUL salon principal (le premier).
+  // C'est lui, et lui seul, qui peut composer les autres salons : voir le
+  // bloc « affectation » du switch admin de server.js. Les admins de
+  // service gardent leur cloisonnement.
+  // Fonction et non liste figée : les salons se déclarent au fil de la
+  // boucle, et le premier est construit avant les suivants.
+  const porteePrincipale = { estPrincipal: true, listerSalons: () => listeSalons() };
+
   for (const salon of salons) {
     const wss = new WebSocketServer({ noServer: true, maxPayload: 1024 * 1024 });
+    const estLePremier = !principal;
     const hote = startHost({
+      portee: estLePremier ? porteePrincipale : null,
       sessionName: salon.name ?? undefined,
       pin: salon.pin,
       adminPin: salon.adminPin,
@@ -130,9 +150,6 @@ export function startRoomsHost({
   // Page mobile et signal de découverte : UN pour l'ensemble. Le nom
   // annoncé est celui du salon principal ; la liste complète accompagne
   // l'annonce pour que les postes puissent choisir.
-  const listeSalons = () => [...hotes.values()].map((h) => ({
-    roomId: h.roomId, name: h.name, path: cheminSalon(h.roomId),
-  }));
   const nomPrincipal = hotes.get(principal).name;
   const mobileServer = startMobileServer({
     sessionName: nomPrincipal, wsPort, httpPort, rooms: listeSalons(),

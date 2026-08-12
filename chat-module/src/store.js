@@ -988,6 +988,34 @@ export function isRoomMember(roomId, fingerprint) {
     .get(String(roomId), String(fingerprint));
 }
 
+/** Retire une personne de la composition d'un salon.
+ *
+ *  ⚠️ Ne touche NI aux messages, NI à la fiche de l'appareil : on retire
+ *  quelqu'un d'un salon, on n'efface pas ce qu'il y a écrit. Effacer sa
+ *  parole en même temps que son accès rendrait l'historique incohérent —
+ *  des réponses sans question, des décisions sans demandeur — et ferait
+ *  d'un simple mouvement de personnel une réécriture des archives.
+ *  Sans effet immédiat sur une connexion en cours : le verrou se contrôle
+ *  à l'entrée. C'est au prochain raccordement que le retrait mord. */
+export function removeRoomMember(roomId, fingerprint) {
+  ensureDb().prepare("DELETE FROM room_members WHERE roomId = ? AND fingerprint = ?")
+    .run(String(roomId), String(fingerprint));
+}
+
+/** Composition d'un salon : qui y a accès, avec ce qu'il faut pour le
+ *  nommer. Sert à l'affectation depuis le salon principal — on ne compose
+ *  pas une liste qu'on ne peut pas relire. */
+export function listRoomMembers(roomId) {
+  return ensureDb().prepare(
+    `SELECT m.fingerprint, m.firstJoin, m.lastJoin,
+            d.lastNickname, d.label, d.role, d.personId
+     FROM room_members m
+     LEFT JOIN devices d ON d.fingerprint = m.fingerprint
+     WHERE m.roomId = ?
+     ORDER BY d.lastNickname IS NULL, d.lastNickname`,
+  ).all(String(roomId));
+}
+
 export function setRoomLocked(roomId, locked) {
   ensureDb().prepare("UPDATE rooms SET locked = ? WHERE roomId = ?")
     .run(locked ? 1 : 0, String(roomId));
