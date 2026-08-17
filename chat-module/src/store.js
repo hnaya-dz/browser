@@ -319,6 +319,13 @@ function ensureDb() {
 // Ferme la base (tests, arrêt propre du serveur permanent)
 export function closeStore() {
   if (db) {
+    // Reversement explicite du journal dans la base avant de fermer.
+    // La fermeture le fait normalement d'elle-même, mais seulement si
+    // aucune autre connexion ne tient le journal — et sur une machine qui
+    // héberge un salon pendant que le navigateur en rejoint un autre, il y
+    // en a. TRUNCATE ramène le fichier à zéro octet plutôt que de le
+    // laisser occuper sa taille maximale atteinte.
+    try { db.exec("PRAGMA wal_checkpoint(TRUNCATE)"); } catch { /* base occupée */ }
     try { db.close(); } catch {}
     db = null;
   }

@@ -58,7 +58,7 @@ const CHAMPS_ADMIN = [
 ];
 import { startHost } from "./server.js";
 import { discoverSessions, joinSession } from "./client.js";
-import { initStore, listRooms, deleteRoom } from "./store.js";
+import { initStore, listRooms, deleteRoom, closeStore } from "./store.js";
 
 // IP LAN du poste — pour composer l'URL d'invitation mobile du QR code.
 // Plusieurs interfaces possibles (VirtualBox, VPN…) : on privilégie les
@@ -533,5 +533,22 @@ process.on("disconnect", () => {
   for (const h of hostHandles.values()) { try { h.stop(); } catch { /* déjà arrêté */ } }
   try { clientHandle?.close(); } catch { /* déjà fermée */ }
   try { stopDiscovery?.(); } catch { /* déjà arrêtée */ }
+  // ⚠️ FERMER LA BASE, sans quoi son journal ne redescend JAMAIS dedans.
+  // SQLite en mode WAL écrit d'abord dans un journal, reversé dans la base
+  // au reversement — que déclenche notamment une fermeture propre. Ce
+  // chemin d'arrêt fermait les salons et le client, puis sortait sans
+  // toucher à la base : le journal ne faisait que croître. Constaté sur ce
+  // poste, 4 Mo de journal pour 224 Ko de base ; et sur les deux serveurs
+  // d'essai, une base restée à 4 Ko — c'est-à-dire vide — avec tout le
+  // contenu dans le journal.
+  //
+  // Mesuré à cette échelle, le surcoût de lecture est indétectable (2 ms
+  // à l'ouverture, 6 ms pour 200 messages, identique après reversement) :
+  // ce n'est donc PAS la cause des lenteurs signalées, et il ne faut pas
+  // le présenter comme telle. Mais un journal qui ne redescend jamais
+  // croît sans borne, et une base qui reste vide ne sauvegarde rien de ce
+  // qu'on croit sauvegarder — un administrateur qui copie hnaya-chat.db
+  // emporterait un fichier de 4 Ko.
+  try { closeStore(); } catch { /* base déjà fermée */ }
   process.exit(0);
 });
