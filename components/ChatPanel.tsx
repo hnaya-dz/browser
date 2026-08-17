@@ -39,6 +39,7 @@ function heureCourte(ts: number): string {
 const VOTE_OPTIONS =["voteApprove", "voteReject", "voteReserve"] as const;
 import ChatMediaBubble from "./ChatMediaBubble";
 import ChatRoster from "./ChatRoster";
+import ChatIdentite from "./ChatIdentite";
 import qrcode from "qrcode-generator";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useLanguage } from "@/context/langcontext";
@@ -351,9 +352,58 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
     });
   };
 
+  // ⚠️ INVITER VERS UN SALON FERMÉ : ON L'OUVRE, PUIS ON ENVOIE.
+  // Un salon fermé n'a ni adresse ni code à transmettre (voir
+  // pickInviteRoom, qui les laisse vides) : l'envoi était donc bloqué en
+  // amont, sans autre explication qu'un bouton inerte et un avertissement
+  // à côté. Inviter quelqu'un dans un salon suppose de toute façon qu'il
+  // soit joignable au moment où l'invité clique — autant l'ouvrir nous-
+  // mêmes plutôt que d'exiger deux gestes dans le bon ordre.
+  // L'invitation est mise en attente le temps que l'hôte démarre ; c'est
+  // `host-started` qui apporte l'adresse et le code réels, qu'on ne peut
+  // pas deviner avant.
+  const invitationEnAttente = useRef<{ to: string | null; roomId: string } | null>(null);
+
+  useEffect(() => {
+    const attente = invitationEnAttente.current;
+    if (!attente) return;
+    const ouvert = store.hostings.find((h) => h.roomId === attente.roomId);
+    if (!ouvert) return;
+    invitationEnAttente.current = null;
+    const ip = ouvert.lanIp || store.roomsLanIp || "";
+    if (!ip) { patchStore({ inviteFeedback: "error" }); return; }
+    getApi()?.send?.("chat-send-invite", {
+      to: attente.to,
+      room: {
+        name: ouvert.name,
+        address: `${ip}${ouvert.wsPort !== 4802 ? ":" + ouvert.wsPort : ""}`,
+        wsPort: ouvert.wsPort,
+        httpPort: ouvert.httpPort,
+        pin: ouvert.pin || null,
+      },
+    });
+    if (!attente.to) patchStore({ inviteFeedback: "delivered" });
+  }, [store.hostings]);
+
+  // Envoyable soit parce qu'on a saisi des coordonnées complètes, soit
+  // parce qu'on a désigné un salon de CE poste — fermé ou non, puisqu'on
+  // sait désormais l'ouvrir. Sans ce second cas, le bouton restait inerte
+  // sur un salon fermé, dont l'adresse et le code sont vides par nature.
+  const salonDeCePoste = !!inviteRoomId && store.rooms.some((r) => r.roomId === inviteRoomId);
+  const invitationPossible = salonDeCePoste
+    || (!!inviteRoom.name.trim() && !!inviteRoom.address.trim());
+
   const sendInvitation = () => {
     const api = getApi();
-    if (!api?.send || !inviteRoom.name.trim() || !inviteRoom.address.trim()) return;
+    if (!api?.send) return;
+    // Salon de ce poste, choisi dans la liste, mais pas encore ouvert :
+    // on l'ouvre et l'invitation partira dès qu'il aura démarré.
+    if (inviteRoomId && !store.hostings.some((h) => h.roomId === inviteRoomId)) {
+      invitationEnAttente.current = { to: inviteTarget || null, roomId: inviteRoomId };
+      api.invoke?.("chat-start-host", { roomId: inviteRoomId });
+      return;
+    }
+    if (!inviteRoom.name.trim() || !inviteRoom.address.trim()) return;
     // Adresse au format ip[:portWS] — le port HTTP mobile suit (+1 par
     // convention 4802→4803 uniquement si port par défaut)
     const [addr, portStr] = inviteRoom.address.trim().split(":");
@@ -915,24 +965,13 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
                 simplement réaffiché. Cela donnait à croire qu'il fallait le
                 ressaisir, et occupait le haut de l'écran pour rien. */}
             {nickname.trim() && !changerPseudo ? (
-              <div style={{
-                display: "flex", alignItems: "center", gap: 8,
-                fontSize: 11.5, color: muted,
-              }}>
-                <User size={13} style={{ flexShrink: 0 }} />
-                <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {t("Chat.identityAs")} <b style={{ color: text }}>{nickname}</b>
-                </span>
-                <button
-                  onClick={() => setChangerPseudo(true)}
-                  style={{
-                    background: "transparent", border: "none", color: accent,
-                    cursor: "pointer", padding: 0, fontSize: 11, textDecoration: "underline",
-                  }}
-                >
-                  {t("Chat.nicknameChange")}
-                </button>
-              </div>
+              // Hors salon : pas de photo, il n'y a nulle part où l'envoyer.
+              <ChatIdentite
+                pseudo={nickname}
+                onChangerPseudo={() => setChangerPseudo(true)}
+                connecte={false}
+                accent={accent} muted={muted} border={border} text={text}
+              />
             ) : (
               <div>
                 <div style={{ fontSize: 11, color: muted, marginBottom: 4 }}>
@@ -1595,8 +1634,8 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
                 </div>
                 <button
                   onClick={sendInvitation}
-                  disabled={!inviteRoom.name.trim() || !inviteRoom.address.trim()}
-                  style={btnStyle(true, !inviteRoom.name.trim() || !inviteRoom.address.trim())}
+                  disabled={!invitationPossible}
+                  style={btnStyle(true, !invitationPossible)}
                 >
                   {t("Chat.inviteSend")}
                 </button>
@@ -1718,7 +1757,7 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
               background: "rgba(255,255,255,0.03)", borderRadius: 8, padding: 10,
             }}>
               <ChatRoster
-                accent={accent} muted={muted} border={border}
+                accent={accent} muted={muted} border={border} text={text}
                 onOpenThread={ouvrirFil}
                 unreadByThread={store.unreadPrivate}
               />

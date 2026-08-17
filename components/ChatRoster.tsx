@@ -8,16 +8,17 @@
 // ligne. Un clic ouvre le fil privé — voir chat-module/src/direct.js
 // pour le cloisonnement côté serveur.
 
-import { useRef, useState } from "react";
 import { useTranslation } from "@/hooks/useTranslation";
-import { MessageSquare, Users, Camera } from "lucide-react";
+import { MessageSquare, Users } from "lucide-react";
 import { store, directThreadId, getApi, type RosterPerson } from "@/context/chatstore";
-import ChatAvatar, { preparerPhoto } from "./ChatAvatar";
+import ChatAvatar from "./ChatAvatar";
+import ChatIdentite from "./ChatIdentite";
 
 interface Props {
   accent: string;
   muted: string;
   border: string;
+  text: string;
   onOpenThread: (threadId: string, person: RosterPerson) => void;
   unreadByThread: Record<string, number>;
 }
@@ -32,41 +33,13 @@ const depuis = (ts: number, t: (k: string) => string) => {
   return `${Math.floor(h / 24)} j`;
 };
 
-export default function ChatRoster({ accent, muted, border, onOpenThread, unreadByThread }: Props) {
+export default function ChatRoster({ accent, muted, border, text, onOpenThread, unreadByThread }: Props) {
   const { t } = useTranslation();
   const me = store.myFingerprint;
-  const fichierRef = useRef<HTMLInputElement>(null);
-  const [occupe, setOccupe] = useState(false);
-  const [erreur, setErreur] = useState("");
-  const maPhoto = store.roster.find((p) => p.isMe)?.avatarSha || null;
 
   // Le fichier est recadré et réencodé AVANT de partir : on ne téléverse
   // jamais les octets choisis par l'utilisateur (métadonnées EXIF, taille
   // arbitraire, format douteux). Voir preparerPhoto.
-  const deposerPhoto = async (fichier: File) => {
-    setOccupe(true); setErreur("");
-    try {
-      const bytes = await preparerPhoto(fichier);
-      const up = await getApi()?.invoke?.("chat-media-upload", {
-        bytes, kind: "image", mime: "image/jpeg", thumb: null,
-      });
-      if (!up?.ok) { setErreur(t("Chat.avatarFailed")); return; }
-      getApi()?.send?.("chat-set-avatar", { sha256: up.sha256 });
-      // L'hôte prévient tout le salon ; on redemande l'annuaire pour se
-      // voir soi-même changer sans attendre.
-      setTimeout(() => getApi()?.send?.("chat-roster"), 400);
-    } catch {
-      setErreur(t("Chat.avatarFailed"));
-    } finally {
-      setOccupe(false);
-    }
-  };
-
-  const retirerPhoto = () => {
-    getApi()?.send?.("chat-set-avatar", { sha256: null });
-    setTimeout(() => getApi()?.send?.("chat-roster"), 400);
-  };
-
   // Soi-même en dernier : on n'écrit pas à son propre appareil, mais le
   // voir confirme qu'on est bien inscrit.
   const gens = [...store.roster].sort((a, b) => {
@@ -85,47 +58,22 @@ export default function ChatRoster({ accent, muted, border, onOpenThread, unread
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-      <div style={{ fontSize: 10.5, color: muted, display: "flex", alignItems: "center", gap: 5, padding: "2px 2px 6px" }}>
-        <Users size={12} /> {t("Chat.rosterTitle")} — {gens.length}
-        {/* Étape M — sa propre photo. Placée dans l'annuaire, là où l'on
-            regarde les visages : c'est le moment où l'on pense à la
-            sienne. Le fichier d'origine ne part jamais — il est recadré et
-            réencodé en JPEG par le navigateur (voir preparerPhoto). */}
-        <span style={{ flex: 1 }} />
-        {maPhoto && (
-          <button
-            onClick={() => retirerPhoto()}
-            disabled={occupe}
-            style={{ background: "transparent", border: "none", color: muted, cursor: "pointer",
-                     fontSize: 10, padding: "2px 4px", textDecoration: "underline" }}
-          >
-            {t("Chat.avatarRemove")}
-          </button>
-        )}
-        <button
-          onClick={() => fichierRef.current?.click()}
-          disabled={occupe}
-          style={{ background: "transparent", border: `1px solid ${border}`, borderRadius: 4,
-                   color: "inherit", cursor: occupe ? "default" : "pointer", fontSize: 10,
-                   padding: "3px 7px", display: "flex", alignItems: "center", gap: 4 }}
-        >
-          <Camera size={11} /> {occupe ? "…" : t("Chat.avatarChange")}
-        </button>
-        <input
-          ref={fichierRef}
-          type="file"
-          accept="image/*"
-          style={{ display: "none" }}
-          onChange={(e) => {
-            const f = e.target.files?.[0];
-            e.target.value = ""; // permet de rechoisir le même fichier
-            if (f) deposerPhoto(f);
-          }}
+      {/* Soi d abord : le pseudo et la photo, reunis. Le pseudo ne se
+          change pas ici — c est celui sous lequel on s est raccorde — donc
+          aucun lien « Modifier » qui mentirait sur son effet. */}
+      {store.roster.some((x) => x.isMe) && (
+        <ChatIdentite
+          pseudo={store.roster.find((x) => x.isMe)?.name || ""}
+          connecte
+          accent={accent} muted={muted} border={border} text={text}
         />
-      </div>
-      {erreur && (
-        <div style={{ fontSize: 10, color: "#ff8080", padding: "0 2px 5px" }}>{erreur}</div>
       )}
+      <div style={{ fontSize: 10.5, color: muted, display: "flex", alignItems: "center", gap: 5, padding: "6px 2px 6px" }}>
+        <Users size={12} /> {t("Chat.rosterTitle")} — {gens.length}
+        {/* Étape M — la photo a rejoint le bloc d IDENTITE, sous la liste :
+            elle disait la meme chose que le pseudo et vivait ailleurs. Voir
+            ChatIdentite. L en-tete retrouve sa ligne. */}
+      </div>
       {gens.map((p) => {
         const fil = me && !p.isMe ? directThreadId(me, p.fingerprint) : null;
         const nonLus = fil ? (unreadByThread[fil] || 0) : 0;

@@ -294,7 +294,7 @@
     "inviteSentTo": "Invitation envoyée au salon",
     "inviteRoomPick": "— Choisir un salon de ce poste —",
     "inviteRoomOpen": "ouvert",
-    "inviteRoomClosedHint": "Ce salon n'est pas ouvert : les invités ne pourront pas le rejoindre tant qu'il n'est pas rouvert depuis l'accueil.",
+    "inviteRoomClosedHint": "Ce salon est fermé : il sera ouvert automatiquement à l’envoi de l’invitation, pour que vos invités puissent y entrer.",
     "adminVaultSave": "Rester administrateur sur ce PC",
     "adminVaultUpdate": "Mettre à jour la session administrateur",
     "adminVaultSaved": "✓ Session administrateur conservée sur ce PC.",

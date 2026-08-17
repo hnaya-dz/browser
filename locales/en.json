@@ -294,7 +294,7 @@
     "inviteSentTo": "Invitation sent for the room",
     "inviteRoomPick": "— Pick a room from this computer —",
     "inviteRoomOpen": "open",
-    "inviteRoomClosedHint": "This room is not open: guests will not be able to join until you reopen it from the home screen.",
+    "inviteRoomClosedHint": "This room is closed: it will be opened automatically when the invitation is sent, so your guests can enter.",
     "adminVaultSave": "Stay administrator on this PC",
     "adminVaultUpdate": "Update the administrator session",
     "adminVaultSaved": "✓ Administrator session kept on this PC.",
