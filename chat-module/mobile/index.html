@@ -49,6 +49,48 @@
     #messages { padding:10px 14px; gap:8px; }
     #composer { padding:9px 12px calc(9px + env(safe-area-inset-bottom)); }
   }
+  /* ⚠️ ÉCRANS ÉTROITS — 360 px et moins, très courants sur Android.
+     Les parties FIXES du composeur (deux boutons d'icône, le bouton
+     d'envoi, les espaces et les marges) réclamaient 245 px, ne laissant
+     presque rien au champ de saisie et poussant l'envoi hors de l'écran.
+     On les resserre ici plutôt que de les rétrécir partout : sur un grand
+     écran, ces tailles restent confortables et au-dessus du seuil tactile.
+     Les étiquettes passent sur deux colonnes pleine largeur — quatre
+     libellés (« Pour info », « Avis », « Validation », « Approbation »)
+     ne tiennent pas côte à côte sous 360 px sans devenir illisibles. */
+  /* ⚠️ LE BOUTON D'ENVOI PASSE EN FLÈCHE SUR TÉLÉPHONE (≤ 400 px).
+     Mesuré à 320 px : avec son libellé, le champ de saisie tombait à
+     75 px — la « fente » que ce fichier dénonçait déjà pour les grands
+     écrans, réapparue sur les petits. À 375 px il n'avait encore que
+     130 px, et le texte d'invite s'y trouvait tronqué. La flèche lui rend
+     une cinquantaine de pixels, sur toute la gamme des téléphones
+     courants (320, 360, 375, 390).
+     Le libellé subsiste dans aria-label : ce qui disparaît est
+     l'encombrement, pas l'accessibilité. Au-delà de 400 px — grandes
+     tablettes — le mot revient, plus explicite qu'un pictogramme pour un
+     public administratif. */
+  @media (max-width:400px) {
+    #composer button#sendBtn { padding:0; width:46px; font-size:0; }
+    #composer button#sendBtn::after { content:"➤"; font-size:19px; line-height:1; display:block; }
+  }
+  /* Écrans étroits — 360 px et moins, très courants sur Android. Les
+     parties FIXES du composeur réclamaient 245 px, ne laissant presque
+     rien au champ. On les resserre ici plutôt que partout : sur un grand
+     écran ces tailles restent confortables et au-dessus du seuil tactile.
+     Les étiquettes passent sur deux colonnes — quatre libellés ne tiennent
+     pas côte à côte sous 360 px sans devenir illisibles. */
+  @media (max-width:360px) {
+    #messages { padding:10px 10px; }
+    #composer { gap:6px; padding:10px calc(10px) calc(10px + env(safe-area-inset-bottom)); }
+    #composer button { padding:0 12px; font-size:15px; }
+    #composer button.att-btn { width:42px; }
+    #tagBar { padding:6px 10px 0; }
+    .tag-choix button { flex:1 1 calc(50% - 3px); font-size:11.5px; padding:5px 4px; }
+    .msg { max-width:88%; padding:9px 12px; }
+    .ligne { max-width:96%; gap:6px; }
+    .ligne .creux, .ligne > .avatar { width:28px; }
+    .ligne > .avatar { height:28px; font-size:12px; }
+  }
   #join h1 { font-size:22px; }
   #join p.sub { color:var(--muted); font-size:15px; line-height:1.5; }
   label { font-size:14px; color:var(--muted); display:block; margin-bottom:6px; }
@@ -106,10 +148,19 @@
   /* ⚠️ Sur un écran de 375 px, les trois boutons ne laissaient que 99 px
      au champ de saisie : on écrivait un message dans une fente. C'est ce
      qui donnait l'impression d'une barre d'outils de bureau posée sur un
-     téléphone. Le champ passe donc en premier servi (flex + min-width),
-     et les boutons prennent une largeur fixe, juste au-dessus du seuil
-     tactile de 44 px. Mesuré : le champ repasse de 99 à ~150 px. */
-  #composer input { flex:1 1 auto; min-width:120px; }
+     téléphone. Le champ passe donc en premier servi, et les boutons
+     prennent une largeur fixe, juste au-dessus du seuil tactile de 44 px.
+
+     ⚠️ MAIS `min-width:120px` EMPÊCHAIT LE CHAMP DE RÉTRÉCIR. Mesuré sur
+     un écran de 320 px : trombone 46 + micro 46 + saisie 120 + « Envoyer »
+     95 + espaces 30 + marges 28 = 351 px pour 320 disponibles. Le bouton
+     d'envoi finissait 31 px HORS de l'écran, et la page entière paraissait
+     conçue pour un ordinateur — il fallait dézoomer pour tout voir, et le
+     texte devenait illisible. Signalé en usage réel sur téléphone.
+     `min-width:0` est ce qui autorise un élément flex à se réduire sous la
+     largeur de son contenu : sans lui, la valeur par défaut (`auto`) le
+     fige. */
+  #composer input { flex:1 1 0; min-width:0; }
   #composer button { padding:0 16px; border-radius:12px; border:none; background:var(--accent);
                      color:#fff; font-weight:700; cursor:pointer; font-size:16px;
                      min-height:46px; flex-shrink:0; }
@@ -425,7 +476,10 @@
       <button id="attBtn" class="att-btn" aria-label="Joindre">📎</button>
       <button id="micBtn" class="att-btn" aria-label="Vocal">🎤</button>
       <input id="draft" maxlength="2000" autocomplete="off">
-      <button id="sendBtn" data-i18n="send">Envoyer</button>
+      <!-- aria-label posé par applyLang en même temps que le libellé : sous
+           360 px le texte est masqué au profit d'une flèche, et sans lui le
+           bouton n'aurait plus de nom pour un lecteur d'écran. -->
+      <button id="sendBtn" data-i18n="send" data-i18n-aria="send">Envoyer</button>
     </div>
   </section>
 </main>
@@ -501,6 +555,12 @@ function applyLang() {
   document.documentElement.lang = lang;
   document.documentElement.dir = lang === "ar" ? "rtl" : "ltr";
   document.querySelectorAll("[data-i18n]").forEach(el => { el.textContent = t(el.dataset.i18n); });
+  // Nom accessible, pour les boutons dont le texte peut être masqué par le
+  // style — le bouton d'envoi passe en flèche sous 360 px. Sans cela, un
+  // lecteur d'écran annoncerait un bouton sans nom.
+  document.querySelectorAll("[data-i18n-aria]").forEach(el => {
+    el.setAttribute("aria-label", t(el.dataset.i18nAria));
+  });
   draft.placeholder = t("draftPlaceholder");
   langSel.value = lang;
   // Le bouton du son et le rappel des messages privés portent du texte
