@@ -636,3 +636,58 @@ est partagé avec le navigateur de l'utilisateur.
   La tâche est démarrée immédiatement par `Start-ScheduledTask`.
 - **Ne pas afficher un code interne** (`task-missing`…) : c'est le message
   d'exception réel remonté par le script élevé qui permet de comprendre.
+
+---
+
+## 15. Identifiant d'application Windows — `public/electron.js`
+
+### Ce qui est en place
+
+```js
+app.setAppUserModelId(app.isPackaged ? "dz.hnaya.browser" : "dz.hnaya.browser.dev");
+```
+
+Appelé dans `app.on("ready")`, **avant** `createWindow()`.
+
+### Pourquoi
+
+Deux exigences se croisent ici, et l'une piège l'autre.
+
+Windows n'affiche une notification que si l'application déclare un
+AppUserModelID **correspondant à un raccourci du menu Démarrer**. Sans cet
+appel, `new Notification(...).show()` réussit sans erreur et il ne se passe
+rien — ni bandeau, ni son.
+
+Mais si aucun raccourci ne porte cet identifiant, **Electron en crée un**,
+nommé d'après l'exécutable courant. En développement, cet exécutable est
+`node_modules/electron/dist/electron.exe` : un `Electron.lnk` apparaît
+alors dans le menu Démarrer, revendiquant l'identifiant de l'application
+installée et portant l'icône d'Electron. Windows résout ensuite le bouton
+de la barre des tâches vers ce raccourci-là.
+
+L'identifiant distinct en développement cloisonne les deux mondes.
+
+### ⚠️ Ne jamais modifier
+
+- **Ne pas retirer l'appel** pour « régler » un problème d'icône : les
+  notifications Windows cesseraient silencieusement de paraître.
+- **Ne pas employer le même identifiant en développement et en
+  production.** Un seul `yarn dev` suffit à réintroduire la panne.
+- **La valeur de production doit rester identique à l'`appId`
+  d'electron-builder** (`package.json`, `build.appId`), sinon le raccourci
+  posé par l'installateur ne correspond plus.
+
+### Comment vérifier
+
+Un seul raccourci doit revendiquer l'identifiant de production :
+
+```powershell
+$app = New-Object -ComObject Shell.Application
+Get-ChildItem "$env:APPDATA\Microsoft\Windows\Start Menu\Programs" -Filter *.lnk -Recurse | ForEach-Object {
+  $id = $app.Namespace($_.DirectoryName).ParseName($_.Name).ExtendedProperty('System.AppUserModel.ID')
+  if ($id -eq 'dz.hnaya.browser') { $_.FullName }
+}
+```
+
+S'il en sort deux, l'icône de la barre des tâches est un tirage au sort.
+Histoire complète : [`DEV-RETOUR-EXPERIENCE.md`](DEV-RETOUR-EXPERIENCE.md) §9.
