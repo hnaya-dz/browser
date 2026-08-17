@@ -407,7 +407,8 @@
     "nicknameChange": "Change",
     "nicknameDone": "OK",
     "myDevices": "My devices",
-    "myDevicesHint": "Send a file to myself"
+    "myDevicesHint": "Send a file to myself",
+    "avatarPending": "will be applied when you enter a room"
   },
   "Privacy": {
     "title": "Privacy",

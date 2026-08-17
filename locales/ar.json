@@ -407,7 +407,8 @@
     "nicknameChange": "تغيير",
     "nicknameDone": "تم",
     "myDevices": "أجهزتي",
-    "myDevicesHint": "إرسال ملف إلى نفسي"
+    "myDevicesHint": "إرسال ملف إلى نفسي",
+    "avatarPending": "ستُطبّق عند دخولك غرفة"
   },
   "Privacy": {
     "title": "الخصوصية",

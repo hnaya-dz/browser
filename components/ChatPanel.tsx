@@ -39,7 +39,7 @@ function heureCourte(ts: number): string {
 const VOTE_OPTIONS =["voteApprove", "voteReject", "voteReserve"] as const;
 import ChatMediaBubble from "./ChatMediaBubble";
 import ChatRoster from "./ChatRoster";
-import ChatIdentite from "./ChatIdentite";
+import ChatIdentite, { avatarEnAttente, oublierAvatarEnAttente } from "./ChatIdentite";
 import qrcode from "qrcode-generator";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useLanguage } from "@/context/langcontext";
@@ -351,6 +351,32 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
       pin: open ? open.pin : "",
     });
   };
+
+  // ⚠️ PHOTO CHOISIE HORS SALON : APPLIQUÉE DÈS QU'ON EN REJOINT UN.
+  // Elle a été retenue localement par ChatIdentite, faute d'hôte vers qui
+  // la téléverser. On attend de se voir dans l'ANNUAIRE — et non le simple
+  // statut « joined » : c'est l'annuaire qui prouve que l'hôte nous connaît
+  // et saura rattacher la photo à notre personne.
+  // Le garde-fou par ref évite de retenter à chaque rafraîchissement de
+  // l'annuaire, lequel arrive à chaque changement de présence.
+  const avatarEnCours = useRef(false);
+  useEffect(() => {
+    if (avatarEnCours.current) return;
+    const bytes = avatarEnAttente();
+    if (!bytes) return;
+    if (!store.roster.some((p) => p.isMe)) return;
+    avatarEnCours.current = true;
+    getApi()?.invoke?.("chat-media-upload", { bytes, kind: "image", mime: "image/jpeg", thumb: null })
+      .then((up: { ok?: boolean; sha256?: string } | undefined) => {
+        if (!up?.ok || !up.sha256) { avatarEnCours.current = false; return; }
+        getApi()?.send?.("chat-set-avatar", { sha256: up.sha256 });
+        // Retirée seulement APRÈS un téléversement réussi : un échec doit
+        // laisser la photo en attente, pas la perdre en silence.
+        oublierAvatarEnAttente();
+        setTimeout(() => getApi()?.send?.("chat-roster"), 400);
+      })
+      .catch(() => { avatarEnCours.current = false; });
+  }, [store.roster]);
 
   // ⚠️ INVITER VERS UN SALON FERMÉ : ON L'OUVRE, PUIS ON ENVOIE.
   // Un salon fermé n'a ni adresse ni code à transmettre (voir
