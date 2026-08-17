@@ -10,7 +10,7 @@ import ChatComposerMedia, { MediaPreview, type PreparedMedia } from "./ChatCompo
 import ChatVoteCard from "./ChatVoteCard";
 import ChatDemandeCard from "./ChatDemandeCard";
 import ChatMeetingCard from "./ChatMeetingCard";
-import type { InviteExtra, MeetingExtra } from "@/context/chatstore";
+import type { InviteExtra, MeetingExtra, RosterPerson, ChatMessage } from "@/context/chatstore";
 
 // Les trois issues d'un vote, dans le vocabulaire administratif validé
 // par l'utilisateur. Ce sont des CLÉS i18n : les libellés partent traduits
@@ -39,6 +39,7 @@ function heureCourte(ts: number): string {
 const VOTE_OPTIONS =["voteApprove", "voteReject", "voteReserve"] as const;
 import ChatMediaBubble from "./ChatMediaBubble";
 import ChatRoster from "./ChatRoster";
+import ChatAvatar from "./ChatAvatar";
 import ChatIdentite, { avatarEnAttente, oublierAvatarEnAttente } from "./ChatIdentite";
 import qrcode from "qrcode-generator";
 import { useTranslation } from "@/hooks/useTranslation";
@@ -350,6 +351,38 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
       address: ip ? `${ip}${port !== 4802 ? ":" + port : ""}` : "",
       pin: open ? open.pin : "",
     });
+  };
+
+  // ── De quel auteur vient ce message ? ────────────────────────────────
+  // L'annuaire indexe des PERSONNES, avec l'empreinte d'un appareil
+  // représentatif ; un message porte l'empreinte de l'appareil qui l'a
+  // écrit, qui peut être un AUTRE appareil de la même personne. On tente
+  // donc l'empreinte, puis le pseudo.
+  //
+  // ⚠️ REPLI ASSUMÉ : personne inconnue de l'annuaire — elle a quitté le
+  // salon, ou le message vient du rattrapage — on dérive la couleur de
+  // l'empreinte de l'appareil. Elle reste stable et distinctive, ce qui
+  // est tout ce qu'on demande à une pastille. Ne JAMAIS la dériver du
+  // pseudo : deux collègues homonymes auraient la même, or c'est
+  // exactement ce que l'avatar doit permettre de distinguer.
+  const parEmpreinte = useMemo(() => {
+    const m = new Map<string, RosterPerson>();
+    for (const p of store.roster) m.set(p.fingerprint, p);
+    return m;
+  }, [store.roster]);
+  const parPseudo = useMemo(() => {
+    const m = new Map<string, RosterPerson>();
+    for (const p of store.roster) if (p.name) m.set(p.name, p);
+    return m;
+  }, [store.roster]);
+
+  const personneDuMessage = (m: ChatMessage) => {
+    const p = (m.deviceFp && parEmpreinte.get(m.deviceFp)) || parPseudo.get(m.from);
+    return {
+      personId: p?.personId || p?.fingerprint || m.deviceFp || m.from,
+      name: p?.name ?? m.from,
+      avatarSha: p?.avatarSha ?? null,
+    };
   };
 
   // ⚠️ PHOTO CHOISIE HORS SALON : APPLIQUÉE DÈS QU'ON EN REJOINT UN.
@@ -1832,8 +1865,19 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
                   {store.activeThread === "all" ? t("Chat.noMessages") : t("Chat.threadEmpty")}
                 </div>
               ) : (
-                messagesDuFil.map((m) => {
+                messagesDuFil.map((m, rang) => {
                   const isMine = m.from === store.userId;
+                  // ⚠️ UN AVATAR PAR PRISE DE PAROLE, PAS PAR MESSAGE.
+                  // Répété à chaque ligne, un échange animé devient une
+                  // colonne de vignettes qui mange la largeur utile d'un
+                  // dock de 340 px. On ne le montre donc qu'au CHANGEMENT
+                  // d'auteur ; les messages suivants gardent un retrait de
+                  // même largeur, pour que les bulles restent alignées.
+                  const precedent = messagesDuFil[rang - 1];
+                  const nouvelAuteur = !precedent
+                    || precedent.from !== m.from
+                    || (precedent.deviceFp || "") !== (m.deviceFp || "");
+                  const qui = personneDuMessage(m);
                   // D.2 — carte d'invitation : cliquable, rejoint le salon
                   // invité avec le PIN prérempli s'il a été transmis
                   if (m.type === "invite" && m.extra) {
@@ -1942,6 +1986,25 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
                     <div key={m.id} id={"msg-" + m.id} style={{
                       alignSelf: isMine ? (isRTL ? "flex-start" : "flex-end") : (isRTL ? "flex-end" : "flex-start"),
                       maxWidth: "85%",
+                      display: "flex", gap: 6, alignItems: "flex-end",
+                      flexDirection: isRTL ? "row-reverse" : "row",
+                    }}>
+                      {/* L'avatar n'accompagne QUE les messages des autres.
+                          Sur les siens, il n'apprend rien — la bulle est
+                          déjà alignée et colorée — et coûterait 24 px de
+                          largeur à chaque ligne. */}
+                      {!isMine && (nouvelAuteur ? (
+                        <ChatAvatar
+                          personId={qui.personId}
+                          name={qui.name}
+                          avatarSha={qui.avatarSha}
+                          size={24}
+                        />
+                      ) : (
+                        <span style={{ width: 24, flexShrink: 0 }} />
+                      ))}
+                    <div style={{
+                      flex: 1, minWidth: 0,
                       background: isMine ? `${accent}30` : "rgba(255,255,255,0.06)",
                       border: `1px solid ${isMine ? accent + "40" : border}`,
                       borderRadius: 8, padding: "6px 10px",
@@ -2042,6 +2105,7 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
                           {t("Chat.seenBy")} {store.reads[m.id].map((r) => r.sender || "?").join(", ")}
                         </div>
                       )}
+                    </div>
                     </div>
                   );
                 })

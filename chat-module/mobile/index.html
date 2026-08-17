@@ -85,6 +85,13 @@
   #messages { flex:1; min-height:0; overflow-y:auto; overflow-x:hidden; padding:14px 16px;
               display:flex; flex-direction:column; gap:10px;
               -webkit-overflow-scrolling:touch; }
+  /* Une prise de parole = un avatar. Les messages suivants du même auteur
+     gardent un retrait de même largeur, pour que les bulles restent
+     alignées au lieu de zigzaguer. */
+  .ligne { display:flex; gap:8px; align-items:flex-end; max-width:92%; }
+  .ligne.mine { align-self:flex-end; }
+  .ligne .creux { width:32px; flex-shrink:0; }
+  .ligne > .avatar { width:32px; height:32px; font-size:13px; }
   .msg { max-width:85%; padding:10px 14px; border-radius:14px; background:rgba(255,255,255,0.07);
          align-self:flex-start; font-size:16px; line-height:1.45; word-break:break-word;
          overflow-wrap:anywhere; }
@@ -1046,7 +1053,25 @@ function meetingNode(m) {
   return box;
 }
 
-function messageNode(m) {
+// Auteur d'un message. L'annuaire indexe des PERSONNES, avec l'empreinte
+// d'un appareil représentatif ; un message porte celle de l'appareil qui
+// l'a écrit, qui peut être un AUTRE appareil de la même personne. On tente
+// donc l'empreinte, puis le pseudo.
+//
+// ⚠️ Repli assumé : personne inconnue de l'annuaire — partie du salon, ou
+// message venu du rattrapage — la couleur dérive de l'empreinte de
+// l'APPAREIL. Jamais du pseudo : deux homonymes auraient la même, or c'est
+// précisément ce que l'avatar doit permettre de distinguer.
+function auteurDuMessage(m) {
+  const p = people.find((x) => m.deviceFp && x.fingerprint === m.deviceFp)
+         || people.find((x) => x.name && x.name === m.from);
+  return p || {
+    personId: m.deviceFp || m.from, fingerprint: m.deviceFp || m.from,
+    name: m.from, avatarSha: null, online: false,
+  };
+}
+
+function messageNode(m, precedent) {
   if (m.type === "vote") return voteNode(m);
   if (m.type === "meeting") return meetingNode(m);
   const div = document.createElement("div");
@@ -1096,7 +1121,30 @@ function messageNode(m) {
     const vu = lecturesNode(m);
     if (vu) div.appendChild(vu);
   }
-  return div;
+
+  // ── L'avatar accompagne la bulle ────────────────────────────────────
+  // Uniquement sur les messages des AUTRES : sur les siens, il n'apprend
+  // rien — la bulle est déjà alignée à droite et colorée — et coûterait
+  // 32 px de largeur sur un écran de téléphone.
+  const ligne = document.createElement("div");
+  ligne.className = "ligne" + (m.from === userId ? " mine" : "");
+  if (m.from !== userId) {
+    const memeAuteur = precedent
+      && precedent.from === m.from
+      && (precedent.deviceFp || "") === (m.deviceFp || "");
+    if (memeAuteur) {
+      const creux = document.createElement("span");
+      creux.className = "creux";
+      ligne.appendChild(creux);
+    } else {
+      // Sans la présence : dans le fil, la pastille verte parlerait de
+      // maintenant à propos d'un message d'hier.
+      const a = auteurDuMessage(m);
+      ligne.appendChild(avatarNode({ ...a, online: false }));
+    }
+  }
+  ligne.appendChild(div);
+  return ligne;
 }
 
 function renderMessages() {
@@ -1120,7 +1168,7 @@ function renderMessages() {
     messagesEl.appendChild(vide);
     return;
   }
-  duFil.forEach((m) => messagesEl.appendChild(messageNode(m)));
+  duFil.forEach((m, i) => messagesEl.appendChild(messageNode(m, duFil[i - 1])));
   messagesEl.scrollTop = messagesEl.scrollHeight;
 }
 
@@ -1147,7 +1195,11 @@ function addMessage(m, duBacklog) {
     // Rendu incrémental : reconstruire tout le fil à chaque message
     // ferait sauter le défilement en pleine lecture.
     if (messagesEl.firstChild && !messagesEl.querySelector(".msg")) messagesEl.textContent = "";
-    messagesEl.appendChild(messageNode(m));
+    // Le message PRÉCÉDENT du même fil, pour ne pas répéter l'avatar sur
+    // une suite de messages du même auteur. On le prend dans la liste
+    // complète, l'affichage étant incrémental et n'ayant pas de mémoire.
+    const duFilCourant = allMessages.filter((x) => (x.groupId || "all") === activeThread);
+    messagesEl.appendChild(messageNode(m, duFilCourant[duFilCourant.length - 2]));
     messagesEl.scrollTop = messagesEl.scrollHeight;
   }
 }
