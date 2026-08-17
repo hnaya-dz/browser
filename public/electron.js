@@ -1,4 +1,4 @@
-import { app, BrowserWindow, WebContentsView, ipcMain, Menu, dialog, shell, screen, clipboard, powerMonitor, Notification } from "electron";
+import { app, BrowserWindow, WebContentsView, ipcMain, Menu, dialog, shell, screen, clipboard, powerMonitor, Notification, nativeImage } from "electron";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import { spawn, fork } from "child_process";
@@ -393,31 +393,52 @@ const { width: screenW, height: screenH } = primaryDisplay.workAreaSize;
 const winWidth  = Math.max(900, Math.round(screenW  * 0.92));
 const winHeight = Math.max(600, Math.round(screenH * 0.92));
 
+/** Icône de la fenêtre, réduite à la taille qu'attend la barre des tâches.
+ *  Voir la note détaillée à l'endroit où elle est posée. Renvoie undefined
+ *  si le fichier est illisible : mieux vaut l'icône de classe qu'une
+ *  fenêtre qui refuse de s'ouvrir. */
+function iconeDeFenetre() {
+  try {
+    const base = nativeImage.createFromPath(join(__dirname, "../public/icons/icon.ico"));
+    if (base.isEmpty()) return undefined;
+    return base.resize({ width: 32, height: 32, quality: "best" });
+  } catch {
+    return undefined;
+  }
+}
+
 mainWindow = new BrowserWindow({
   width:     winWidth,
   height:    winHeight,
   center:    true,
   minWidth:  900,
   minHeight: 600,
-  // ⚠️ AUCUNE ICÔNE IMPOSÉE EN VERSION INSTALLÉE — et c'est délibéré.
+  // ⚠️ ICÔNE DE FENÊTRE : REDIMENSIONNÉE À 32 px, JAMAIS LE .ico BRUT.
   //
-  // Sans cette ligne, Windows prend l'icône de l'EXÉCUTABLE, qu'electron-
-  // builder y grave à toutes les tailles utiles. Avec elle, la fenêtre
-  // reçoit ce que nativeImage sait produire d'un .ico : UNE SEULE image,
-  // la plus grande, soit 256×256 — vérifié, y compris sur un fichier qui
-  // en contient sept. Windows doit alors la rétrécir lui-même pour un
-  // bouton de 32 px, et échoue : icône générique.
+  // Constaté en interrogeant la fenêtre en cours d'exécution (WM_GETICON) :
+  //   • avec `icon: "…/icon.ico"`, nativeImage ne rend du fichier qu'UNE
+  //     SEULE image, la plus grande — 256×256, même sur un .ico qui en
+  //     contient sept. Windows doit la réduire à 32 px pour la barre des
+  //     tâches, et le résultat est méconnaissable ;
+  //   • sans l'option, la fenêtre n'a AUCUNE icône (les trois variantes de
+  //     WM_GETICON renvoient zéro) et Windows se rabat sur l'icône de
+  //     CLASSE, un 48×48 tout aussi écrasé. Retirer l'option ne fait donc
+  //     pas hériter l'icône de l'exécutable, contrairement à ce que j'avais
+  //     supposé en 0.7.4.
   //
-  // Cela n'a longtemps rien cassé parce que le bouton de la barre des
-  // tâches suivait l'exécutable. C'est `setAppUserModelId`, ajouté en
-  // 0.7.0 pour que les notifications Windows paraissent, qui l'a fait
-  // suivre l'icône de la FENÊTRE — révélant un défaut présent depuis
-  // toujours mais jusque-là sans conséquence. Trois corrections
-  // successives ont porté sur le FICHIER, qui n'était pas en cause.
+  // On fournit donc une image déjà réduite proprement par Electron, ce qui
+  // donne à la fenêtre un vrai HICON de 32 px.
   //
-  // En développement, le processus est electron.exe : son icône est celle
-  // d'Electron, donc on impose la nôtre, faute de mieux.
-  ...(app.isPackaged ? {} : { icon: join(__dirname, "../public/icons/icon.ico") }),
+  // Pourquoi cela n'a gêné qu'à partir de la 0.7.0 : jusque-là le bouton de
+  // la barre des tâches suivait l'exécutable, dont electron-builder grave
+  // l'icône à toutes les tailles. `setAppUserModelId`, ajouté pour que les
+  // notifications Windows paraissent, l'a fait suivre l'icône de la
+  // FENÊTRE — révélant un défaut présent depuis l'origine.
+  //
+  // ⚠️ Vérifier une modification d'ici en interrogeant la fenêtre RÉELLE
+  // (WM_GETICON), jamais le fichier : quatre corrections successives ont
+  // été livrées sur la foi de contrôles portant sur le .ico.
+  icon: iconeDeFenetre(),
   webPreferences: {
     preload: join(__dirname, "preload.js"),
     nodeIntegration: false,
