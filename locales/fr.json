@@ -402,7 +402,10 @@
     "adminRoomsAdd": "Ajouter",
     "adminRoomsRemove": "Retirer",
     "adminRoomsEmpty": "Personne pour l’instant.",
-    "adminRoomsAllIn": "Tout l’annuaire a déjà accès."
+    "adminRoomsAllIn": "Tout l’annuaire a déjà accès.",
+    "identityAs": "Vous êtes",
+    "nicknameChange": "Modifier",
+    "nicknameDone": "OK"
   },
   "Privacy": {
     "title": "Confidentialité",

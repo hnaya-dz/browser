@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 // ✅ Icônes vectorielles (lucide, déjà dans les dépendances) plutôt
 // qu'emoji : les emoji sont rendus par la police du système et diffèrent
 // visuellement entre Windows 10 et 11 — incohérent d'un poste à l'autre.
-import { MessageSquare, Shield, Lock, Smartphone, KeyRound, Eye, EyeOff, Send, History, DoorOpen, Trash2, KeySquare, Users, ArrowLeft, CornerUpLeft, X, CheckCircle2, AlertTriangle, Volume2, VolumeX, CalendarClock, MoreHorizontal, ChevronUp } from "lucide-react";
+import { MessageSquare, Shield, Lock, Smartphone, KeyRound, Eye, EyeOff, Send, History, DoorOpen, Trash2, KeySquare, Users, ArrowLeft, CornerUpLeft, X, CheckCircle2, AlertTriangle, Volume2, VolumeX, CalendarClock, MoreHorizontal, ChevronUp, User, Plus } from "lucide-react";
 import ChatAdminPanel from "./ChatAdminPanel";
 import ChatServerSetup from "./ChatServerSetup";
 import ChatComposerMedia, { MediaPreview, type PreparedMedia } from "./ChatComposerMedia";
@@ -164,6 +164,13 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
     typeof window !== "undefined" ? localStorage.getItem("hnaya-chat-nickname") || "" : ""
   );
   const [sessionNameInput, setSessionNameInput] = useState("");
+  // Le pseudo est déjà mémorisé : on le RAPPELLE, on ne le redemande pas.
+  // Ce drapeau n'ouvre le champ que sur demande explicite — ou d'office à
+  // la toute première utilisation, quand il n'y a encore rien à rappeler.
+  const [changerPseudo, setChangerPseudo] = useState(false);
+  // Créer un salon est une action d'installation, pas un geste quotidien :
+  // repliée par défaut.
+  const [creationOuverte, setCreationOuverte] = useState(false);
   const [pinInput, setPinInput] = useState("");
   const [messageInput, setMessageInput] = useState("");
   // Étape E — pièce jointe préparée, en attente d'envoi
@@ -900,51 +907,114 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
                 </button>
               </div>
             ))}
-            <div>
-              <div style={{ fontSize: 11, color: muted, marginBottom: 4 }}>
-                {t("Chat.nickname")} <span style={{ color: accent }}>*</span>
+            {/* ── IDENTITÉ ────────────────────────────────────────────
+                Le pseudo se pose UNE FOIS, comme un mot de passe : ensuite
+                on le rappelle, on ne le redemande pas. Il était présenté en
+                champ de saisie obligatoire à chaque ouverture — avec son
+                astérisque rouge — alors qu'il était déjà mémorisé et
+                simplement réaffiché. Cela donnait à croire qu'il fallait le
+                ressaisir, et occupait le haut de l'écran pour rien. */}
+            {nickname.trim() && !changerPseudo ? (
+              <div style={{
+                display: "flex", alignItems: "center", gap: 8,
+                fontSize: 11.5, color: muted,
+              }}>
+                <User size={13} style={{ flexShrink: 0 }} />
+                <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {t("Chat.identityAs")} <b style={{ color: text }}>{nickname}</b>
+                </span>
+                <button
+                  onClick={() => setChangerPseudo(true)}
+                  style={{
+                    background: "transparent", border: "none", color: accent,
+                    cursor: "pointer", padding: 0, fontSize: 11, textDecoration: "underline",
+                  }}
+                >
+                  {t("Chat.nicknameChange")}
+                </button>
               </div>
-              <input
-                style={{
-                  ...inputStyle,
-                  border: `1px solid ${nickname.trim() ? border : `${accent}80`}`,
-                }}
-                value={nickname}
-                onChange={(e) => saveNickname(e.target.value)}
-                placeholder={t("Chat.nicknamePlaceholder")}
-              />
-              {!nickname.trim() && (
-                <div style={{ fontSize: 11, color: accent, marginTop: 4 }}>
-                  {t("Chat.nicknameRequired")}
+            ) : (
+              <div>
+                <div style={{ fontSize: 11, color: muted, marginBottom: 4 }}>
+                  {t("Chat.nickname")} <span style={{ color: accent }}>*</span>
                 </div>
-              )}
-            </div>
+                <div style={{ display: "flex", gap: 6 }}>
+                  <input
+                    style={{
+                      ...inputStyle, flex: 1,
+                      border: `1px solid ${nickname.trim() ? border : `${accent}80`}`,
+                    }}
+                    value={nickname}
+                    onChange={(e) => saveNickname(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter" && nickname.trim()) setChangerPseudo(false); }}
+                    placeholder={t("Chat.nicknamePlaceholder")}
+                    autoFocus={changerPseudo}
+                  />
+                  {nickname.trim() && (
+                    <button onClick={() => setChangerPseudo(false)} style={{ ...btnStyle(true), padding: "0 14px" }}>
+                      {t("Chat.nicknameDone")}
+                    </button>
+                  )}
+                </div>
+                {!nickname.trim() && (
+                  <div style={{ fontSize: 11, color: accent, marginTop: 4 }}>
+                    {t("Chat.nicknameRequired")}
+                  </div>
+                )}
+              </div>
+            )}
 
-            <div style={{ borderTop: `1px solid ${border}`, paddingTop: 12 }}>
-              <div style={{ fontSize: 11, color: muted, marginBottom: 4 }}>{t("Chat.sessionName")}</div>
-              <input
-                style={{ ...inputStyle, marginBottom: 8 }}
-                value={sessionNameInput}
-                onChange={(e) => setSessionNameInput(e.target.value)}
-                placeholder={t("Chat.sessionNamePlaceholder")}
-              />
-              {/* D.2 — PIN admin choisi (optionnel, généré sinon) : fini
-                  le PIN fantôme découvert après coup dans les Réglages */}
-              <input
-                style={{ ...inputStyle, marginBottom: 8, direction: "ltr", textAlign: "start" }}
-                value={adminPinInput}
-                onChange={(e) => setAdminPinInput(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                placeholder={t("Chat.adminPinOptional")}
-                inputMode="numeric"
-              />
+            {/* ── CRÉER UN SALON — action RARE, donc repliée ───────────
+                Une organisation crée ses salons à l'installation, puis
+                presque plus jamais. Trois champs de saisie occupaient
+                pourtant le haut de l'écran à chaque ouverture, devant les
+                salons existants, qui sont eux l'usage quotidien.
+                Retour terrain : « je ne vois pas l'intérêt de proposer la
+                création d'un salon à chaque ouverture de la messagerie ». */}
+            {!creationOuverte ? (
               <button
-                onClick={handleCreateRoom}
-                disabled={!nickname.trim()}
-                style={{ ...btnStyle(true, !nickname.trim()), width: "100%" }}
+                onClick={() => setCreationOuverte(true)}
+                style={{
+                  ...btnStyle(), width: "100%", padding: "7px 10px", fontSize: 11.5,
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                  opacity: 0.75,
+                }}
               >
-                {t("Chat.createRoom")}
+                <Plus size={13} /> {t("Chat.createRoom")}
               </button>
-            </div>
+            ) : (
+              <div style={{ borderTop: `1px solid ${border}`, paddingTop: 12 }}>
+                <div style={{ fontSize: 11, color: muted, marginBottom: 4 }}>{t("Chat.sessionName")}</div>
+                <input
+                  style={{ ...inputStyle, marginBottom: 8 }}
+                  value={sessionNameInput}
+                  onChange={(e) => setSessionNameInput(e.target.value)}
+                  placeholder={t("Chat.sessionNamePlaceholder")}
+                  autoFocus
+                />
+                {/* D.2 — PIN admin choisi (optionnel, généré sinon) : fini
+                    le PIN fantôme découvert après coup dans les Réglages */}
+                <input
+                  style={{ ...inputStyle, marginBottom: 8, direction: "ltr", textAlign: "start" }}
+                  value={adminPinInput}
+                  onChange={(e) => setAdminPinInput(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                  placeholder={t("Chat.adminPinOptional")}
+                  inputMode="numeric"
+                />
+                <div style={{ display: "flex", gap: 6 }}>
+                  <button
+                    onClick={handleCreateRoom}
+                    disabled={!nickname.trim()}
+                    style={{ ...btnStyle(true, !nickname.trim()), flex: 1 }}
+                  >
+                    {t("Chat.createRoom")}
+                  </button>
+                  <button onClick={() => setCreationOuverte(false)} style={{ ...btnStyle(), padding: "0 14px" }}>
+                    {t("Chat.cancel")}
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* D.2 — réouverture explicite : c'est ICI que vit la
                 continuité (« Créer » = toujours un salon neuf) */}

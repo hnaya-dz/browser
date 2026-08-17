@@ -402,7 +402,10 @@
     "adminRoomsAdd": "إضافة",
     "adminRoomsRemove": "إزالة",
     "adminRoomsEmpty": "لا أحد حتّى الآن.",
-    "adminRoomsAllIn": "جميع من في الدليل لهم حق الدخول مسبقًا."
+    "adminRoomsAllIn": "جميع من في الدليل لهم حق الدخول مسبقًا.",
+    "identityAs": "أنت",
+    "nicknameChange": "تغيير",
+    "nicknameDone": "تم"
   },
   "Privacy": {
     "title": "الخصوصية",

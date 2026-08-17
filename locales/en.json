@@ -402,7 +402,10 @@
     "adminRoomsAdd": "Add",
     "adminRoomsRemove": "Remove",
     "adminRoomsEmpty": "Nobody yet.",
-    "adminRoomsAllIn": "Everyone in the directory already has access."
+    "adminRoomsAllIn": "Everyone in the directory already has access.",
+    "identityAs": "You are",
+    "nicknameChange": "Change",
+    "nicknameDone": "OK"
   },
   "Privacy": {
     "title": "Privacy",
