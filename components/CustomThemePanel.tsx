@@ -37,7 +37,7 @@ export default function CustomThemePanel({ onClose }: CustomThemePanelProps) {
   const processFile = useCallback((file: File) => {
     setError("");
     // ✅ Sur Windows, file.type peut être vide ou incorrect pour certains
-    // fichiers (déjà constaté pour le JPEG — voir RETOUR_EXPERIENCE.md).
+    // fichiers (déjà constaté pour le JPEG — voir docs/DEV-RETOUR-EXPERIENCE.md).
     // On garde la vérification MIME stricte, mais avec un repli sur
     // l'extension du nom de fichier si le MIME est absent ou incorrect,
     // pour ne pas rejeter des PNG/JPG/WEBP valides.

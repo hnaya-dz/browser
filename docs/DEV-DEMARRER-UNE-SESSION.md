@@ -39,8 +39,8 @@ Exemples de fichiers clés :
 - components/ChatPanel.tsx   → dock messagerie locale (colonne droite)
 - components/ChatDockMount.tsx → point de montage unique du dock
 - app/layout.tsx             → layout racine Next.js
-- TECHNIQUES.md              → configurations critiques à ne pas modifier
-- RETOUR_EXPERIENCE.md       → bugs résolus et tentatives échouées
+- DEV-INVARIANTS.md              → configurations critiques à ne pas modifier
+- DEV-RETOUR-EXPERIENCE.md       → bugs résolus et tentatives échouées
 - version.json               → version actuelle pour les mises à jour
 
 Stack : Electron 35, Next.js 15, TypeScript, Tailwind CSS, yt-dlp
@@ -71,7 +71,7 @@ https://raw.githubusercontent.com/hnaya-dz/browser/main/{chemin}
 | urlbar.tsx | `https://raw.githubusercontent.com/hnaya-dz/browser/main/components/urlbar.tsx` |
 | tabbar.tsx | `https://raw.githubusercontent.com/hnaya-dz/browser/main/components/tabbar.tsx` |
 | fr.json | `https://raw.githubusercontent.com/hnaya-dz/browser/main/locales/fr.json` |
-| TECHNIQUES.md | `https://raw.githubusercontent.com/hnaya-dz/browser/main/TECHNIQUES.md` |
+| DEV-INVARIANTS.md | `https://raw.githubusercontent.com/hnaya-dz/browser/main/DEV-INVARIANTS.md` |
 
 ### Trouver le chemin d'un fichier sur GitHub
 
@@ -116,8 +116,8 @@ browser/
 │   ├── ar.json / fr.json / en.json
 ├── app/
 │   └── layout.tsx           ← layout racine Next.js
-├── TECHNIQUES.md            ← ⚠️ configurations critiques
-├── RETOUR_EXPERIENCE.md     ← historique des bugs résolus
+├── DEV-INVARIANTS.md            ← ⚠️ configurations critiques
+├── DEV-RETOUR-EXPERIENCE.md     ← historique des bugs résolus
 └── version.json             ← version pour update-check
 ```
 
@@ -196,6 +196,6 @@ yarn dist
 
 | Fichier | Contenu |
 |---|---|
-| `TECHNIQUES.md` | Configurations critiques avec explication et ⚠️ "Ne pas faire" |
-| `RETOUR_EXPERIENCE.md` | Historique des tentatives échouées et solutions finales |
+| `DEV-INVARIANTS.md` | Configurations critiques avec explication et ⚠️ "Ne pas faire" |
+| `DEV-RETOUR-EXPERIENCE.md` | Historique des tentatives échouées et solutions finales |
 | `version.json` | Version actuelle + notes de release multilingues (AR/FR/EN) |

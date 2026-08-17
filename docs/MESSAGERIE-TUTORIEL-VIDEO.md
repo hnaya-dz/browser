@@ -2,7 +2,7 @@
 
 **À l'usage de Claude Design.** Ce document n'est pas un guide
 d'utilisation : c'est le dossier de tournage. Le guide, lui, est
-[GUIDE_MESSAGERIE.md](GUIDE_MESSAGERIE.md) — il dit *ce que fait* le
+[MESSAGERIE-GUIDE.md](MESSAGERIE-GUIDE.md) — il dit *ce que fait* le
 produit ; celui-ci dit *ce qu'il faut montrer, dans quel ordre, et avec
 quels mots*.
 
@@ -69,6 +69,12 @@ série de capsules d'une minute par thème (voir §6).
 
 **Logo** : le fennec à la loupe, `public/icons/icon.ico` — sept tailles de
 16 à 256 px. Pour une animation, partez du 256.
+
+> ⚠️ Si vous régénérez ce fichier, les tailles **inférieures à 256 doivent
+> être en BMP**, jamais en PNG : Windows ne lit le PNG de façon fiable que
+> pour l'entrée 256, et un fichier tout en PNG fait apparaître l'icône par
+> défaut du système. L'incident est raconté dans
+> [`DEV-RETOUR-EXPERIENCE.md`](DEV-RETOUR-EXPERIENCE.md) §9.
 
 Le produit existe en thème sombre et clair ; **tournez en sombre**, c'est
 le rendu par défaut et le plus lisible en vidéo.
@@ -283,14 +289,16 @@ déception à la démonstration client :
 ## 9. Où vit ce dossier
 
 ```
-C:\Users\pc\browser\TUTORIEL_VIDEO_MESSAGERIE.md   ← ce document
-C:\Users\pc\browser\GUIDE_MESSAGERIE.md            ← le guide d'utilisation
-C:\Users\pc\browser\locales\                       ← les textes, 3 langues
-C:\Users\pc\browser\public\icons\                  ← le logo
-C:\Users\pc\browser\chat-module\mobile\            ← l'interface téléphone
-C:\Users\pc\browser\chat-module\tools\demo.mjs     ← le jeu de démonstration
+docs\MESSAGERIE-TUTORIEL-VIDEO.md   ← ce document
+docs\MESSAGERIE-GUIDE.md            ← le guide d'utilisation
+docs\PRODUIT.md                     ← la fiche produit, pour le ton et les arguments
+locales\                            ← les textes de l'interface, 3 langues
+public\icons\icon.ico               ← le logo, 7 tailles de 16 à 256
+chat-module\mobile\                 ← l'interface téléphone
+chat-module\tools\demo.mjs          ← le jeu de démonstration
 ```
 
-Le dossier à confier à Claude Design est `C:\Users\pc\browser`. Les deux
-documents Markdown suffisent à écrire le scénario ; les autres chemins
-servent aux captures et aux vérifications de libellé.
+Le dossier à confier à Claude Design est `C:\Users\pc\browser` ; tous les
+chemins ci-dessus en sont relatifs. Les documents Markdown suffisent à
+écrire le scénario ; les autres servent aux captures et aux vérifications
+de libellé.

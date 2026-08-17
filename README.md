@@ -4,7 +4,7 @@
 > native (RTL), téléchargement vidéo intégré, messagerie locale sans
 > serveur. Windows · macOS · Linux.
 
-Hnaya DZ Browser est un navigateur de bureau construit avec **Electron 35**
+Hnaya DZ Browser est un navigateur de bureau construit avec **Electron 43**
 et **Next.js 15**, conçu pour les utilisateurs arabophones et francophones
 — institutions, PME, écoles et familles — qui veulent naviguer et
 collaborer **sans dépendre de services étrangers ni d'abonnements**.
@@ -13,11 +13,13 @@ collaborer **sans dépendre de services étrangers ni d'abonnements**.
 
 - **Interface trilingue native** AR / FR / EN, y compris le sens de lecture
   (RTL), les menus contextuels et les boîtes de dialogue système.
-- **Messagerie locale** *(v0.3.0)* — communication d'équipe chiffrée
-  (AES-256, code PIN) entièrement sur le réseau local : sans serveur, sans
-  compte, sans abonnement. Panneau ancré pour discuter en naviguant,
-  découverte automatique des salons, configuration du pare-feu Windows
-  guidée. Voir [`chat-module/README.md`](chat-module/README.md).
+- **Messagerie locale** — communication d'équipe chiffrée entièrement sur
+  le réseau interne : sans serveur distant, sans compte, sans abonnement.
+  Salons cloisonnés, demandes qualifiées avec décision signée, réunions
+  avec rappel, annuaire, accès par téléphone sans installer d'application.
+  En option sous licence, un **serveur permanent** sert plusieurs salons
+  — Salon général, Direction, DRH — derrière une seule adresse.
+  Guide d'usage : [`docs/MESSAGERIE-GUIDE.md`](docs/MESSAGERIE-GUIDE.md).
 - **Téléchargement vidéo intégré** — 30+ plateformes (YouTube, TikTok,
   Facebook…) via yt-dlp, téléchargé automatiquement au premier lancement.
 - **Gestionnaire de mots de passe** local chiffré (AES-256 + safeStorage)
@@ -27,7 +29,7 @@ collaborer **sans dépendre de services étrangers ni d'abonnements**.
 - **Mises à jour non intrusives** — vérification hebdomadaire, bannière
   discrète, jamais imposées.
 
-La liste complète est dans [`FICHE_TECHNIQUE.md`](FICHE_TECHNIQUE.md).
+La liste complète est dans [`docs/PRODUIT.md`](docs/PRODUIT.md).
 
 ## Démarrage
 
@@ -65,13 +67,35 @@ yarn dist:linux   # Linux (AppImage)
 
 ## Documents de référence
 
-| Fichier | Contenu |
+La documentation est rangée **par destinataire** : chacun trouve son
+document sans traverser ceux des autres.
+
+### Pour présenter le produit
+
+| Document | Contenu |
 |---|---|
-| [`TECHNIQUES.md`](TECHNIQUES.md) | Configurations critiques et invariants à ne pas casser |
-| [`RETOUR_EXPERIENCE.md`](RETOUR_EXPERIENCE.md) | Tentatives échouées et solutions finales, par fonctionnalité |
-| [`FICHE_TECHNIQUE.md`](FICHE_TECHNIQUE.md) | Fiche produit complète |
-| [`PROTOCOLE_SESSION.md`](PROTOCOLE_SESSION.md) | Protocole de reprise de session de développement |
+| [`docs/PRODUIT.md`](docs/PRODUIT.md) | Fiche produit complète — ce que fait le navigateur, argument par argument |
+
+### Pour se servir de la messagerie
+
+| Document | Contenu |
+|---|---|
+| [`docs/MESSAGERIE-GUIDE.md`](docs/MESSAGERIE-GUIDE.md) | Guide d'utilisation : salons, demandes qualifiées, réunions, annuaire, serveur permanent |
+| [`docs/MESSAGERIE-TUTORIEL-VIDEO.md`](docs/MESSAGERIE-TUTORIEL-VIDEO.md) | Dossier de production du tutoriel vidéo — découpage, narration, identité visuelle |
+
+### Pour développer
+
+| Document | Contenu |
+|---|---|
+| [`docs/DEV-INVARIANTS.md`](docs/DEV-INVARIANTS.md) | Ce qui ne doit pas être touché, et ce qui casse si on y touche |
+| [`docs/DEV-RETOUR-EXPERIENCE.md`](docs/DEV-RETOUR-EXPERIENCE.md) | Défauts vécus : ce qui a été tenté, pourquoi ça a échoué, comment on l'a trouvé |
+| [`docs/DEV-DEMARRER-UNE-SESSION.md`](docs/DEV-DEMARRER-UNE-SESSION.md) | Reprendre le travail sur une session neuve : contexte à transmettre, arborescence |
 | [`chat-module/README.md`](chat-module/README.md) | Architecture et modèle de sécurité de la messagerie locale |
+
+> Les deux documents de développement se répondent : **INVARIANTS** énonce
+> la règle, **RETOUR-EXPERIENCE** raconte l'incident qui l'a fait naître.
+> Avant de modifier un mécanisme sensible, lire la règle ; si elle paraît
+> arbitraire, l'histoire est à côté.
 
 ## Licence
 

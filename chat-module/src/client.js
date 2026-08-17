@@ -3,7 +3,7 @@
 // ═══════════════════════════════════════════════════════════════
 // Ce fichier n'a pas d'interface graphique : il expose des fonctions
 // simples que le main process d'Electron appelle, puis relaie vers le
-// renderer via IPC (comme pour le reste de Hnaya DZ — voir TECHNIQUES.md
+// renderer via IPC (comme pour le reste de Hnaya DZ — voir docs/DEV-INVARIANTS.md
 // section 1, pattern preload.js déjà en place dans le navigateur).
 
 import WebSocket from "ws";

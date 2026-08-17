@@ -6,7 +6,7 @@ décrit ce que fait le produit, comment s'en servir, et — tout aussi
 important — **ce qu'il ne fait pas**.
 
 Pour l'architecture interne et les choix techniques, voir
-`chat-module/README.md` et `TECHNIQUES.md`, qui s'adressent aux
+`chat-module/README.md` et `DEV-INVARIANTS.md`, qui s'adressent aux
 développeurs.
 
 ---

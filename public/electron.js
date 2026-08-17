@@ -256,7 +256,7 @@ const chatModulePath = app.isPackaged
 let chatWorker = null; // process enfant (fork) du module de chat, null si inactif
 
 // ── Chemin vers yt-dlp (multi-OS) ────────────────────────────────────────────
-// ⚠️ NE PAS modifier sans relire TECHNIQUES.md — affecte Windows/macOS/Linux
+// ⚠️ NE PAS modifier sans relire docs/DEV-INVARIANTS.md — affecte Windows/macOS/Linux
 function getYtDlpBinaryName() {
   if (process.platform === "win32") return "yt-dlp.exe";
   return "yt-dlp"; // macOS et Linux utilisent le même binaire universel sans extension
@@ -1025,7 +1025,7 @@ function ensureChatWorker() {
 
   // Relaie chaque événement du worker vers le renderer via un seul canal
   // ("chat-event") — évite d'avoir à whitelister un canal par type
-  // d'événement dans preload.js (voir TECHNIQUES.md section 1).
+  // d'événement dans preload.js (voir docs/DEV-INVARIANTS.md section 1).
   chatWorker.on("message", (msg) => {
     // Étape E — réponses de transfert : elles répondent à une promesse
     // précise (chatMediaRequest) et n'ont rien à faire dans le flux

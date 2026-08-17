@@ -1,6 +1,15 @@
-# Hnaya DZ Browser — Techniques & Configurations Critiques
+# Hnaya DZ Browser — Invariants
 
-> **But de ce document** : expliquer pourquoi certaines configurations existent et ne doivent pas être modifiées, pour éviter de casser des fonctionnalités qui ont nécessité plusieurs itérations de débogage.
+> **Ce document énonce LA RÈGLE** : ce qui est en place, pourquoi, et ce
+> qui casse si on y touche. À lire avant de modifier un mécanisme sensible.
+>
+> Son jumeau, [`DEV-RETOUR-EXPERIENCE.md`](DEV-RETOUR-EXPERIENCE.md),
+> **raconte L'INCIDENT** qui a fait naître chaque règle : ce qui a été
+> tenté, pourquoi ça a échoué, comment on l'a trouvé. Si une règle vous
+> paraît arbitraire, son histoire est là-bas.
+>
+> **Le code en vigueur ne figure qu'ICI.** Le recopier dans les deux
+> documents les ferait diverger au premier changement.
 
 ---
 
@@ -387,7 +396,7 @@ lancement de la fenêtre principale.
 Ce canal utilise `receive()` côté renderer, qui n'a **pas** besoin d'être ajouté à
 une whitelist (contrairement à `send`/`invoke`) — voir section 1 de ce document.
 
-### Ligne à ajouter au tableau récapitulatif final de TECHNIQUES.md
+### Ligne à ajouter au tableau récapitulatif final de DEV-INVARIANTS.md
 
 | Configuration | Fichier | Risque si supprimée |
 |---|---|---|
@@ -397,7 +406,7 @@ une whitelist (contrairement à `send`/`invoke`) — voir section 1 de ce docume
 
 ## 11. Messagerie locale — configurations critiques (v0.3.0)
 
-> Détails complets et historique des échecs : `RETOUR_EXPERIENCE.md` §8
+> Détails complets et historique des échecs : `DEV-RETOUR-EXPERIENCE.md` §8
 > et `chat-module/README.md`. Résumé des invariants à ne pas casser :
 
 | Configuration | Fichier(s) | Risque si modifiée |

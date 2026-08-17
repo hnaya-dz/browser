@@ -1,8 +1,17 @@
-# Hnaya DZ Browser — Retour d'expérience de développement
+# Hnaya DZ Browser — Retour d'expérience
 
-> **But de ce document** : tracer l'historique des tentatives échouées, des solutions finales
-> retenues, et identifier les configurations à ne jamais modifier pour éviter de réintroduire
-> des bugs déjà résolus.
+> **Ce document raconte LES INCIDENTS** : ce qui a été tenté, pourquoi ça
+> a échoué, et comment la cause a fini par être trouvée. On y vient pour
+> comprendre, ou pour éviter de refaire un chemin déjà parcouru.
+>
+> Son jumeau, [`DEV-INVARIANTS.md`](DEV-INVARIANTS.md), **énonce la règle**
+> qui en découle, avec le code en vigueur. Pour savoir *ce qu'il ne faut
+> pas toucher*, c'est là-bas ; pour savoir *pourquoi*, c'est ici.
+>
+> Une leçon revient assez souvent pour mériter d'être dite en tête :
+> **un contrôle qui ne peut pas échouer ne vérifie rien.** Plusieurs
+> défauts consignés ici ont survécu à des vérifications vertes, menées
+> avec un outil plus tolérant que celui qui produisait la panne.
 
 ---
 
@@ -220,11 +229,12 @@ const icon = currentTheme === "light"  ? "☀️"
 
 ### Solution finale retenue ✅
 
-```js
-const formatArgs = quality === "hq"
-  ? ["--format", "bestvideo+bestaudio/best", "--merge-output-format", "mp4"]  // nécessite ffmpeg
-  : ["--format", "best[ext=mp4][vcodec!*=av01]/bestvideo[ext=mp4][height<=720][vcodec!*=av01]+bestaudio[ext=m4a]/best[height<=720]", "--no-part"];
-```
+Un format MP4 préemballé en mode **Rapide**, qui contient déjà le son et
+l'image : plus de fusion, donc plus de dépendance à ffmpeg. Le mode
+**Haute qualité** garde `bestvideo+bestaudio` et exige ffmpeg, assumé.
+
+> Le code en vigueur : [`DEV-INVARIANTS.md`](DEV-INVARIANTS.md) §5. Il n'est
+> pas recopié ici — deux exemplaires divergeraient au premier changement.
 
 ### ⚠️ Ne jamais modifier
 
