@@ -299,6 +299,79 @@ const allowed = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
 
 ---
 
+## 9. Icône de la barre des tâches disparue — v0.7.x
+
+### Le symptôme
+
+Depuis la 0.7.0, l'icône du bouton de la barre des tâches est celle par
+défaut de Windows, application ouverte. Elle était correcte de la 0.3.0 à
+la 0.6.2. Tout le reste — icône du fichier dans l'Explorateur, du
+raccourci, du menu Démarrer — reste juste, ce qui égare : on cherche du
+côté du fichier alors que le fichier n'est pas en cause.
+
+### La cause, en deux morceaux qui ne se voient qu'ensemble
+
+1. `public/icons/icon.ico` ne contenait **qu'une seule image, 256×256**.
+   Quand Windows lui demande un 32×32, il reçoit un 256×256 : le format ICO
+   ne redimensionne pas, il rend l'entrée disponible.
+2. `app.setAppUserModelId()` a été ajouté en 0.7.0 pour que les
+   notifications Windows fonctionnent. **Il déplace l'origine de l'icône du
+   bouton** : sans lui, le bouton est rattaché à l'exécutable — dont
+   electron-builder génère toutes les tailles correctement ; avec lui, le
+   bouton suit l'identifiant d'application et l'icône **de la fenêtre**,
+   donc le `.ico` chargé à l'exécution.
+
+Aucun des deux ne suffisait. Le fichier à une seule taille existait depuis
+toujours sans gêner ; l'identifiant d'application est indispensable aux
+notifications. C'est leur rencontre qui casse l'affichage.
+
+### Solution finale retenue ✅
+
+Un `.ico` multi-tailles — 16, 24, 32, 48, 64, 128 en **BMP/DIB**, 256 en
+**PNG** — produit par `nativeImage` d'Electron, sans dépendance ajoutée.
+
+### ⚠️ Ne jamais modifier
+
+- **Ne pas encoder les petites tailles en PNG.** Windows n'accepte le PNG
+  de façon fiable que pour l'entrée 256. Un `.ico` entièrement en PNG a été
+  livré en 0.7.1 : icône par défaut partout, y compris sur le fichier.
+- **Ne pas retirer `setAppUserModelId`** pour « régler » l'icône : les
+  notifications Windows cesseraient silencieusement de paraître.
+- **Ne pas se contenter de `--name` du fichier pour vérifier.** L'entrée
+  DIB attend du BGRA **de bas en haut** ; une inversion oubliée donne une
+  icône retournée, un mauvais ordre d'octets un fennec bleu.
+
+### Comment vérifier — et comment NE PAS vérifier
+
+Trois contrôles successifs ont donné un résultat rassurant et FAUX :
+
+| Contrôle | Pourquoi il ne prouve rien |
+|---|---|
+| `ExtractAssociatedIcon` | renvoie 32×32 quelle que soit l'icône réelle — il ne peut pas échouer |
+| `ExtractIconEx` | lit le PNG dans les petites tailles, là où le shell ne le lit pas |
+| Regarder l'icône du fichier dans l'Explorateur | vient de l'exécutable, pas de la fenêtre — surface différente |
+
+Le seul contrôle qui tranche, parce qu'il interroge le fichier comme
+Windows le fait pour une fenêtre :
+
+```powershell
+Add-Type -AssemblyName System.Drawing
+foreach ($n in 16,24,32,48) {
+  $b = (New-Object System.Drawing.Icon('public\icons\icon.ico', $n, $n)).ToBitmap()
+  '{0} -> {1}' -f $n, $b.Width      # doit rendre EXACTEMENT la taille demandée
+}
+```
+
+Avant correction, les quatre demandes rendaient 256. Après, chacune rend sa
+taille. Le 256 revient en 128 sous GDI+, qui ignore les entrées PNG — c'est
+une limite de cette bibliothèque, pas du shell.
+
+**La leçon générale** : se vérifier avec une API plus tolérante que celle
+qui affiche réellement, c'est ne rien vérifier. Trois corrections
+successives ont été livrées sur la foi de contrôles verts.
+
+---
+
 ## Tableau récapitulatif — Ce qui fonctionne et ne doit pas être touché
 
 | Mécanisme | Fichier(s) | Risque si modifié |
