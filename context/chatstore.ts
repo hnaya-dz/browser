@@ -131,6 +131,12 @@ export interface RosterPerson {
   personId?: string | null;
   // Étape M — empreinte de la photo de profil ; null = initiales.
   avatarSha?: string | null;
+  // Empreintes des appareils de cette personne. Envoyée UNIQUEMENT pour
+  // soi-même (voir server.js) : elle sert à composer le fil privé entre
+  // son poste et son téléphone — le transfert de fichiers vers soi-même.
+  // Absente pour les autres, et c'est voulu : leur nombre d'appareils ne
+  // regarde personne.
+  appareils?: string[];
 }
 
 /** Identifiant d'un fil privé — même règle que côté module

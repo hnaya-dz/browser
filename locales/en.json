@@ -405,7 +405,9 @@
     "adminRoomsAllIn": "Everyone in the directory already has access.",
     "identityAs": "You are",
     "nicknameChange": "Change",
-    "nicknameDone": "OK"
+    "nicknameDone": "OK",
+    "myDevices": "My devices",
+    "myDevicesHint": "Send a file to myself"
   },
   "Privacy": {
     "title": "Privacy",

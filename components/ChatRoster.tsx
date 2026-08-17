@@ -9,7 +9,7 @@
 // pour le cloisonnement côté serveur.
 
 import { useTranslation } from "@/hooks/useTranslation";
-import { MessageSquare, Users } from "lucide-react";
+import { MessageSquare, Users, Smartphone } from "lucide-react";
 import { store, directThreadId, getApi, type RosterPerson } from "@/context/chatstore";
 import ChatAvatar from "./ChatAvatar";
 import ChatIdentite from "./ChatIdentite";
@@ -37,16 +37,20 @@ export default function ChatRoster({ accent, muted, border, text, onOpenThread, 
   const { t } = useTranslation();
   const me = store.myFingerprint;
 
-  // Le fichier est recadré et réencodé AVANT de partir : on ne téléverse
-  // jamais les octets choisis par l'utilisateur (métadonnées EXIF, taille
-  // arbitraire, format douteux). Voir preparerPhoto.
   // Soi-même en dernier : on n'écrit pas à son propre appareil, mais le
-  // voir confirme qu'on est bien inscrit.
+  // voir confirme qu'on est bien inscrit. Pour joindre son AUTRE appareil,
+  // voir « Mes appareils » plus bas.
   const gens = [...store.roster].sort((a, b) => {
     if (a.isMe !== b.isMe) return a.isMe ? 1 : -1;
     if (a.online !== b.online) return a.online ? -1 : 1;
     return (a.name || "").localeCompare(b.name || "");
   });
+
+  // Mes autres appareils : ceux de MA personne, moins celui-ci. La liste
+  // n est envoyee que pour soi (voir server.js) — pour autrui, elle est
+  // absente, et un fil se compose alors avec l appareil representatif.
+  const mesAutresAppareils = (store.roster.find((x) => x.isMe)?.appareils || [])
+    .filter((fp) => fp && fp !== me);
 
   if (!gens.length) {
     return (
@@ -74,6 +78,53 @@ export default function ChatRoster({ accent, muted, border, text, onOpenThread, 
             elle disait la meme chose que le pseudo et vivait ailleurs. Voir
             ChatIdentite. L en-tete retrouve sa ligne. */}
       </div>
+      {/* ── MES APPAREILS — s'envoyer un fichier à soi-même ─────────────
+          Un fil privé se route par empreinte d'APPAREIL. Le poste et le
+          téléphone d'une même personne en ont deux, distinctes, et ne
+          partagent que leur personId : le fil poste↔téléphone est donc un
+          fil privé ORDINAIRE, déjà pris en charge de bout en bout. Rien à
+          ajouter au protocole — il manquait seulement le moyen de
+          l'ouvrir, l'annuaire ne montrant qu'une entrée par personne.
+          Ne paraît qu'à partir de deux appareils appairés : sans mobile
+          rattaché, la ligne n'aurait aucun sens. */}
+      {mesAutresAppareils.map((fp, i) => {
+        const fil = me ? directThreadId(me, fp) : null;
+        if (!fil) return null;
+        const nonLus = unreadByThread[fil] || 0;
+        const moi = store.roster.find((x) => x.isMe);
+        return (
+          <button
+            key={"moi-" + fp}
+            onClick={() => moi && onOpenThread(fil, moi)}
+            style={{
+              display: "flex", alignItems: "center", gap: 8, width: "100%",
+              background: `${accent}10`, border: `1px solid ${accent}40`, borderRadius: 4,
+              padding: "7px 9px", cursor: "pointer", color: "inherit", textAlign: "start",
+            }}
+            title={t("Chat.myDevicesHint")}
+          >
+            <Smartphone size={16} style={{ color: accent, flexShrink: 0 }} />
+            <span style={{ flex: 1, minWidth: 0 }}>
+              <span style={{ display: "block", fontSize: 12 }}>
+                {t("Chat.myDevices")}
+                {mesAutresAppareils.length > 1 && (
+                  <span style={{ color: muted, fontSize: 10 }}> · {i + 1}</span>
+                )}
+              </span>
+              <span style={{ display: "block", fontSize: 10, color: muted, marginTop: 1 }}>
+                {t("Chat.myDevicesHint")}
+              </span>
+            </span>
+            {nonLus > 0 && (
+              <span style={{
+                background: accent, color: "#fff", fontSize: 9.5, fontWeight: 700,
+                borderRadius: 9, minWidth: 17, padding: "1px 5px", textAlign: "center", flexShrink: 0,
+              }}>{nonLus}</span>
+            )}
+          </button>
+        );
+      })}
+
       {gens.map((p) => {
         const fil = me && !p.isMe ? directThreadId(me, p.fingerprint) : null;
         const nonLus = fil ? (unreadByThread[fil] || 0) : 0;

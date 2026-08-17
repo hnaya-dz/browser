@@ -1019,6 +1019,16 @@ export function startHost({ sessionName = null, pin, adminPin, roomId, dataDir, 
           // plusieurs centaines de kilooctets à chaque changement de
           // présence, plusieurs fois par minute.
           avatarSha: d.avatarSha || null,
+          // ⚠️ SES PROPRES APPAREILS, ET RIEN QUE LES SIENS.
+          // Permet d'ouvrir un fil entre son poste et son téléphone — le
+          // transfert de fichiers vers soi-même. Les fils privés se
+          // routant par empreinte d'APPAREIL, il faut connaître celle de
+          // son autre appareil pour composer l'identifiant du fil.
+          // Envoyer la liste de TOUT LE MONDE dirait à chacun combien
+          // d'appareils utilisent ses collègues et lesquels : l'annuaire
+          // n'a pas à porter cela. Un seul appareil représentatif suffit
+          // pour écrire à quelqu'un d'autre, et c'est déjà `fingerprint`.
+          ...(!!moi && d.appareils.includes(moi) ? { appareils: d.appareils } : {}),
         }));
         sendTo({ v: 1, type: "roster", people: gens, me: moi });
         return;

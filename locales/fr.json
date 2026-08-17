@@ -405,7 +405,9 @@
     "adminRoomsAllIn": "Tout l’annuaire a déjà accès.",
     "identityAs": "Vous êtes",
     "nicknameChange": "Modifier",
-    "nicknameDone": "OK"
+    "nicknameDone": "OK",
+    "myDevices": "Mes appareils",
+    "myDevicesHint": "M’envoyer un fichier à moi-même"
   },
   "Privacy": {
     "title": "Confidentialité",

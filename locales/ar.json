@@ -405,7 +405,9 @@
     "adminRoomsAllIn": "جميع من في الدليل لهم حق الدخول مسبقًا.",
     "identityAs": "أنت",
     "nicknameChange": "تغيير",
-    "nicknameDone": "تم"
+    "nicknameDone": "تم",
+    "myDevices": "أجهزتي",
+    "myDevicesHint": "إرسال ملف إلى نفسي"
   },
   "Privacy": {
     "title": "الخصوصية",
