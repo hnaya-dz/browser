@@ -399,7 +399,25 @@ mainWindow = new BrowserWindow({
   center:    true,
   minWidth:  900,
   minHeight: 600,
-  icon: join(__dirname, "../public/icons/icon.ico"),
+  // ⚠️ AUCUNE ICÔNE IMPOSÉE EN VERSION INSTALLÉE — et c'est délibéré.
+  //
+  // Sans cette ligne, Windows prend l'icône de l'EXÉCUTABLE, qu'electron-
+  // builder y grave à toutes les tailles utiles. Avec elle, la fenêtre
+  // reçoit ce que nativeImage sait produire d'un .ico : UNE SEULE image,
+  // la plus grande, soit 256×256 — vérifié, y compris sur un fichier qui
+  // en contient sept. Windows doit alors la rétrécir lui-même pour un
+  // bouton de 32 px, et échoue : icône générique.
+  //
+  // Cela n'a longtemps rien cassé parce que le bouton de la barre des
+  // tâches suivait l'exécutable. C'est `setAppUserModelId`, ajouté en
+  // 0.7.0 pour que les notifications Windows paraissent, qui l'a fait
+  // suivre l'icône de la FENÊTRE — révélant un défaut présent depuis
+  // toujours mais jusque-là sans conséquence. Trois corrections
+  // successives ont porté sur le FICHIER, qui n'était pas en cause.
+  //
+  // En développement, le processus est electron.exe : son icône est celle
+  // d'Electron, donc on impose la nôtre, faute de mieux.
+  ...(app.isPackaged ? {} : { icon: join(__dirname, "../public/icons/icon.ico") }),
   webPreferences: {
     preload: join(__dirname, "preload.js"),
     nodeIntegration: false,
