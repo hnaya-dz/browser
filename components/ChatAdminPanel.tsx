@@ -302,9 +302,9 @@ export default function ChatAdminPanel({ accent, muted, border, inputBg, inputSt
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 {(d.platform || "").startsWith("mobile-web") ? <PhoneIcon size={13} /> : <Laptop size={13} />}
                 {/* ⚠️ L'étiquette NE REMPLACE PLUS le pseudo.
-                    Elle le masquait : poser « Bureau 33 » sur un appareil
-                    faisait disparaître « Directeur » de l'en-tête, et l'on
-                    croyait avoir renommé la personne. Or l'étiquette nomme
+                    Elle le masquait : poser un nom d'appareil (« poste de
+                    l'accueil ») faisait disparaître le pseudo de l'en-tête,
+                    et l'on croyait avoir renommé la personne. Or elle nomme
                     l'APPAREIL, le pseudo désigne QUI écrit — les deux
                     doivent rester lisibles ensemble. */}
                 <span style={{ fontSize: 12, fontWeight: 700, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
