@@ -1777,6 +1777,39 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
               </div>
             )}
 
+            {/* ── OÙ L'ON ÉCRIT — bandeau du SALON ────────────────────────
+                ⚠️ RISQUE DE CONFIDENTIALITÉ, PAS SIMPLE CONFORT.
+                Le fil privé nommait son destinataire dans un bandeau bien
+                visible ; le salon, lui, n'avait que son nom en 11 px sous
+                le titre du panneau. Cette asymétrie est précisément ce qui
+                permet d'écrire à la Direction en croyant écrire à la DRH —
+                et tout l'intérêt du produit repose sur le cloisonnement.
+                Signalé en usage réel : « on ne voit pas son nom, ce qui
+                pourrait causer l'envoi d'informations confidentielles vers
+                les mauvais destinataires. »
+                Même grammaire visuelle que le bandeau privé, à la même
+                place : ce qui change, c'est la destination, pas la forme. */}
+            {!showAdmin && !showRoster && store.activeThread === "all" && store.sessionName && (
+              <div style={{
+                display: "flex", alignItems: "center", gap: 7, flexShrink: 0,
+                background: `${accent}18`, border: `1px solid ${accent}40`,
+                borderRadius: 6, padding: "6px 8px",
+              }}>
+                <Users size={13} style={{ color: accent, flexShrink: 0 }} />
+                <span style={{
+                  flex: 1, minWidth: 0, fontSize: 11.5,
+                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                }}>
+                  <b>{store.sessionName}</b>
+                </span>
+                <span style={{ fontSize: 9.5, color: muted, flexShrink: 0 }}>
+                  {store.online.length > 0
+                    ? `${store.online.length} ${t("Chat.roomBannerPeople")}`
+                    : t("Chat.roomBannerAll")}
+                </span>
+              </div>
+            )}
+
             {/* Annuaire : remplace le fil tant qu'il est ouvert */}
             {!showAdmin && showRoster && <div style={{
               flex: 1, minHeight: 0, overflowY: "auto",
@@ -2296,8 +2329,19 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
                   onChange={(e) => setMessageInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleSend()}
                   disabled={store.licenceReadOnly}
+                  /* La DESTINATION jusque dans le champ de saisie : « Écrire
+                     dans Direction… ». Le nom du salon n'existait qu'en 11 px
+                     sous le titre du panneau — présent, mais pas là où l'œil
+                     se porte au moment d'écrire. Signalé comme un risque de
+                     confidentialité : se tromper de salon, c'est adresser un
+                     document à la mauvaise direction. */
                   placeholder={store.licenceReadOnly ? t("Chat.licenceSuspended")
-                    : pendingMedia ? t("Chat.mediaCaptionPlaceholder") : t("Chat.messagePlaceholder")}
+                    : pendingMedia ? t("Chat.mediaCaptionPlaceholder")
+                    : threadPeer && store.activeThread !== "all"
+                      ? `${t("Chat.writeToPrefix")} ${threadPeer.name || t("Chat.rosterUnnamed")}…`
+                      : store.sessionName
+                        ? `${t("Chat.writeInPrefix")} ${store.sessionName}…`
+                        : t("Chat.messagePlaceholder")}
                 />
                 <button
                   onClick={handleSend}

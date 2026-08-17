@@ -408,7 +408,11 @@
     "nicknameDone": "OK",
     "myDevices": "My devices",
     "myDevicesHint": "Send a file to myself",
-    "avatarPending": "will be applied when you enter a room"
+    "avatarPending": "will be applied when you enter a room",
+    "writeInPrefix": "Write in",
+    "writeToPrefix": "Write to",
+    "roomBannerPeople": "online",
+    "roomBannerAll": "everyone in the room"
   },
   "Privacy": {
     "title": "Privacy",
