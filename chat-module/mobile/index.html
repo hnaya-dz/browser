@@ -282,9 +282,14 @@
                 border-top:1px solid rgba(255,180,60,0.30); color:#ffcf8a;
                 background:rgba(255,180,60,0.10); }
   #licenceBar[hidden] { display:none; }
-  #bureauBar { padding:10px 14px; font-size:12.5px; line-height:1.45; flex-shrink:0;
-               color:#ffd9a0; background:rgba(255,180,60,0.12);
-               border-bottom:1px solid rgba(255,180,60,0.35); }
+  /* ⚠️ Plus GRAND que les autres bandeaux, à dessein : quand il paraît, la
+     page entière est déjà réduite par le navigateur. Un avertissement à la
+     taille des autres textes serait illisible précisément dans le seul cas
+     où il sert. Signalé en usage réel : « après avoir difficilement lu le
+     message de désactivation du mode version ordinateur ». */
+  #bureauBar { padding:14px; font-size:16px; font-weight:600; line-height:1.5;
+               flex-shrink:0; color:#ffe4b8; background:rgba(255,170,40,0.20);
+               border-bottom:2px solid rgba(255,170,40,0.55); }
   #bureauBar[hidden] { display:none; }
   #licenceBar.stop { color:#ff9d9d; background:rgba(255,80,80,0.10);
                      border-top-color:rgba(255,80,80,0.35); }
@@ -405,6 +410,17 @@
     <option value="en">English</option>
   </select>
 </header>
+
+<!-- ⚠️ SOUS L'EN-TÊTE, ET HORS DES ÉCRANS — donc visible DÈS LA CONNEXION.
+     Ce bandeau vivait dans l'écran de discussion, juste au-dessus du
+     composeur : il n'apparaissait qu'une fois entré dans un salon, en bas
+     de page et en petits caractères — c'est-à-dire au moment où l'on a
+     déjà lutté contre l'affichage, et à l'endroit où l'on regarde le
+     moins. Retour d'usage : « peut-être que cette notification devrait
+     apparaître à la connexion ».
+     Ici, il précède l'écran de saisie du pseudo comme celui du fil : on le
+     lit avant d'essayer de se servir de la page. -->
+<div id="bureauBar" hidden><span id="bureauTxt"></span></div>
 <main>
   <section id="join" class="screen active">
     <h1 data-i18n="joinTitle">Rejoindre le salon</h1>
@@ -488,7 +504,6 @@
          Signalé en usage réel, capture à l'appui, où le mode paysage était
          parfaitement lisible alors que le portrait était illisible — ce qui
          écarte un défaut de mise en page et désigne cette option. -->
-    <div id="bureauBar" hidden><span id="bureauTxt"></span></div>
     <div id="licenceBar" hidden><span id="licenceTxt"></span></div>
     <div id="composer">
       <!-- Photo, image ou document. `capture` fait proposer l'appareil
