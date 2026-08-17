@@ -149,9 +149,11 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
   useChatSnapshot();
 
   useEffect(() => {
-    // Préchauffage du module de messagerie dès l'ouverture du panneau —
-    // sur machine lente, le premier fork prend plusieurs secondes qui
-    // s'ajoutaient au délai ressenti sur « Créer » / « Rejoindre ».
+    // Filet de sécurité seulement : le préchauffage réel a lieu bien plus
+    // tôt, dans ChatDockMount, qui vit en permanence dans la mise en page.
+    // Ici, au montage du panneau, il arrivait trop tard — le processus
+    // démarrait en même temps que les premières actions de l'utilisateur.
+    // Sans effet si le processus tourne déjà (ensureChatWorker est idempotent).
     getApi()?.send?.("chat-warmup");
     // Réserve la colonne : la page web se rétrécit au lieu d'être cachée
     getApi()?.send?.("chat-dock", DOCK_WIDTH);

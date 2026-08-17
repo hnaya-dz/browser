@@ -1293,7 +1293,12 @@ ipcMain.on("chat-set-avatar", (event, { sha256 } = {}) => {
 // minutes, c'est ce qui limite la portée d'un QR photographié.
 ipcMain.handle("chat-pairing-token", async () => {
   try {
-    const res = await chatMediaRequest("pairing-token", {}, 10000);
+    // 10 s étaient absurdes pour une signature locale : le QR s'affiche
+    // immédiatement sans le jeton, puis CHANGE quand il arrive — sous les
+    // yeux de quelqu'un en train de le scanner. Mieux vaut renoncer vite
+    // et laisser le QR stable, sans appairage, que le modifier dix
+    // secondes plus tard.
+    const res = await chatMediaRequest("pairing-token", {}, 4000);
     return { ok: true, token: res.token };
   } catch (e) {
     return { ok: false, error: e?.message || "jeton" };
