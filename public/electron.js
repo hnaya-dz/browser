@@ -631,7 +631,27 @@ app.on("ready", async () => {
   // C'est exactement ce qu'a produit le premier rappel de réunion en test
   // réel : aucun message d'erreur, aucun indice, rien à l'écran.
   // La valeur doit être identique à l'`appId` d'electron-builder.
-  app.setAppUserModelId("dz.hnaya.browser");
+  //
+  // ⚠️ IDENTIFIANT DISTINCT EN DÉVELOPPEMENT — ET C'EST ESSENTIEL.
+  // Pour qu'une notification paraisse, Windows exige un raccourci du menu
+  // Démarrer portant cet identifiant. N'en trouvant pas, Electron EN CRÉE
+  // UN, nommé d'après l'exécutable courant. En développement, l'exécutable
+  // est node_modules/electron/dist/electron.exe : il apparaît donc un
+  // « Electron.lnk » qui revendique l'identifiant de l'application
+  // installée, et dont l'icône est celle d'Electron.
+  //
+  // Windows résout alors l'identifiant vers CE raccourci-là, et le bouton
+  // de la barre des tâches de l'application installée affiche l'icône
+  // d'Electron — quand bien même l'exécutable, le raccourci du menu
+  // Démarrer et la fenêtre portent tous la bonne icône.
+  //
+  // Le défaut a coûté cinq versions (0.7.1 à 0.7.5) passées à corriger le
+  // fichier .ico, qui n'a jamais été en cause. Un seul lancement de
+  // `yarn dev` suffisait à le réintroduire.
+  //
+  // Un identifiant propre au développement cloisonne les deux mondes : le
+  // raccourci créé pour lui ne peut plus usurper celui de la production.
+  app.setAppUserModelId(app.isPackaged ? "dz.hnaya.browser" : "dz.hnaya.browser.dev");
 
   // Interrupteurs confidentialité : lus AVANT createWindow pour que le
   // filtre réseau respecte le choix de l'utilisateur dès la 1re requête

@@ -319,26 +319,81 @@ la 0.6.2. Tout le reste — icône du fichier dans l'Explorateur, du
 raccourci, du menu Démarrer — reste juste, ce qui égare : on cherche du
 côté du fichier alors que le fichier n'est pas en cause.
 
-### La cause, en deux morceaux qui ne se voient qu'ensemble
+### La cause — UN RACCOURCI FANTÔME CRÉÉ PAR `yarn dev`
 
-1. `public/icons/icon.ico` ne contenait **qu'une seule image, 256×256**.
-   Quand Windows lui demande un 32×32, il reçoit un 256×256 : le format ICO
-   ne redimensionne pas, il rend l'entrée disponible.
-2. `app.setAppUserModelId()` a été ajouté en 0.7.0 pour que les
-   notifications Windows fonctionnent. **Il déplace l'origine de l'icône du
-   bouton** : sans lui, le bouton est rattaché à l'exécutable — dont
-   electron-builder génère toutes les tailles correctement ; avec lui, le
-   bouton suit l'identifiant d'application et l'icône **de la fenêtre**,
-   donc le `.ico` chargé à l'exécution.
+Pour qu'une notification paraisse, Windows exige un raccourci du menu
+Démarrer portant l'AppUserModelID de l'application. **N'en trouvant pas,
+Electron en crée un lui-même**, nommé d'après l'exécutable courant.
 
-Aucun des deux ne suffisait. Le fichier à une seule taille existait depuis
-toujours sans gêner ; l'identifiant d'application est indispensable aux
-notifications. C'est leur rencontre qui casse l'affichage.
+En développement, cet exécutable est
+`node_modules/electron/dist/electron.exe`. Chaque `yarn dev` déposait donc
+un **`Electron.lnk`** dans le menu Démarrer, revendiquant
+`dz.hnaya.browser` — l'identifiant de l'application installée — et portant
+l'icône d'Electron.
+
+Deux raccourcis pour un même identifiant. Windows en choisit un pour
+résoudre le bouton de la barre des tâches, et prenait celui d'Electron.
+
+```
+Electron.lnk           dz.hnaya.browser   →  node_modules\electron\dist\electron.exe
+Hnaya DZ Browser.lnk   dz.hnaya.browser   →  …\Hnaya DZ Browser.exe
+```
+
+C'est pourquoi **l'icône du fichier .exe, celle du raccourci du Bureau et
+celle du menu Démarrer restaient correctes** : seule la barre des tâches
+passe par cette résolution. Le symptôme désignait le coupable depuis le
+début, à condition de savoir lire quelle surface dépend de quoi.
 
 ### Solution finale retenue ✅
 
-Un `.ico` multi-tailles — 16, 24, 32, 48, 64, 128 en **BMP/DIB**, 256 en
-**PNG** — produit par `nativeImage` d'Electron, sans dépendance ajoutée.
+1. Supprimer le `Electron.lnk` fautif.
+2. **Un AppUserModelID distinct en développement** —
+   `dz.hnaya.browser.dev` — pour qu'un lancement de dev ne puisse plus
+   usurper l'identité de la production :
+
+```js
+app.setAppUserModelId(app.isPackaged ? "dz.hnaya.browser" : "dz.hnaya.browser.dev");
+```
+
+### ⚠️ Ce que cette panne a coûté, et pourquoi
+
+**Cinq versions (0.7.1 à 0.7.5) à corriger le fichier `.ico`, qui n'a
+jamais été en cause.** Chaque correction était vérifiée — et chaque
+vérification portait sur le fichier, l'exécutable ou la fenêtre, c'est-à-dire
+sur des surfaces qui allaient déjà bien.
+
+Pire : **un seul `yarn dev` suffisait à recréer le raccourci fautif**. Les
+lancements de développement faits pour tester les correctifs entretenaient
+donc la panne qu'ils étaient censés lever.
+
+Ce qui a fini par trancher : **énumérer qui revendique l'identifiant**,
+plutôt que d'examiner ce que l'application déclare.
+
+```powershell
+$app = New-Object -ComObject Shell.Application
+Get-ChildItem "$env:APPDATA\Microsoft\Windows\Start Menu\Programs" -Filter *.lnk -Recurse | ForEach-Object {
+  $id = $app.Namespace($_.DirectoryName).ParseName($_.Name).ExtendedProperty('System.AppUserModel.ID')
+  if ($id) { '{0,-34} {1}' -f $_.Name, $id }
+}
+```
+
+Un seul raccourci doit revendiquer `dz.hnaya.browser`. S'il y en a deux,
+l'icône de la barre des tâches est un tirage au sort.
+
+### Les correctifs intermédiaires, et ce qu'ils valent
+
+Les mesures faites en chemin restent justes et ont été conservées, même si
+elles ne réglaient pas la panne :
+
+- le `.ico` porte désormais 16 à 128 en **BMP/DIB** et 256 en PNG. Windows
+  n'accepte le PNG de façon fiable que pour le 256 ; un `.ico` tout en PNG,
+  livré en 0.7.1, faisait apparaître l'icône par défaut **partout** ;
+- la fenêtre reçoit une image réduite à 32 px par `nativeImage`, et non le
+  `.ico` brut — dont `nativeImage` ne rend que la plus grande image, 256×256,
+  que Windows écrasait ensuite ;
+- ne PAS donner d'icône à la fenêtre (tenté en 0.7.4) ne fait pas hériter
+  celle de l'exécutable : la fenêtre se retrouve sans icône et Windows
+  se rabat sur celle de la **classe**, un 48×48 tout aussi écrasé.
 
 ### ⚠️ Ne jamais modifier
 
