@@ -124,9 +124,25 @@
   #status.show { display:flex; }
   #status button { margin-inline-start:auto; background:none; border:1px solid var(--danger);
                    color:var(--danger); border-radius:8px; padding:6px 14px; font-size:14px; cursor:pointer; }
+  /* ⚠️ COLONNE DE LECTURE BORNÉE — pour rapprocher les deux bords.
+     Les bulles épousent leur contenu et se collent aux bords opposés : un
+     « hi ! » à gauche et un « Quoi ?! » à droite laissaient entre eux un
+     vide immense dès que la mise en page était large, et l'œil devait
+     traverser l'écran pour suivre l'échange. Signalé en usage réel :
+     « les messages des deux bords ne s'affichent pas au même niveau, il
+     serait mieux de les rapprocher. »
+     Sur un téléphone en mode normal (≤ 640 px) cette borne ne change
+     rien ; elle n'agit que là où le mal existe — tablette, mode paysage,
+     ou « Site pour ordinateur » resté coché. */
   #messages { flex:1; min-height:0; overflow-y:auto; overflow-x:hidden; padding:14px 16px;
               display:flex; flex-direction:column; gap:10px;
               -webkit-overflow-scrolling:touch; }
+  #messages > * { max-width:640px; }
+  #messages { align-items:stretch; }
+  /* La colonne elle-même reste centrée quand l'écran la dépasse. */
+  @media (min-width:660px) {
+    #messages { padding-inline:calc((100% - 640px) / 2); }
+  }
   /* Une prise de parole = un avatar. Les messages suivants du même auteur
      gardent un retrait de même largeur, pour que les bulles restent
      alignées au lieu de zigzaguer. */
@@ -266,6 +282,10 @@
                 border-top:1px solid rgba(255,180,60,0.30); color:#ffcf8a;
                 background:rgba(255,180,60,0.10); }
   #licenceBar[hidden] { display:none; }
+  #bureauBar { padding:10px 14px; font-size:12.5px; line-height:1.45; flex-shrink:0;
+               color:#ffd9a0; background:rgba(255,180,60,0.12);
+               border-bottom:1px solid rgba(255,180,60,0.35); }
+  #bureauBar[hidden] { display:none; }
   #licenceBar.stop { color:#ff9d9d; background:rgba(255,80,80,0.10);
                      border-top-color:rgba(255,80,80,0.35); }
   /* — Étape H : vote — */
@@ -459,6 +479,16 @@
     <!-- Étape I — échéance de licence : préavis, puis envoi suspendu. Le
          texte est celui envoyé par l'hôte (organisme, date, coordonnées de
          renouvellement) : même formulation que sur le poste. -->
+    <!-- ⚠️ « Site pour ordinateur » coché dans le navigateur du téléphone.
+         Chrome met alors la page en page sur ~980 px puis la réduit : les
+         textes deviennent minuscules, il faut dézoomer pour voir les deux
+         colonnes de messages, et AUCUNE règle de style ne peut s'y opposer
+         — l'option prend le pas sur le viewport déclaré par la page.
+         Un utilisateur ne diagnostiquera jamais cela seul : la page le dit.
+         Signalé en usage réel, capture à l'appui, où le mode paysage était
+         parfaitement lisible alors que le portrait était illisible — ce qui
+         écarte un défaut de mise en page et désigne cette option. -->
+    <div id="bureauBar" hidden><span id="bureauTxt"></span></div>
     <div id="licenceBar" hidden><span id="licenceTxt"></span></div>
     <div id="composer">
       <!-- Photo, image ou document. `capture` fait proposer l'appareil
@@ -510,7 +540,7 @@ function genMsgId() {
 
 // ── i18n ──────────────────────────────────────────────────────
 const I18N = {
-  fr: { appTitle:"Messagerie locale", roomPick:"Salon", joinTitle:"Rejoindre le salon", joinSub:"Communication chiffrée sur votre réseau interne — rien ne transite par Internet.", nickname:"Pseudo", pinLabel:"Code PIN (6 chiffres, communiqué par l'hôte)", joinBtn:"Rejoindre", notice:"Gardez cette page ouverte pour recevoir les messages — les notifications d'écran verrouillé ne sont pas disponibles dans cette version.", connectionLost:"Connexion au salon perdue.", rejoin:"Reconnecter", send:"Envoyer", wrongPin:"PIN incorrect — vérifiez le code auprès de l'hôte.", cantReach:"Salon injoignable — vérifiez que vous êtes sur le même wifi.", online:"en ligne", draftPlaceholder:"Écrire un message…", connecting:"Connexion…",
+  fr: { bureauMode:"Affichage « Site pour ordinateur » actif : la page est réduite et devient illisible. Ouvrez le menu ⋮ de votre navigateur et décochez « Site pour ordinateur ».", appTitle:"Messagerie locale", roomPick:"Salon", joinTitle:"Rejoindre le salon", joinSub:"Communication chiffrée sur votre réseau interne — rien ne transite par Internet.", nickname:"Pseudo", pinLabel:"Code PIN (6 chiffres, communiqué par l'hôte)", joinBtn:"Rejoindre", notice:"Gardez cette page ouverte pour recevoir les messages — les notifications d'écran verrouillé ne sont pas disponibles dans cette version.", connectionLost:"Connexion au salon perdue.", rejoin:"Reconnecter", send:"Envoyer", wrongPin:"PIN incorrect — vérifiez le code auprès de l'hôte.", cantReach:"Salon injoignable — vérifiez que vous êtes sur le même wifi.", online:"en ligne", draftPlaceholder:"Écrire un message…", connecting:"Connexion…",
         rosterTitle:"Annuaire", rosterEmpty:"Personne d'autre n'a encore rejoint ce salon.", rosterMe:"vous", rosterUnnamed:"Sans nom", rosterOnline:"En ligne", rosterJustNow:"à l'instant", threadPrivate:"Privé", threadEmpty:"Aucun message dans cette conversation privée.", roomThread:"Salon", priveWaiting:"vous a écrit en privé", soundOn:"Signal sonore activé", soundOff:"Signal sonore coupé",
         tag_info:"Pour info", tag_avis:"Avis", tag_validation:"Validation", tag_approbation:"Approbation",
         issue_valide:"Validé", issue_refuse:"Refusé", issue_reserve:"Réserves",
@@ -522,7 +552,7 @@ const I18N = {
         demandeNotForYou:"Cette demande est adressée à quelqu'un d'autre.",
         attVoice:"Message vocal", attFile:"Pièce jointe", attSave:"Ouvrir", attLoading:"Chargement…", attGone:"Pièce jointe indisponible.", attFailed:"Échec du téléchargement.",
         attSending:"Envoi…", attTooBig:"Fichier trop volumineux (25 Mo maximum).", attTypeRefused:"Ce type de fichier n'est pas autorisé.", attQuotaBytes:"Limite de volume atteinte pour cet appareil (200 Mo par heure).", attQuotaFiles:"Trop de fichiers envoyés depuis cet appareil dans la dernière heure.", attBusy:"Trop d'envois simultanés — patientez.", attSendFailed:"L'envoi de la pièce jointe a échoué.", attImageFailed:"Cette image n'a pas pu être lue. Son extension annonce un format que son contenu ne respecte pas — cas fréquent des photos d'iPhone enregistrées en « .jpg » alors qu'elles sont au format HEIC.", attCaption:"Ajouter un mot (facultatif)…", attAttachment:"Pièce jointe", roomEmpty:"Aucun message pour l'instant.", roomEmptyHint:"Écrivez le premier message du salon, ou attendez qu'un collègue s'exprime.", reply:"Répondre", replyingTo:"En réponse à", replyGone:"Message supprimé", voteLabel:"POUR VALIDATION", voteNotNamed:"non nominatif", voteAnswered:"ont répondu", votePending:"en attente", voteFinal:"Votre bulletin est définitif.", voteAlready:"Vous avez déjà voté — un vote non nominatif est définitif." },
-  en: { appTitle:"Local Messaging", roomPick:"Room", joinTitle:"Join the room", joinSub:"Encrypted communication over your internal network — nothing goes through the Internet.", nickname:"Nickname", pinLabel:"PIN code (6 digits, provided by the host)", joinBtn:"Join", notice:"Keep this page open to receive messages — lock-screen notifications are not available in this version.", connectionLost:"Connection to the room lost.", rejoin:"Reconnect", send:"Send", wrongPin:"Incorrect PIN — check the code with the host.", cantReach:"Room unreachable — make sure you are on the same wifi.", online:"online", draftPlaceholder:"Write a message…", connecting:"Connecting…",
+  en: { bureauMode:"“Desktop site” is on: the page is scaled down and hard to read. Open your browser menu ⋮ and uncheck “Desktop site”.", appTitle:"Local Messaging", roomPick:"Room", joinTitle:"Join the room", joinSub:"Encrypted communication over your internal network — nothing goes through the Internet.", nickname:"Nickname", pinLabel:"PIN code (6 digits, provided by the host)", joinBtn:"Join", notice:"Keep this page open to receive messages — lock-screen notifications are not available in this version.", connectionLost:"Connection to the room lost.", rejoin:"Reconnect", send:"Send", wrongPin:"Incorrect PIN — check the code with the host.", cantReach:"Room unreachable — make sure you are on the same wifi.", online:"online", draftPlaceholder:"Write a message…", connecting:"Connecting…",
         rosterTitle:"Directory", rosterEmpty:"Nobody else has joined this room yet.", rosterMe:"you", rosterUnnamed:"Unnamed", rosterOnline:"Online", rosterJustNow:"just now", threadPrivate:"Private", threadEmpty:"No messages in this private conversation yet.", roomThread:"Room", priveWaiting:"wrote to you privately", soundOn:"Sound on", soundOff:"Sound off",
         tag_info:"For info", tag_avis:"Opinion", tag_validation:"Validation", tag_approbation:"Approval",
         issue_valide:"Validated", issue_refuse:"Refused", issue_reserve:"Reservations",
@@ -534,7 +564,7 @@ const I18N = {
         demandeNotForYou:"This request is addressed to someone else.",
         attVoice:"Voice message", attFile:"Attachment", attSave:"Open", attLoading:"Loading…", attGone:"Attachment unavailable.", attFailed:"Download failed.",
         attSending:"Sending…", attTooBig:"File too large (25 MB maximum).", attTypeRefused:"This file type is not allowed.", attQuotaBytes:"Upload limit reached for this device (200 MB per hour).", attQuotaFiles:"Too many files sent from this device in the past hour.", attBusy:"Too many uploads at once — please wait.", attSendFailed:"Sending the attachment failed.", attImageFailed:"This image could not be read. Its extension claims a format its contents do not match — commonly an iPhone photo saved as “.jpg” while actually being HEIC.", attCaption:"Add a note (optional)…", attAttachment:"Attachment", roomEmpty:"No messages yet.", roomEmptyHint:"Write the room's first message, or wait for a colleague to speak.", reply:"Reply", replyingTo:"Replying to", replyGone:"Message deleted", voteLabel:"FOR APPROVAL", voteNotNamed:"not named", voteAnswered:"answered", votePending:"pending", voteFinal:"Your ballot is final.", voteAlready:"You have already voted — a non-nominative ballot is final." },
-  ar: { appTitle:"المراسلة المحلية", roomPick:"الغرفة", joinTitle:"الانضمام إلى الغرفة", joinSub:"تواصل مشفّر عبر شبكتك الداخلية — لا شيء يمر عبر الإنترنت.", nickname:"الاسم المستعار", pinLabel:"رمز PIN (6 أرقام، يقدّمه المضيف)", joinBtn:"انضمام", notice:"أبقِ هذه الصفحة مفتوحة لاستقبال الرسائل — إشعارات شاشة القفل غير متاحة في هذا الإصدار.", connectionLost:"انقطع الاتصال بالغرفة.", rejoin:"إعادة الاتصال", send:"إرسال", wrongPin:"رمز PIN غير صحيح — تحقّق من الرمز لدى المضيف.", cantReach:"تعذّر الوصول إلى الغرفة — تأكّد أنك على نفس شبكة الواي فاي.", online:"متصل", draftPlaceholder:"اكتب رسالة…", connecting:"جارٍ الاتصال…",
+  ar: { bureauMode:"وضع «موقع سطح المكتب» مفعَّل: الصفحة مصغَّرة وصعبة القراءة. افتح قائمة المتصفح ⋮ وأزل تحديد «موقع سطح المكتب».", appTitle:"المراسلة المحلية", roomPick:"الغرفة", joinTitle:"الانضمام إلى الغرفة", joinSub:"تواصل مشفّر عبر شبكتك الداخلية — لا شيء يمر عبر الإنترنت.", nickname:"الاسم المستعار", pinLabel:"رمز PIN (6 أرقام، يقدّمه المضيف)", joinBtn:"انضمام", notice:"أبقِ هذه الصفحة مفتوحة لاستقبال الرسائل — إشعارات شاشة القفل غير متاحة في هذا الإصدار.", connectionLost:"انقطع الاتصال بالغرفة.", rejoin:"إعادة الاتصال", send:"إرسال", wrongPin:"رمز PIN غير صحيح — تحقّق من الرمز لدى المضيف.", cantReach:"تعذّر الوصول إلى الغرفة — تأكّد أنك على نفس شبكة الواي فاي.", online:"متصل", draftPlaceholder:"اكتب رسالة…", connecting:"جارٍ الاتصال…",
         rosterTitle:"الدليل", rosterEmpty:"لم ينضم أحد آخر إلى هذه الغرفة بعد.", rosterMe:"أنت", rosterUnnamed:"بلا اسم", rosterOnline:"متصل", rosterJustNow:"الآن", threadPrivate:"خاص", threadEmpty:"لا توجد رسائل في هذه المحادثة الخاصة.", roomThread:"الغرفة", priveWaiting:"راسلك على الخاص", soundOn:"التنبيه الصوتي مفعَّل", soundOff:"التنبيه الصوتي مكتوم",
         tag_info:"للعلم", tag_avis:"رأي", tag_validation:"مصادقة", tag_approbation:"موافقة",
         issue_valide:"مُصادَق", issue_refuse:"مرفوض", issue_reserve:"تحفّظات",
@@ -589,7 +619,14 @@ const joinScreen = $("join"), chatScreen = $("chat"), joinBtn = $("joinBtn"),
   threadBar = $("threadBar"), threadBack = $("threadBack"),
   threadPeerEl = $("threadPeer"), threadTagEl = $("threadTag");
 
-langSel.onchange = () => { lang = langSel.value; localStorage.setItem("hnaya-mobile-lang", lang); applyLang(); };
+// controlerModeBureau est appelé ici aussi : son texte est posé par du
+// code, non par data-i18n, et applyLang ne le retraduirait donc pas.
+langSel.onchange = () => {
+  lang = langSel.value;
+  localStorage.setItem("hnaya-mobile-lang", lang);
+  applyLang();
+  controlerModeBureau();
+};
 // « Ajouter mon mobile » : le QR peut transporter le pseudo du poste qui
 // invite (paramètre ?u=). Le téléphone rejoint alors sous LA MÊME
 // identité, sans que l'utilisateur ait à retaper — ou à inventer — un
@@ -616,6 +653,32 @@ if (pseudoInvite) {
   setTimeout(() => { try { pinInput.focus(); } catch { /* champ absent */ } }, 250);
 }
 applyLang();
+
+// ── « Site pour ordinateur » : le détecter et le dire ─────────────────
+// Coché dans le navigateur du téléphone, il fait mettre la page en page
+// sur ~980 px puis la réduit : textes minuscules, deux colonnes de
+// messages qu'on ne voit qu'en dézoomant. Aucune feuille de style n'y peut
+// rien — l'option prend le pas sur le viewport déclaré par la page. Faute
+// de pouvoir le corriger, la page le signale.
+//
+// ⚠️ Le critère compare la largeur de MISE EN PAGE à celle de l'ÉCRAN, et
+// exige les deux conditions. Sur un téléphone en mode normal, innerWidth
+// suit l'écran ; sur un ordinateur, innerWidth est plus PETIT que l'écran
+// (fenêtre partielle). C'est le RAPPORT qui trahit l'anomalie — une
+// largeur absolue donnerait un faux positif sur toute tablette.
+function controlerModeBureau() {
+  const barre = $("bureauBar"), txt = $("bureauTxt");
+  if (!barre || !txt) return;
+  const ecran = (window.screen && window.screen.width) || 0;
+  const miseEnPage = window.innerWidth || 0;
+  const suspect = ecran > 0 && miseEnPage > ecran * 1.4 && miseEnPage > 700;
+  txt.textContent = t("bureauMode");
+  barre.hidden = !suspect;
+}
+controlerModeBureau();
+// La rotation change la largeur : en paysage l'anomalie s'atténue souvent,
+// et le bandeau doit disparaître avec elle.
+window.addEventListener("resize", controlerModeBureau);
 
 // Nom du salon + port WS — servis par l'hôte
 let wsPort = 4802;
