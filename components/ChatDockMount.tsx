@@ -35,7 +35,20 @@ export default function ChatDockMount() {
   // secondes pour ne pas alourdir le démarrage du navigateur de ceux qui
   // ne se serviront jamais de la messagerie.
   useEffect(() => {
-    const t = setTimeout(() => { getApi()?.send?.("chat-warmup"); }, DELAI_PRECHAUFFAGE_MS);
+    const t = setTimeout(() => {
+      getApi()?.send?.("chat-warmup");
+      // ⚠️ ET LE CODE DU PANNEAU, pas seulement le processus.
+      // ChatPanel est chargé à la demande (import dynamique) : son morceau
+      // de code arrivait donc au moment du clic, en même temps que le
+      // démarrage du processus. Le précharger ici le met en cache bien
+      // avant. Mesuré sur le paquet livré : le plus gros morceau de
+      // l'interface pèse 170 Ko — ce n'est pas la cause des lenteurs
+      // signalées, mais c'est le dernier segment du parcours qui restait
+      // payé au clic, et le préparer ne coûte rien.
+      // L'échec est volontairement muet : un préchargement qui rate n'est
+      // pas une panne, le panneau se chargera à l'ouverture comme avant.
+      import("./ChatPanel").catch(() => { /* sera chargé à l'ouverture */ });
+    }, DELAI_PRECHAUFFAGE_MS);
     return () => clearTimeout(t);
   }, []);
 
