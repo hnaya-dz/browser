@@ -81,7 +81,7 @@ entièrement, y compris l'alignement des messages et la position des
 boutons. Une version arabe qui garderait la mise en page latine serait
 perçue comme un placage.
 
-**Durée visée** : trois à quatre minutes pour la vidéo complète, ou huit
+**Durée visée** : trois à quatre minutes pour la vidéo complète, ou neuf
 capsules autonomes (§7).
 
 ---
@@ -309,9 +309,9 @@ Elles ne sont pas indicatives.
 
 ---
 
-## 7. Découpage — huit séquences
+## 7. Découpage — neuf séquences
 
-Chacune se tient seule : elles peuvent devenir huit capsules, ou
+Chacune se tient seule : elles peuvent devenir neuf capsules, ou
 s'enchaîner en une vidéo unique. La durée indiquée est celle du montage
 final, narration comprise, et c'est un **plancher**.
 
@@ -347,7 +347,37 @@ c'est la clé du salon. Il chiffre les échanges.
 
 ---
 
-### Séquence 3 — Le téléphone, sans installer d'application · 30 s · ≥ 8 plans
+### Séquence 3 — Votre identité, une fois pour toutes · 25 s · ≥ 7 plans
+
+Une simplification voulue, et qui se voit mal si on ne la montre pas : le
+pseudo **ne se ressaisit pas à chaque connexion**. On le change comme on
+change un mot de passe — et c'est au même endroit qu'on pose sa photo.
+
+**À l'image** : écran A, le bloc **« Vous êtes »** *pseudo* et son bouton
+**« Modifier »**. Déplié : le champ **« Votre pseudo »**
+(*« ex. Directeur RH »*), le bouton **« Ma photo »**, le choix d'une image,
+la pastille qui se remplit, puis **« OK »**. Enchaîner sur le fil, où
+l'avatar accompagne **chaque prise de parole** — et montrer, à côté, un
+interlocuteur sans photo : `ChatAvatar` affiche alors ses **initiales
+colorées**, stables et distinctives.
+
+**Narration** : « Votre pseudo se saisit une fois. On ne le retape pas à
+chaque connexion : on le modifie comme un mot de passe, depuis le même bloc
+où l'on ajoute sa photo. Dans le fil, chaque prise de parole porte son
+visage — ou ses initiales. »
+
+**Exactitude à respecter** : une photo posée hors d'un salon n'apparaît pas
+instantanément dans un fil. Le produit l'annonce lui-même — **« sera
+appliquée en entrant dans un salon »**. Ne montez pas une photo qui
+surgirait dans une conversation à laquelle on n'est pas connecté.
+
+**Pourquoi cette séquence compte pour la cible** : un directeur ne veut pas
+d'un outil qui lui redemande qui il est chaque matin. C'est un argument de
+sobriété, pas une fonction accessoire.
+
+---
+
+### Séquence 4 — Le téléphone, sans installer d'application · 30 s · ≥ 8 plans
 
 **À l'image** : **« Inviter un mobile »**, le QR code, un téléphone qui le
 scanne, l'écran F qui s'ouvre. Montrer le sélecteur **« Salon »** quand le
@@ -363,7 +393,7 @@ convient.
 
 ---
 
-### Séquence 4 — Qualifier un message · 40 s · ≥ 10 plans
+### Séquence 5 — Qualifier un message · 40 s · ≥ 10 plans
 
 Le cœur de l'argument institutionnel. Un message n'est pas qu'un texte :
 il porte une **étiquette** — Pour info, Avis, Validation, Approbation — et
@@ -386,7 +416,7 @@ accompagner la demande.
 
 ---
 
-### Séquence 5 — La réunion qui se rappelle à vous · 35 s · ≥ 9 plans
+### Séquence 6 — La réunion qui se rappelle à vous · 35 s · ≥ 9 plans
 
 **À l'image** : **« Annoncer une réunion »**, les champs **« Objet de la
 réunion »**, **« Lieu (facultatif) »**, **« Durée en minutes »**, le bouton
@@ -405,7 +435,7 @@ vaut autant que le report.
 
 ---
 
-### Séquence 6 — Une direction, un salon · 40 s · ≥ 10 plans
+### Séquence 7 — Une direction, un salon · 40 s · ≥ 10 plans
 
 **À l'image** : un serveur, et trois salons qui en partent — Salon général,
 Direction, DRH. Montrer un message écrit à la Direction qui **n'apparaît
@@ -424,7 +454,7 @@ message le plus fort.
 
 ---
 
-### Séquence 7 — Ce que l'administrateur voit · 30 s · ≥ 8 plans
+### Séquence 8 — Ce que l'administrateur voit · 30 s · ≥ 8 plans
 
 **À l'image** : l'écran E et ses **quatre** onglets. Le registre des
 appareils avec **« Étiquette »** et **« Fonction »**, l'historique
@@ -438,7 +468,7 @@ n'entre, même avec le bon code. »
 
 ---
 
-### Séquence 8 — S'envoyer un fichier à soi-même · 30 s · ≥ 8 plans
+### Séquence 9 — S'envoyer un fichier à soi-même · 30 s · ≥ 8 plans
 
 Une fonction que les prospects ne demandent pas et qu'ils retiennent :
 faire passer un document de son poste à son téléphone, ou l'inverse, sans
