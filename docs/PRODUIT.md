@@ -14,14 +14,25 @@ automatiquement la langue sélectionnée — sans redémarrage.
 
 ---
 
-## 2. Quatre thèmes visuels dont un mode personnalisé
+## 2. Sept thèmes visuels, dont un fond personnalisé
 
-Hnaya propose trois thèmes intégrés (Sombre, Clair, Coucher de soleil) et un quatrième
-mode **Personnalisé** unique : l'utilisateur importe sa propre image depuis son ordinateur
-comme fond d'écran du navigateur. Un curseur d'opacité permet d'ajuster la transparence
-de la couche de lisibilité par-dessus l'image. Le choix est mémorisé d'une session à
-l'autre. Le passage d'un thème à l'autre s'effectue en un seul clic, sans rechargement
-de page.
+Un sélecteur s'ouvre depuis la barre de navigation et présente les sept
+choix d'un seul coup d'œil, chacun avec une pastille montrant sa couleur
+réelle :
+
+| Fond sombre | Fond clair |
+|---|---|
+| **Sombre**, **Vert émeraude**, **Gris**, **Coucher de soleil** | **Clair**, **Blanc** |
+
+Le septième est le mode **Personnalisé** : l'utilisateur importe sa propre
+image depuis son ordinateur comme fond du navigateur, avec un curseur
+d'opacité pour ajuster la couche de lisibilité par-dessus. Une image déjà
+posée se remplace par le bouton « Changer l'image » de la liste.
+
+Le choix est mémorisé d'une session à l'autre et appliqué **avant le
+premier affichage** : aucun clignotement au démarrage. Le passage d'un
+thème à l'autre se fait en un clic, sans rechargement de page, et la liste
+se parcourt aussi au clavier.
 
 ---
 

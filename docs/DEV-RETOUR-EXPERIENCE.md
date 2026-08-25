@@ -194,27 +194,61 @@ const updateTabInfo = () => {
 
 ---
 
-## 5. Icônes du bouton ThemeSwitch
+## 5. Sélecteur de thème — du cycle en emoji à une liste *(refait le 18/08/2026)*
 
-### Tentative échouée
+> Cette section décrivait une solution en emoji, marquée « ne jamais
+> modifier ». Elle a été refaite : les emoji ont été remplacés et le cycle
+> a disparu. Ce qui suit remplace l'ancien contenu.
 
-| Tentative | Raison de l'échec |
+### Ce qui n'allait pas dans le cycle
+
+| Défaut | Conséquence |
 |---|---|
-| Icône = thème **suivant** (ex: 🌙 en mode sombre = "aller vers clair") | Contre-intuitif pour l'utilisateur — en mode clair, l'icône ☀️ montrait qu'on était en mode sombre, créant une confusion |
+| Le clic ouvrait le panneau d'image depuis « coucher de soleil » **ET** depuis « personnalisé » | Arrivé au thème personnalisé, chaque clic rouvrait ce panneau : **on ne pouvait plus jamais revenir aux autres thèmes** |
+| Icônes en emoji (☀️ 🌅 🖼️ 🎨 🌙) | Dessin différent entre Windows 10 et 11 ; la palette 🎨 n'était reconnue par personne — signalé en usage réel |
 
 ### Solution finale retenue ✅
 
-```ts
-// L'icône représente le thème ACTUEL
-const icon = currentTheme === "light"  ? "☀️"
-           : currentTheme === "sunset" ? "🌅"
-           : currentTheme === "custom" ? (customBg ? "🖼️" : "🎨")
-           : "🌙"; // dark par défaut
-```
+Une **liste** (`role="menu"`), et non plus un cycle : sept entrées, chacune
+avec sa pastille de couleur réelle, toutes atteignables en un clic depuis
+n'importe quel thème. La panne d'enfermement disparaît par construction, et
+non par un cas particulier de plus.
+
+Icônes **`lucide-react`** : `Moon`, `Gem`, `Circle`, `Sunset`, `Sun`,
+`ImageIcon`, plus `Pencil` pour changer l'image.
+
+### La question de l'icône « du thème suivant » — tranchée deux fois
+
+L'ancienne version de cette fiche notait déjà que montrer le thème
+**suivant** avait été essayé et jugé contre-intuitif. La demande est revenue
+le 18/08/2026, et elle devient **sans objet** : dans un cycle il fallait
+deviner où l'on allait, d'où l'idée ; avec une liste on voit tout, l'icône
+du bouton dit donc où l'on **est**, et la ligne active porte une coche.
+
+### Trois défauts introduits en corrigeant, tous le même jour
+
+Ils valent d'être consignés : ils décrivent une manière de se tromper, pas
+seulement trois bogues.
+
+| Défaut | Cause | Leçon |
+|---|---|---|
+| L'icône a disparu sur « coucher de soleil » | `<ThemeSwitch />` est posé **sans classe de couleur**, alors que tous ses voisins portent `text-white/70`. L'emoji avait ses couleurs propres ; une icône vectorielle suit `currentColor` | Remplacer un emoji par une icône **révèle** les endroits où la couleur n'était jamais définie |
+| Le serveur de développement est tombé en **500** | Un commentaire `//` glissé **entre les attributs** d'une balise JSX | `tsc --noEmit` passe sans broncher ; **seul le compilateur de Next est juge** |
+| Une image personnalisée déjà posée ne pouvait plus être changée | `setShowPanel(base === "custom" && !customBg)`, écrit pour éviter que le panneau ne s'ouvre à chaque retour | Le panneau était le **seul** accès au réglage : en supprimant le désagrément, on supprimait l'accès |
+
+Les deux premier et troisième défauts sont la même faute de forme que le
+cycle d'origine : **traiter un cas particulier par une condition, au lieu
+de donner un chemin explicite.**
 
 ### ⚠️ Ne jamais modifier
 
-- **Ne pas inverser** pour montrer le thème suivant — testé et confirmé non intuitif.
+- **Ne pas revenir à un cycle.** Toute liste de thèmes doit rester
+  entièrement atteignable, quel que soit le thème courant.
+- **Pas d'emoji comme icône de bouton** — voir `DEV-INVARIANTS.md` §16.
+- **Ne pas retirer `text-white/70`** du bouton : la barre est `bg-black/40`
+  sur tous les thèmes.
+- **Ne pas retirer le script de teinte** de `app/layout.tsx` : sans lui, le
+  fond clignote au démarrage.
 
 ---
 

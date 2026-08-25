@@ -137,8 +137,11 @@ browser/
 # Lancer en développement
 yarn dev
 
-# Tuer les processus en cours
+# Arrêter les serveurs DE CE PROJET (voir DEV-INVARIANTS.md §18)
 yarn kill-dev
+
+# Voir ce qui serait arrêté, sans rien toucher
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/kill-dev.ps1 -Lister
 
 # Synchroniser depuis GitHub
 git pull origin main
@@ -166,7 +169,7 @@ yarn dist
 | Téléchargement multi-OS (Windows/Mac/Linux) | ✅ Actif |
 | Choix qualité vidéo (Rapide/Haute qualité) | ✅ Actif |
 | Gestionnaire mots de passe (AES-256 + safeStorage) | ✅ Actif |
-| Thème sombre / clair / coucher de soleil / personnalisé | ✅ Actif |
+| Sept thèmes (sombre, émeraude, gris, coucher de soleil, clair, blanc, image personnalisée) | ✅ Actif — sélecteur en liste, voir DEV-INVARIANTS §17 |
 | Image de fond personnalisée | ✅ Actif |
 | Scroll onglets avec flèches ‹ › | ✅ Actif |
 | Titres d'onglets corrects | ✅ Actif |
@@ -196,6 +199,9 @@ yarn dist
 
 | Fichier | Contenu |
 |---|---|
-| `DEV-INVARIANTS.md` | Configurations critiques avec explication et ⚠️ "Ne pas faire" |
-| `DEV-RETOUR-EXPERIENCE.md` | Historique des tentatives échouées et solutions finales |
+| `docs/DEV-INVARIANTS.md` | Configurations critiques avec explication et ⚠️ "Ne pas faire" |
+| `docs/DEV-RETOUR-EXPERIENCE.md` | Historique des tentatives échouées et solutions finales |
+| `docs/SERVEUR-MESSAGERIE.md` | Serveur autonome : prérequis Node 22.5+, installation Windows et Linux, licence, sauvegarde |
+| `docs/PRODUIT.md` | Fiche produit — arguments de vente, à jour des sept thèmes |
+| `docs/MESSAGERIE-TUTORIEL-VIDEO.md` | Dossier de tournage : anatomie des écrans, quatre capsules par public |
 | `version.json` | Version actuelle + notes de release multilingues (AR/FR/EN) |

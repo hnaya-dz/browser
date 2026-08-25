@@ -24,8 +24,9 @@ collaborer **sans dépendre de services étrangers ni d'abonnements**.
   Facebook…) via yt-dlp, téléchargé automatiquement au premier lancement.
 - **Gestionnaire de mots de passe** local chiffré (AES-256 + safeStorage)
   — aucune inscription, aucune donnée dans le cloud.
-- **Favoris et groupes d'onglets**, thèmes (sombre, clair, coucher de
-  soleil, image personnalisée), recherche orientée Algérie.
+- **Favoris et groupes d'onglets**, sept thèmes (sombre, vert émeraude,
+  gris, coucher de soleil, clair, blanc, image personnalisée), recherche
+  orientée Algérie.
 - **Mises à jour non intrusives** — vérification hebdomadaire, bannière
   discrète, jamais imposées.
 
@@ -35,7 +36,8 @@ La liste complète est dans [`docs/PRODUIT.md`](docs/PRODUIT.md).
 
 ### Prérequis
 
-- Node.js ≥ 18
+- **Node.js ≥ 22.5** — plancher dur, imposé par `node:sqlite` dans
+  `chat-module` (voir [`docs/SERVEUR-MESSAGERIE.md`](docs/SERVEUR-MESSAGERIE.md))
 - Yarn 1.x
 
 ### Installation
@@ -51,7 +53,7 @@ cd chat-module && yarn install && cd ..   # dépendances de la messagerie locale
 
 ```bash
 yarn dev        # Next.js + Electron
-yarn kill-dev   # arrêter tous les processus de dev (Windows)
+yarn kill-dev   # arrêter les serveurs DE CE PROJET seulement (Windows)
 ```
 
 ### Distribution
@@ -83,6 +85,7 @@ document sans traverser ceux des autres.
 | [`docs/MESSAGERIE-GUIDE.md`](docs/MESSAGERIE-GUIDE.md) | Guide d'utilisation : salons, demandes qualifiées, réunions, annuaire, serveur permanent |
 | [`docs/MESSAGERIE-TUTORIEL-VIDEO.md`](docs/MESSAGERIE-TUTORIEL-VIDEO.md) | Dossier de production du tutoriel vidéo — découpage, narration, identité visuelle |
 | [`docs/SERVEUR-MESSAGERIE.md`](docs/SERVEUR-MESSAGERIE.md) | Serveur de messagerie autonome (sans navigateur) — prérequis, installation Windows et Linux, licence, sauvegarde |
+| [`docs/RELEASE-v0.7.7.md`](docs/RELEASE-v0.7.7.md) | Note de version 0.7.7, trilingue — à coller dans la publication GitHub |
 
 ### Pour développer
 

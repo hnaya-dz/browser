@@ -691,3 +691,128 @@ Get-ChildItem "$env:APPDATA\Microsoft\Windows\Start Menu\Programs" -Filter *.lnk
 
 S'il en sort deux, l'icône de la barre des tâches est un tirage au sort.
 Histoire complète : [`DEV-RETOUR-EXPERIENCE.md`](DEV-RETOUR-EXPERIENCE.md) §9.
+
+---
+
+## 16. Icônes de l'interface — vectorielles, jamais des emoji
+
+### Ce qui est en place
+
+Toutes les icônes de boutons viennent de **`lucide-react`**. Deux
+exceptions assumées, qui sont des **fichiers image** et non des
+pictogrammes de bibliothèque :
+
+| Fichier | Où |
+|---|---|
+| `public/icons/market.png` (PNG 172×172) | bouton **Achat** de la console de recherche |
+| `public/hnaya.png` | logo, barre de navigation et accueil |
+
+Les flèches de navigation sont des **SVG écrits en ligne** dans
+`components/urlbar.tsx` (`IconBack`, `IconForward`, `IconRefresh`,
+`IconSearch`). Les fichiers `public/icons/arrow.*.svg`, `house.svg` et
+`magnifyingglass.svg` **ne sont référencés nulle part** : ressources
+mortes, ne pas s'y fier.
+
+### Pourquoi
+
+Un emoji est dessiné par la police du système : son rendu **change entre
+Windows 10 et 11**, et certains ne sont pas rendus du tout — les drapeaux
+apparaissent en deux lettres encadrées. Le bouton « Découvrir » portait
+🇩🇿 et ne montrait donc **aucun drapeau à personne** sous Windows. La
+palette 🎨 du sélecteur de thème n'était reconnue par aucun utilisateur.
+
+`components/navbar.tsx` portait déjà cette règle en commentaire ; la barre
+d'adresse et le sélecteur de thème ont été alignés le 18/08/2026.
+
+### ⚠️ Ne pas faire
+
+- **Ne pas réintroduire d'emoji comme icône de bouton.** Ceux qui restent
+  sont à l'**intérieur des panneaux** (coffre, favoris, téléchargement) et
+  n'ont pas encore été traités — ce n'est pas un précédent.
+- **Ne pas poser une icône vectorielle sans définir sa couleur.** Elle suit
+  `currentColor` là où un emoji portait ses couleurs propres : c'est ainsi
+  que l'icône du sélecteur de thème a disparu sur « coucher de soleil ».
+
+---
+
+## 17. Teintes de thème — `data-tint`
+
+### Ce qui est en place
+
+Émeraude, gris et blanc ne sont **pas des thèmes** au sens de
+`next-themes` : ce sont des **fonds** posés sur un thème existant, via
+l'attribut `data-tint` sur `<html>`. Émeraude et gris s'appuient sur
+`dark`, blanc sur `light`.
+
+### Pourquoi
+
+Les couleurs de l'interface ne vivent pas dans `styles/globals.css` mais
+**dans les composants** : environ 45 règles `.light …` et 41 règles
+`.sunset …` réparties entre `urlbar.tsx`, `app/page.tsx` et
+`TutorialOverlay.tsx`. Un vrai thème supplémentaire aurait exigé une
+quarantaine de règles **par couleur**. Une teinte hérite de tout et ne
+redéfinit que le fond.
+
+`next-themes` ne peut pas servir à cela : il applique la valeur par
+`classList.add(valeur)`, qui **refuse une chaîne contenant un espace** —
+un thème à deux classes est donc impossible.
+
+### ⚠️ Ne pas faire
+
+- **Ne pas croiser les familles.** Une teinte claire sur base `dark`
+  donnerait du texte clair sur fond blanc.
+- **Ne pas retirer la classe de base du sélecteur CSS**
+  (`html.dark[data-tint="emeraude"]`). À spécificité égale, seul l'ordre du
+  fichier départagerait, et un déplacement de bloc casserait l'affichage
+  sans prévenir.
+- **Ne pas retirer le script de `<head>` dans `app/layout.tsx`.**
+  `next-themes` pose sa classe avant le premier rendu ; un `useEffect`
+  s'exécute après. Sans ce script jumeau, le fond du thème de base
+  s'affiche puis saute à la teinte, à chaque ouverture.
+
+---
+
+## 18. Arrêter les serveurs de développement — `scripts/kill-dev.ps1`
+
+### Ce qui est en place
+
+`yarn kill-dev` n'arrête que les processus **de ce projet**, reconnus à la
+racine du dépôt présente dans leur ligne de commande. Le mode `-Lister`
+affiche les cibles sans rien toucher.
+
+### Pourquoi
+
+La version précédente était :
+
+```
+taskkill /IM electron.exe /F & taskkill /IM node.exe /F
+```
+
+Elle tuait **tous** les processus `node.exe` de la machine — les autres
+projets ouverts, les serveurs de l'éditeur, les sessions de travail
+parallèles. Constaté en usage réel : un serveur de développement s'est
+arrêté sans raison apparente pendant qu'une autre session travaillait sur
+un autre dépôt. Mesuré après correction : 23 processus node présents, 3
+désignés, 3 arrêtés, 20 survivants.
+
+### ⚠️ Ne pas faire
+
+- **Ne jamais revenir à `taskkill /IM node.exe`.**
+- **Ne pas retirer l'exclusion du processus courant et de ses parents** : le
+  script s'arrêterait au milieu du travail en laissant survivre ce qu'il
+  devait tuer.
+
+---
+
+## 19. Fins de ligne — `.gitattributes`
+
+Le dépôt est travaillé sous Windows avec `core.autocrlf=true`. `*.sh` et
+`*.service` sont **forcés en LF**, `*.ps1` en CRLF.
+
+**Pourquoi ce n'est pas cosmétique** : le module serveur est empaqueté
+depuis la copie de travail (`extraResources`). Sans cette règle, un
+`install-linux.sh` converti en CRLF partait chez un partenaire Linux et
+échouait sur `bad interpreter: /bin/sh^M` — panne obscure, au tout premier
+contact avec le produit.
+
+Ne pas ajouter `* text=auto` : cela renormaliserait tout le dépôt d'un coup.
