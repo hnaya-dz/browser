@@ -14,7 +14,7 @@
     "ws": "^8.18.0"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=22.5.0"
   },
   "devDependencies": {
     "@noble/ciphers": "^2.2.0",

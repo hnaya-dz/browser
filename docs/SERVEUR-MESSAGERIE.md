@@ -58,15 +58,47 @@ de ses membres.
 | Port `4803/tcp` | page mobile servie sur le réseau interne |
 | Licence | fichier `.hnaya-lic` remis par Hnaya DZ |
 
-> ⚠️ **Node 22.5 est un plancher dur, pas une recommandation.** Le stockage
-> repose sur `node:sqlite` (`DatabaseSync`), apparu en 22.5 et **sans
-> repli** dans le code. Sur Node 18 ou 20 — encore courants sur Debian 12 —
-> le service démarre puis s'arrête sur une erreur de module introuvable,
-> peu explicite. Vérifiez avant d'installer :
->
-> ```bash
-> node --version
-> ```
+### Pourquoi Node, et pourquoi cette version
+
+Le serveur Hnaya est écrit pour **Node.js**, le moteur d'exécution qui fait
+tourner l'immense majorité des services d'entreprise. Il n'est pas fourni
+avec le module : c'est un composant système, qui reçoit ses correctifs de
+sécurité par vos canaux habituels — `apt`, `dnf`, votre politique de mise à
+jour Windows. Vous gardez ainsi la maîtrise des mises à jour du moteur,
+comme pour n'importe quel autre service de votre parc.
+
+**La version 22.5 est un plancher dur, pas une recommandation.** Le
+stockage repose sur `node:sqlite`, la base de données intégrée à Node, qui
+n'existe qu'à partir de cette version — et le code n'a **aucun repli**. Sur
+Node 18 ou 20, encore livrés par défaut sur Debian 12, le service
+s'installerait puis s'arrêterait au démarrage sur une erreur peu lisible.
+
+Les scripts d'installation refusent désormais d'aller plus loin dans ce
+cas, avec la marche à suivre.
+
+**Vérifier la version en place :**
+
+```bash
+node --version
+```
+
+**Installer ou mettre à jour Node.js :**
+
+| Système | Où | Comment |
+|---|---|---|
+| Windows Server | [nodejs.org/en/download](https://nodejs.org/en/download) | installateur `.msi`, version **LTS** |
+| Debian, Ubuntu | [github.com/nodesource/distributions](https://github.com/nodesource/distributions) | dépôt `apt` officiel Node |
+| RHEL, Rocky, Alma | [github.com/nodesource/distributions](https://github.com/nodesource/distributions) | dépôt `dnf` |
+| Autres | [nodejs.org/en/download](https://nodejs.org/en/download) | archives officielles |
+
+Prenez la version **LTS** : elle est au-delà de 22.5 et bénéficie du suivi
+de sécurité le plus long. L'installation ne demande aucune configuration —
+Node s'ajoute au `PATH`, et c'est tout ce dont le service a besoin.
+
+> Sous Windows, la tâche planifiée s'exécute sous le compte **SYSTEM**. Si
+> Node a été installé pour un utilisateur seulement, SYSTEM ne le trouvera
+> pas : installez-le pour toute la machine, ou passez le chemin complet au
+> script avec `-NodeExe`.
 
 Les deux ports doivent être ouverts **sur le réseau interne uniquement**.
 Le produit n'a aucun usage exposé à Internet, et l'exposer contredirait sa
@@ -122,17 +154,16 @@ l'unité `hnaya-chat.service`, puis l'active et la démarre.
 systemctl status hnaya-chat
 ```
 
-> ⚠️ **Deux défauts connus du script Linux, à corriger avant toute
-> livraison à un partenaire :**
+> ⚠️ **Un défaut connu du script Linux, à corriger avant toute livraison
+> à un partenaire** (le second de cette liste est déjà corrigé) **:**
 >
 > 1. **Le script ne place pas la licence.** Il configure le nom, le
 >    répertoire de données et le code d'accès — jamais le fichier
 >    `.hnaya-lic`. Déposez-le manuellement (§5) **avant** le premier
 >    démarrage, sinon le service refuse de servir.
-> 2. **La version de Node n'est pas vérifiée.** Le script contrôle que
->    `node` existe dans le `PATH`, jamais qu'il est en 22.5 ou plus, alors
->    que son propre en-tête annonce « Node.js 22+ ». Faites le contrôle du
->    §2 vous-même.
+> 2. ~~La version de Node n'est pas vérifiée.~~ **Corrigé** : les deux
+>    scripts refusent désormais une version antérieure à 22.5 et indiquent
+>    où télécharger Node.
 
 ---
 
@@ -245,9 +276,11 @@ l'emballage, non de l'architecture :
 1. **Un livrable séparé.** Aujourd'hui ces 705 Ko ne voyagent que dans
    l'installateur du navigateur (102,7 Mo). Il faut une archive autonome,
    déposable par un service informatique.
-2. **Corriger les deux défauts du §4** — licence non placée, version de
-   Node non vérifiée. Ils cassent la première installation.
-3. **Décider du moteur Node** : exiger Node 22.5+ chez le client — voie
-   immédiate, raisonnable face à un service informatique — ou produire un
-   exécutable autonome par plateforme, plus confortable mais qui ajoute une
-   étape de compilation.
+2. **Corriger le défaut restant du §4** — la licence n'est pas placée par
+   `install-linux.sh`. Il casse la première installation.
+3. ~~Décider du moteur Node.~~ **Décidé** : le client installe **Node
+   22.5+** (§2). Le moteur n'est pas embarqué — ses correctifs de sécurité
+   restent à la charge du système du client, et non de Hnaya DZ. Le choix
+   n'est pas irréversible : produire un exécutable autonome pour un client
+   qui interdit l'installation d'un moteur d'exécution ne demanderait
+   aucune réécriture du code.

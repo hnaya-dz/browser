@@ -1,4 +1,4 @@
-# ═══════════════════════════════════════════════════════════════
+﻿# ═══════════════════════════════════════════════════════════════
 # Installation du salon permanent Hnaya en tâche de démarrage Windows
 # ═══════════════════════════════════════════════════════════════
 # Exécuter en tant qu'administrateur :
@@ -25,6 +25,22 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+
+# ⚠️ CONTRÔLE DE VERSION, PAS SEULEMENT DE PRÉSENCE.
+# Le stockage repose sur node:sqlite (DatabaseSync), apparu en Node 22.5 et
+# SANS repli dans le code. Sans ce contrôle, l'installation réussissait sur
+# un Node plus ancien et la tâche planifiée s'arrêtait au démarrage sur une
+# erreur de module introuvable — invisible, puisqu'elle se produit après
+# l'installation et sous le compte SYSTEM.
+# On teste la VALEUR RENVOYÉE, pas une exception : un exécutable natif qui
+# échoue ne lève pas en PowerShell, même avec ErrorActionPreference = Stop.
+$aide = "Telechargement officiel : https://nodejs.org/en/download"
+$nodeVer = & $NodeExe -p "process.versions.node" 2>$null
+if (-not $nodeVer) { throw "Node.js introuvable ($NodeExe). $aide" }
+$nodeOk = & $NodeExe -p "const [a,b]=process.versions.node.split('.').map(Number); (a>22||(a===22&&b>=5))?'1':'0'" 2>$null
+if ($nodeOk -ne '1') {
+  throw "Node.js $nodeVer detecte - la version 22.5 ou plus est requise (base interne node:sqlite). $aide"
+}
 
 # serve.js est à côté de ce script (../src/serve.js)
 $serveJs = Join-Path (Split-Path $PSScriptRoot -Parent) "src\serve.js"
