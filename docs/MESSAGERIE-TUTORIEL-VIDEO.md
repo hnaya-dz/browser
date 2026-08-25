@@ -68,13 +68,14 @@ nuage, de planète, de cadenas flottant ou de « cloud sécurisé ».
 - pas de personnages qui s'envoient des cœurs ou des émojis : le **panneau
   de messagerie** n'en emploie aucun, c'est un choix assumé.
 
-> ⚠️ **Une exception subsiste : le sélecteur de thème.** La barre d'adresse
-> et l'accueil employaient eux aussi des émojis comme icônes — ⬇️, ★/☆, 📑,
-> 🔐, 🇩🇿 — et ce sont précisément les boutons qui disparaissaient des
-> reconstitutions : leur icône n'était ni un composant ni un fichier, mais
-> un caractère. **Ils sont passés aux icônes `lucide` le 18/08/2026.**
-> Seul le sélecteur de thème garde les siennes (☀️ 🌅 🖼️ 🎨 🌙) :
-> représentez-le tel quel. Inventaire complet en **§5.8**.
+> ⚠️ **Aucune barre d'outils ne porte plus d'émoji.** La barre d'adresse,
+> l'accueil et le sélecteur de thème en employaient comme icônes — ⬇️,
+> ★/☆, 📑, 🔐, 🇩🇿, ☀️ 🌅 🖼️ 🎨 🌙 — et ce sont précisément les boutons qui
+> disparaissaient des reconstitutions : leur icône n'était ni un composant
+> ni un fichier, mais un caractère. **Tous sont passés aux icônes `lucide`
+> le 18/08/2026.** Il reste des émojis À L'INTÉRIEUR des panneaux (coffre,
+> favoris, téléchargement) : ceux-là sont réels, représentez-les tels
+> quels. Inventaire complet en **§5.8**.
 
 ---
 
@@ -132,7 +133,7 @@ après la vidéo doit retrouver les mêmes signes.
 > |---|---|---|
 > | `public/icons/market.png` | PNG **172×172** | le bouton **Achat** de la console de recherche |
 > | `public/hnaya.png` | PNG | le logo, barre de navigation et page d'accueil |
-> | ☀️ 🌅 🖼️ 🎨 🌙 | **émojis** | le sélecteur de thème (`theme-switch.tsx`) — seul rescapé |
+> | émojis divers | **émojis** | uniquement À L'INTÉRIEUR des panneaux (`VaultPanel`, `FavoritesPanel`, `DownloadPanel`) — aucune barre d'outils |
 >
 > Les fichiers `public/icons/arrow.*.svg`, `house.svg` et
 > `magnifyingglass.svg` existent mais **ne sont référencés nulle part** :
@@ -374,7 +375,7 @@ Leur inventaire complet est en **§5.8**.
 ### 5.8 Écran H — Barre d'adresse, navigation et onglets *(hors messagerie)*
 
 > **Liste de contrôle.** À l'œil, un bouton manquant ne se voit pas : on
-> voit une interface plausible. Cochez donc les vingt-neuf entrées
+> voit une interface plausible. Cochez donc les trente-trois entrées
 > ci-dessous une par une sur toute reconstitution montrant le navigateur.
 
 #### Barre d'adresse — 11 boutons (`components/urlbar.tsx`)
@@ -405,16 +406,42 @@ tutoriel du produit le dit lui-même. Sur une page d'accueil vide, leur
 absence est normale : ne la reproduisez pas comme si elle était l'état
 courant.
 
-#### Barre de navigation — 6 boutons (`components/navbar.tsx`)
+#### Barre de navigation — 10 boutons
 
-| # | Contenu | Infobulle |
+`components/navbar.tsx` en dessine 6, mais **deux composants en ajoutent
+quatre** et sont faciles à oublier : ils ne sont pas dans ce fichier.
+
+| # | Contenu | Infobulle | Fichier |
+|---|---|---|---|
+| 1 | logo `public/hnaya.png` | — | `navbar.tsx` |
+| 2 | libellé du raccourci (ex. **« Hnaya Market »**) | — | idem |
+| 3 | `BookOpen` | « Tutoriel » | idem |
+| 4 | `MessageSquare` | « Messagerie locale » | idem |
+| 5 | `Bell` + pastille du nombre de notifications non lues | « Notifications » | idem |
+| 6 | `Shield` | « Confidentialité » | idem |
+| 7-9 | **ع · FR · EN** — trois boutons, celui de la langue active surligné par un fond glissant | — | **`lang-switch.tsx`** |
+| 10 | icône du **thème courant** | « Thème : *nom du thème* » | **`theme-switch.tsx`** |
+
+##### Le bouton 10 ouvre une liste — surface à part entière
+
+Ce n'est pas une bascule : un clic déroule un menu de **sept entrées**,
+chacune précédée d'une **pastille montrant sa couleur réelle**, la ligne
+active portant une **coche**.
+
+| Entrée | Icône | Pastille |
 |---|---|---|
-| 1 | logo `public/hnaya.png` | — |
-| 2 | libellé du raccourci (ex. **« Hnaya Market »**) | — |
-| 3 | `BookOpen` | « Tutoriel » |
-| 4 | `MessageSquare` | « Messagerie locale » |
-| 5 | `Bell` + pastille du nombre de notifications non lues | « Notifications » |
-| 6 | `Shield` | « Confidentialité » |
+| Sombre | `Moon` | `#001208` |
+| Vert émeraude | `Gem` | `#04261d` |
+| Gris | `Circle` | `#17191b` |
+| Coucher de soleil | `Sunset` | `#1a0005` |
+| Clair | `Sun` | `#f0f7f4` |
+| Blanc | `Sun` | `#ffffff` |
+| Image personnalisée | `Image` | `#2a2a2a` |
+
+Quand une image de fond est déjà posée, cette dernière ligne porte en plus
+un bouton **crayon** (`Pencil`, « Changer l'image »). Le menu **suit le
+thème** : fond sombre sur les thèmes sombres, blanc sur les thèmes clairs
+— ne le dessinez pas systématiquement sombre.
 
 > Le code porte ici une note explicite : *« Icône vectorielle : rendu
 > identique sur Windows 10 et 11, contrairement aux emoji »*. Cette barre a
@@ -831,7 +858,7 @@ en tenant compte du sens de lecture pour l'arabe.
 **Contrôle avant livraison** — trois questions, dans cet ordre :
 
 1. Chaque écran reconstitué porte-t-il **toutes** les commandes de la §5 —
-   **y compris les 29 boutons hors messagerie des §5.7 et §5.8** ?
+   **y compris les 33 boutons hors messagerie des §5.7 et §5.8** ?
 2. Chaque séquence atteint-elle son **nombre minimal de plans** (§6) ?
 3. Chaque texte affiché existe-t-il dans `locales/fr.json` **ou dans
    `app/page.tsx`** ?

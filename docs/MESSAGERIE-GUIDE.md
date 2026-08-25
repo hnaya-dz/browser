@@ -358,6 +358,13 @@ Section *Serveur permanent* de l'écran d'accueil de la messagerie :
 Une tâche planifiée « Au démarrage » est créée. Le salon tourne dès
 l'allumage de la machine, **sans qu'une session soit ouverte**.
 
+> **Sur un vrai serveur, le navigateur n'est pas nécessaire.** La marche
+> ci-dessus installe le service depuis le navigateur, ce qui convient à un
+> poste dédié. Une organisation qui dispose d'un serveur — Windows ou
+> Linux — installe plutôt le **module seul**, 705 Ko sans navigateur :
+> prérequis, installation, licence et sauvegarde sont dans
+> [SERVEUR-MESSAGERIE.md](SERVEUR-MESSAGERIE.md).
+
 ### Ce que contient une licence
 
 Un organisme, une échéance, un nombre d'**appareils**. La vérification est
