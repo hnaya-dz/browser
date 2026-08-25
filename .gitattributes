@@ -1,0 +1,19 @@
+# ═══════════════════════════════════════════════════════════════
+# Fins de ligne — ce qui part sous Linux doit rester en LF
+# ═══════════════════════════════════════════════════════════════
+# Le dépôt est travaillé sous Windows avec core.autocrlf=true : sans les
+# règles ci-dessous, Git convertit les fichiers en CRLF dans la copie de
+# travail à chaque checkout. Or le module serveur est empaqueté DEPUIS la
+# copie de travail (extraResources) : un install-linux.sh converti part
+# alors chez le client Linux et refuse de démarrer sur
+# « bad interpreter: /bin/sh^M » — panne obscure, au tout premier contact
+# avec le produit.
+#
+# On ne met délibérément PAS « * text=auto » : cela renormaliserait tout le
+# dépôt d'un coup et noierait les vraies modifications.
+
+*.sh        text eol=lf
+*.service   text eol=lf
+
+# Les scripts PowerShell restent en CRLF, leur terrain naturel.
+*.ps1       text eol=crlf
