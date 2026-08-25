@@ -15,8 +15,9 @@ l'aligner sur ce document.
 
 ## 0. Lisez ceci avant tout le reste
 
-La première production tirée de ce dossier a échoué sur deux points
-précis. Ils sont corrigés ici, et les deux corrections sont **impératives**.
+La première production tirée de ce dossier a échoué sur trois points
+précis. Ils sont corrigés ici, et les trois corrections sont
+**impératives**.
 
 **Défaut 1 — les clips étaient trop courts.** Les durées de la §7 sont des
 durées **planchers**, pas des cibles à comprimer. Un plan d'interface tenu
@@ -30,7 +31,15 @@ et donne, écran par écran, la liste exhaustive des commandes dans leur
 ordre réel d'affichage. Une reconstitution qui omet un bouton de la §5 est
 à refaire.
 
-**Pourquoi cette omission était prévisible, et comment ne pas la répéter :**
+**Défaut 3 — le bouton « Achat » n'a jamais pu être reproduit.** Et la
+faute en revenait à ce dossier, non au concepteur : deux de ses règles
+l'interdisaient. La §3 imposait de n'employer que des icônes
+`lucide-react`, alors que celle-ci est une **image** (`market.png`) ; la §4
+affirmait qu'un texte absent de `locales/` n'existe pas, alors que le
+libellé « Achat » est écrit en dur dans `app/page.tsx`. Les deux règles
+sont désormais nuancées, et la console de recherche est décrite en **§5.7**.
+
+**Pourquoi la deuxième omission était prévisible, et comment ne pas la répéter :**
 l'interface n'est pas dans un fichier mais dans **treize composants**. Les
 boutons *Joindre un fichier* et *Enregistrer un message vocal* ne sont pas
 dans `ChatPanel.tsx` — ils vivent dans `ChatComposerMedia.tsx`. Qui n'ouvre
@@ -81,8 +90,8 @@ entièrement, y compris l'alignement des messages et la position des
 boutons. Une version arabe qui garderait la mise en page latine serait
 perçue comme un placage.
 
-**Durée visée** : trois à quatre minutes pour la vidéo complète, ou neuf
-capsules autonomes (§7).
+**Durée visée** : trois à quatre minutes pour la vidéo complète, ou **quatre capsules**
+autonomes, adressées à des publics différents (§7).
 
 ---
 
@@ -106,6 +115,22 @@ réellement employées par le panneau sont : `MessageSquare`, `Shield`,
 `CalendarClock`, `MoreHorizontal`, `ChevronUp`, `User`, `Plus`. N'inventez
 pas d'icône hors de cette liste : le spectateur qui ouvrira le produit
 après la vidéo doit retrouver les mêmes signes.
+
+> ⚠️ **Toutes les icônes ne viennent PAS de `lucide-react`.** La consigne
+> ci-dessus vaut pour le **panneau de messagerie**. Ailleurs dans le
+> navigateur, certaines icônes sont des **fichiers image**, qu'aucune
+> bibliothèque ne peut fournir :
+>
+> | Fichier | Format | Où |
+> |---|---|---|
+> | `public/icons/market.png` | PNG **172×172** | le bouton **Achat** de la console de recherche |
+> | `public/hnaya.png` | PNG | le logo, barre de navigation et page d'accueil |
+> | `public/icons/arrow.left.svg`, `arrow.right.svg`, `arrow.clockwise.svg`, `house.svg`, `magnifyingglass.svg` | SVG | la barre de navigation |
+>
+> **C'est ce qui a empêché de reproduire le bouton « Achat »** : cherché
+> dans `lucide-react`, il n'existe pas ; interdit d'inventer, il ne pouvait
+> qu'être omis. **Reprenez le fichier `market.png` tel quel** — ne le
+> redessinez pas, ne lui cherchez pas d'équivalent.
 
 **Logo** : le fennec à la loupe, `public/icons/icon.ico` — sept tailles de
 16 à 256 px. Pour une animation, partez du 256.
@@ -141,9 +166,16 @@ Le mot **salon** désigne un espace de discussion cloisonné. Ne le rendez ni
 par « canal » ni par « groupe » : le cloisonnement est physique — historique,
 codes et registre séparés — et le vocabulaire doit le porter.
 
-Les 264 libellés complets sont dans `locales/fr.json`, section `Chat`.
-**Aucun texte affiché à l'image ne doit être inventé** : s'il n'est pas
-dans ce fichier, il n'existe pas dans le produit.
+Les 264 libellés complets de la messagerie sont dans `locales/fr.json`,
+section `Chat`. **Aucun texte affiché à l'image ne doit être inventé.**
+
+> ⚠️ **`locales/` ne contient pas tout.** Les libellés de la **page
+> d'accueil** — dont le bouton **Achat** — sont écrits en dur dans
+> `app/page.tsx`, pas dans les fichiers de traduction. Un texte absent de
+> `locales/` n'est donc pas forcément inexistant : vérifiez aussi
+> `app/page.tsx` avant de conclure. Cette règle, appliquée trop
+> littéralement, a contribué à faire disparaître le bouton « Achat » d'une
+> reconstitution.
 
 ---
 
@@ -287,6 +319,42 @@ Les **quatre mêmes étiquettes** qu'au poste. Sous 400 px de large, le
 bouton d'envoi devient **une flèche** — c'est le rendu normal, pas un
 défaut : montrez-le tel quel.
 
+### 5.7 Écran G — Console de recherche *(hors messagerie)*
+
+Cet écran n'appartient pas au module de messagerie, mais il apparaît dès
+qu'on montre le navigateur. Il a été **omis d'une reconstitution
+précédente** faute d'être décrit ici. Source : `app/page.tsx`.
+
+De gauche à droite, la ligne de recherche « Algérie » :
+
+1. **Champ de recherche**, avec son indication.
+2. Bouton de recherche principal — style `glass-btn-primary`.
+3. **Bouton « Achat »** — style `glass-btn-amber`, donc **ambre, pas
+   vert** : c'est le seul bouton de cette teinte, et sa couleur fait partie
+   de son identité.
+
+Le bouton **Achat** se compose de deux éléments, dans cet ordre :
+
+| Élément | Valeur exacte |
+|---|---|
+| Icône | **`public/icons/market.png`**, PNG 172×172, affiché en 20×20 |
+| Libellé `fr` | **« Achat »** |
+| Libellé `en` | **« Buy »** |
+| Libellé `ar` | **« بحث للتسوّق »** |
+
+Il ouvre un onglet sur la boutique Hnaya, en y reportant la recherche
+saisie. Le tutoriel intégré au produit le décrit ainsi : *« Ce bouton lance
+votre recherche sur Hnaya Market et affiche directement les résultats d'une
+sélection de sites e-commerce algériens connus et fiables. »*
+
+> **À ne pas rater** : l'icône est une **image**, pas un pictogramme de
+> bibliothèque, et le libellé arabe n'est pas la traduction littérale du
+> français — c'est « recherche pour achat ». Reprenez les trois libellés
+> tels quels.
+
+Le sélecteur **Algérie / Monde** et la barre d'adresse complètent l'écran ;
+leurs icônes de navigation sont les SVG de `public/icons/` (§3).
+
 ---
 
 ## 6. Règles de rythme *(défaut 1)*
@@ -309,15 +377,34 @@ Elles ne sont pas indicatives.
 
 ---
 
-## 7. Découpage — neuf séquences
+## 7. Découpage — quatre capsules
 
-Chacune se tient seule : elles peuvent devenir neuf capsules, ou
-s'enchaîner en une vidéo unique. La durée indiquée est celle du montage
-final, narration comprise, et c'est un **plancher**.
+Le découpage n'est plus une suite de séquences interchangeables : il est
+organisé en **quatre capsules**, chacune **autonome** et adressée à un
+**public différent**. Une capsule se diffuse seule, sans les autres, et se
+comprend sans les avoir vues.
+
+| Capsule | Public | Durée | Ce qu'elle doit obtenir |
+|---|---|---|---|
+| **1. Découvrir** | direction, décideur | ~1 min | comprendre que rien ne sort du réseau |
+| **2. Le salon et le mobile** | tout utilisateur | ~2 min | savoir s'en servir dès le lendemain |
+| **3. Décider dans le fil** | direction, encadrement | ~1 min 15 | voir la trace d'une décision |
+| **4. Serveur permanent et licence** | **administrateur informatique** | ~2 min | savoir l'installer et l'exploiter |
+
+> **La capsule 4 ne s'adresse pas au même monde que les trois autres.**
+> Elle parle à quelqu'un qui installe et exploite, pas à quelqu'un qui
+> achète. Son registre change : pas d'argument de vente, pas de superlatif,
+> des chemins, des versions, des ports. Un administrateur qui entend un
+> discours commercial se méfie du produit.
+
+Les durées restent des **planchers** (§6), et le nombre minimal de plans
+s'applique séquence par séquence.
 
 ---
 
-### Séquence 1 — « Vos messages ne sortent pas d'ici » · 30 s · ≥ 8 plans
+## Capsule 1 — Découvrir · ~1 min · direction
+
+### 1.1 — « Vos messages ne sortent pas d'ici » · 30 s · ≥ 8 plans
 
 **À l'image** : un plan d'étage ou un immeuble stylisé, trois bureaux, un
 trait vert qui relie les postes entre eux. Le trait ne franchit jamais les
@@ -330,24 +417,7 @@ par Internet. »
 **À éviter** : la tentation du cadenas. Ce qui protège ici, c'est
 l'absence de sortie, pas un symbole apposé.
 
----
-
-### Séquence 2 — Ouvrir un salon · 25 s · ≥ 7 plans
-
-**À l'image** : écran A. Le bloc **« Créer un salon »** qu'on déplie — il
-est replié au repos —, la saisie du nom, l'apparition du code à six
-chiffres sous **« Code PIN à partager »**.
-
-**Narration** : « Un salon s'ouvre en trente secondes depuis le
-navigateur. Le code à six chiffres est ce que vous communiquez à vos
-collègues — c'est lui, et lui seul, qui donne l'accès. »
-
-**Point à faire passer** : le code n'est pas un mot de passe de compte,
-c'est la clé du salon. Il chiffre les échanges.
-
----
-
-### Séquence 3 — Votre identité, une fois pour toutes · 25 s · ≥ 7 plans
+### 1.2 — Votre identité, une fois pour toutes · 25 s · ≥ 7 plans
 
 Une simplification voulue, et qui se voit mal si on ne la montre pas : le
 pseudo **ne se ressaisit pas à chaque connexion**. On le change comme on
@@ -371,13 +441,29 @@ instantanément dans un fil. Le produit l'annonce lui-même — **« sera
 appliquée en entrant dans un salon »**. Ne montez pas une photo qui
 surgirait dans une conversation à laquelle on n'est pas connecté.
 
-**Pourquoi cette séquence compte pour la cible** : un directeur ne veut pas
-d'un outil qui lui redemande qui il est chaque matin. C'est un argument de
-sobriété, pas une fonction accessoire.
-
 ---
 
-### Séquence 4 — Le téléphone, sans installer d'application · 30 s · ≥ 8 plans
+## Capsule 2 — Le salon et le mobile · ~2 min · tout utilisateur
+
+**C'est la capsule de prise en main**, et celle qui sera le plus revue.
+Elle doit permettre à quelqu'un qui ne l'a jamais vue de s'en servir le
+lendemain. Elle se termine sur le transfert à soi-même, qui est l'argument
+que les gens retiennent.
+
+### 2.1 — Ouvrir un salon · 25 s · ≥ 7 plans
+
+**À l'image** : écran A. Le bloc **« Créer un salon »** qu'on déplie — il
+est replié au repos —, la saisie du nom, l'apparition du code à six
+chiffres sous **« Code PIN à partager »**.
+
+**Narration** : « Un salon s'ouvre en trente secondes depuis le
+navigateur. Le code à six chiffres est ce que vous communiquez à vos
+collègues — c'est lui, et lui seul, qui donne l'accès. »
+
+**Point à faire passer** : le code n'est pas un mot de passe de compte,
+c'est la clé du salon. Il chiffre les échanges.
+
+### 2.2 — Le téléphone, sans installer d'application · 30 s · ≥ 8 plans
 
 **À l'image** : **« Inviter un mobile »**, le QR code, un téléphone qui le
 scanne, l'écran F qui s'ouvre. Montrer le sélecteur **« Salon »** quand le
@@ -391,84 +477,26 @@ aucun magasin d'applications. »
 montrez pas d'URL réelle relevée sur une machine — `http://192.168.1.10:4803`
 convient.
 
----
+### 2.3 — Joindre, dicter, réécouter · 30 s · ≥ 8 plans
 
-### Séquence 5 — Qualifier un message · 40 s · ≥ 10 plans
+**À l'image** : la barre de saisie complète. **« Joindre un fichier »** et
+le document qui apparaît en aperçu ; puis **« Enregistrer un message
+vocal »**, le bouton devenant **« Arrêter l'enregistrement »**, et surtout
+**la réécoute avant envoi** avec **« Ajouter un mot (facultatif)… »** et
+**« Retirer la pièce jointe »**.
 
-Le cœur de l'argument institutionnel. Un message n'est pas qu'un texte :
-il porte une **étiquette** — Pour info, Avis, Validation, Approbation — et
-peut désigner **un destinataire précis**.
+**Narration** : « Images, documents et messages vocaux, jusqu'à 25 Mio. Un
+message vocal se réécoute avant d'être envoyé — on ne s'envoie pas soi-même
+par erreur. »
 
-**À l'image** : les quatre étiquettes de la barre de saisie, le choix de
-**« Validation »**, la liste de destinataires quittant **« Sans
-destinataire précis »** pour une personne. Puis la carte
-(`ChatDemandeCard`) dans le fil, et la décision : **« Validé »**,
-**« Refusé »** ou **« Réserves »**, avec son auteur et l'heure.
+**Le plan à ne pas couper** : l'aperçu avant envoi. C'est ce qui distingue
+le produit d'une messagerie où l'on relâche le doigt et où c'est parti.
 
-**Narration** : « Une demande de validation n'est pas un message parmi
-d'autres. Elle désigne qui doit se prononcer, et la décision reste attachée
-à la demande — signée, datée, sans confusion possible sur son auteur. »
+**À ne pas promettre** : depuis le téléphone, l'enregistrement passe par le
+magnétophone de l'appareil, pas par un bouton intégré à la page. La
+réécoute avant envoi est une fonction **du poste**.
 
-**Détail à ne pas rater** : la décision est **signée
-cryptographiquement**. C'est ce qui la distingue d'un simple « ok » dans un
-fil de discussion. Une pièce jointe — un rapport, un tableur — peut
-accompagner la demande.
-
----
-
-### Séquence 6 — La réunion qui se rappelle à vous · 35 s · ≥ 9 plans
-
-**À l'image** : **« Annoncer une réunion »**, les champs **« Objet de la
-réunion »**, **« Lieu (facultatif) »**, **« Durée en minutes »**, le bouton
-**« Annoncer »**. Puis la pastille épinglée (`ChatMeetingChip`) et son
-compte à rebours, la notification Windows quinze minutes avant, et
-**« Ajouter à mon agenda »**. Enchaîner sur **« Décaler »** : la nouvelle
-heure s'affiche, **« Était prévue le »** reste lisible en dessous.
-
-**Narration** : « La réunion s'épingle en tête du salon avec son compte à
-rebours, et prévient chacun quinze minutes avant — même navigateur fermé.
-Si elle se déplace, ce qui avait été convoqué reste lisible : on voit la
-nouvelle heure, l'ancienne, et qui a décidé du changement. »
-
-**Pourquoi c'est important** : dans une administration, la trace du report
-vaut autant que le report.
-
----
-
-### Séquence 7 — Une direction, un salon · 40 s · ≥ 10 plans
-
-**À l'image** : un serveur, et trois salons qui en partent — Salon général,
-Direction, DRH. Montrer un message écrit à la Direction qui **n'apparaît
-pas** dans la DRH. Puis l'onglet **« Salons »** de l'administration, avec
-**« Annuaire du serveur »**, **« Ont accès »**, **« Ajouter »**.
-
-**Narration** : « Un seul serveur, plusieurs salons cloisonnés. Ce qui se
-dit à la Direction ne parvient pas à la DRH — historiques séparés, codes
-séparés, annuaires séparés. L'administrateur compose chaque salon depuis
-l'annuaire, avant même que ses membres s'y connectent. »
-
-**Nuance à ne pas écraser** : affecter quelqu'un à un salon ne lui en ouvre
-pas la porte. Il lui faut aussi le code de ce salon. Si la séquence doit
-choisir, montrez le cloisonnement plutôt que l'affectation — c'est le
-message le plus fort.
-
----
-
-### Séquence 8 — Ce que l'administrateur voit · 30 s · ≥ 8 plans
-
-**À l'image** : l'écran E et ses **quatre** onglets. Le registre des
-appareils avec **« Étiquette »** et **« Fonction »**, l'historique
-recherchable, **« Rétention des messages (jours) »**, et
-**« Verrouiller »**.
-
-**Narration** : « L'administrateur dispose du registre des appareils, de
-l'historique complet — recherchable et exportable — et de la durée de
-conservation. Il peut verrouiller le salon : plus aucun appareil nouveau
-n'entre, même avec le bon code. »
-
----
-
-### Séquence 9 — S'envoyer un fichier à soi-même · 30 s · ≥ 8 plans
+### 2.4 — S'envoyer un fichier à soi-même · 30 s · ≥ 8 plans
 
 Une fonction que les prospects ne demandent pas et qu'ils retiennent :
 faire passer un document de son poste à son téléphone, ou l'inverse, sans
@@ -495,8 +523,154 @@ appareil à votre identité ; **« Inviter un mobile »** fait entrer *une
 autre personne* dans le salon. Deux boutons, deux intentions — la vidéo
 doit les distinguer explicitement.
 
-**Clore sur** : le logo, et une phrase unique. « Hnaya — votre messagerie
-reste chez vous. »
+---
+
+## Capsule 3 — Décider dans le fil · ~1 min 15 · direction, encadrement
+
+### 3.1 — Qualifier un message · 40 s · ≥ 10 plans
+
+Le cœur de l'argument institutionnel. Un message n'est pas qu'un texte :
+il porte une **étiquette** — Pour info, Avis, Validation, Approbation — et
+peut désigner **un destinataire précis**.
+
+**À l'image** : les quatre étiquettes de la barre de saisie, le choix de
+**« Validation »**, la liste de destinataires quittant **« Sans
+destinataire précis »** pour une personne. Puis la carte
+(`ChatDemandeCard`) dans le fil, et la décision : **« Validé »**,
+**« Refusé »** ou **« Réserves »**, avec son auteur et l'heure.
+
+**Narration** : « Une demande de validation n'est pas un message parmi
+d'autres. Elle désigne qui doit se prononcer, et la décision reste attachée
+à la demande — signée, datée, sans confusion possible sur son auteur. »
+
+**Détail à ne pas rater** : la décision est **signée
+cryptographiquement**. C'est ce qui la distingue d'un simple « ok » dans un
+fil de discussion. Une pièce jointe — un rapport, un tableur — peut
+accompagner la demande.
+
+### 3.2 — La réunion qui se rappelle à vous · 35 s · ≥ 9 plans
+
+**À l'image** : **« Annoncer une réunion »**, les champs **« Objet de la
+réunion »**, **« Lieu (facultatif) »**, **« Durée en minutes »**, le bouton
+**« Annoncer »**. Puis la pastille épinglée (`ChatMeetingChip`) et son
+compte à rebours, la notification Windows quinze minutes avant, et
+**« Ajouter à mon agenda »**. Enchaîner sur **« Décaler »** : la nouvelle
+heure s'affiche, **« Était prévue le »** reste lisible en dessous.
+
+**Narration** : « La réunion s'épingle en tête du salon avec son compte à
+rebours, et prévient chacun quinze minutes avant — même navigateur fermé.
+Si elle se déplace, ce qui avait été convoqué reste lisible : on voit la
+nouvelle heure, l'ancienne, et qui a décidé du changement. »
+
+**Pourquoi c'est important** : dans une administration, la trace du report
+vaut autant que le report.
+
+---
+
+## Capsule 4 — Serveur permanent et licence · ~2 min · administrateur informatique
+
+> **Changement de public, changement de registre.** Cette capsule se
+> diffuse seule, à un service informatique, sans que les trois autres aient
+> été vues. Elle ne vend rien : elle informe quelqu'un qui va installer,
+> exploiter et sauvegarder. Bannissez « simple », « puissant », « en un
+> clic ». Donnez des versions, des ports, des chemins.
+>
+> **La source de vérité de cette capsule est
+> [`SERVEUR-MESSAGERIE.md`](SERVEUR-MESSAGERIE.md)** — n'inventez aucune
+> valeur, tout y est relevé dans le code.
+
+### 4.1 — Ce que le serveur apporte, et ce qu'il n'apporte pas · 35 s · ≥ 9 plans
+
+**À l'image** : un poste de travail qui s'éteint, le salon devenu
+injoignable ; puis le même poste rallumé et **« Rouvrir un salon de ce
+poste »** qui rend l'historique intact. Enchaîner sur une machine serveur
+qui, elle, ne s'éteint pas.
+
+**Narration** : « Sans serveur, un salon vit dans le navigateur de celui
+qui l'héberge. Sa machine éteinte, le salon devient injoignable — mais rien
+n'est perdu : l'historique est conservé sur le disque et revient à la
+réouverture. Ce que le serveur apporte, c'est la disponibilité : le salon
+reste joignable la nuit, le week-end, et quand la personne qui l'avait
+ouvert n'est plus là. »
+
+> ⚠️ **Ne dites jamais que l'historique est perdu quand le poste s'éteint.**
+> C'est faux : la base est un fichier SQLite conservé sur la machine hôte,
+> et seule une suppression explicite la détruit. Un argument de vente faux
+> se retourne à la première démonstration client.
+
+### 4.2 — Installer : prérequis et mise en service · 40 s · ≥ 10 plans
+
+**À l'image** : d'abord `node --version` dans un terminal — c'est le
+premier geste. Puis les deux voies, côte à côte : sous Windows la commande
+PowerShell administrateur et la tâche planifiée `HnayaChatServer` créée ;
+sous Linux `sh install-linux.sh` et `systemctl status hnaya-chat` au vert.
+
+**Narration** : « Le serveur est un service Node de 705 kilo-octets, avec
+une seule dépendance et aucune compilation. Il n'embarque pas le
+navigateur : on n'installe pas un navigateur sur un serveur. Node 22.5 ou
+plus est requis — le programme d'installation le vérifie et refuse d'aller
+plus loin sinon. Sous Windows, une tâche planifiée démarre le service au
+démarrage de la machine ; sous Linux, un service systemd. »
+
+**Chiffres exacts, à ne pas arrondir** : 705 Ko, une dépendance (`ws`),
+Node **22.5+**, ports **4802** (WebSocket) et **4803** (page mobile).
+
+**Le plan qui rend service** : montrer le **refus** sur une version trop
+ancienne, avec son message et le lien de téléchargement. Un administrateur
+retient mieux l'erreur qu'il évitera que la réussite qu'il attend.
+
+### 4.3 — La licence : ce qu'elle fait, ce qu'elle ne fait pas · 35 s · ≥ 9 plans
+
+**À l'image** : le fichier `licence.hnaya-lic` déposé dans le répertoire de
+données ; puis le tableau des états, animé état par état.
+
+**Narration** : « La licence fixe un plafond d'appareils et une échéance.
+À l'approche du terme, un avis s'affiche — rien n'est bloqué. Passé le
+terme, trente jours de grâce pendant lesquels tout continue. Ensuite, le
+salon passe en lecture seule : l'historique reste consultable, rien n'est
+effacé. Le mode poste, lui, reste libre et sans licence. »
+
+**Les quatre points à faire tenir à l'image :**
+
+1. le plafond d'appareils est compté **une seule fois** pour tous les
+   salons du serveur ;
+2. une place se libère quand un poste est remplacé — **« Libérer la
+   place »** ;
+3. une licence échue **n'efface jamais rien** ;
+4. seule une licence **illisible ou mal signée** empêche le démarrage.
+
+**À ne pas omettre** : le mode poste — un salon créé depuis le navigateur —
+ne demande aucune licence. Le taire ferait croire à un produit entièrement
+payant.
+
+### 4.4 — Plusieurs salons, un annuaire, une sauvegarde · 40 s · ≥ 10 plans
+
+**À l'image** : un serveur et trois salons qui en partent — Salon général,
+Direction, DRH. Un message écrit à la Direction qui **n'apparaît pas** dans
+la DRH. Puis l'onglet **« Salons »** de l'administration, avec **« Annuaire
+du serveur »**, **« Ont accès »**, **« Ajouter »**. Terminer sur la
+sauvegarde : le service arrêté, le répertoire de données archivé, le
+service relancé.
+
+**Narration** : « Un seul service, plusieurs salons cloisonnés derrière une
+seule adresse. Ce qui se dit à la Direction ne parvient pas à la DRH : le
+code d'accès de chaque salon est aussi sa clé de chiffrement, le
+cloisonnement n'est pas un filtrage. L'administrateur compose chaque salon
+depuis l'annuaire, avant même que ses membres s'y connectent. Et tout ce
+qu'il faut sauvegarder tient dans un seul répertoire. »
+
+**Précision technique à ne pas escamoter** : la sauvegarde se fait
+**service arrêté**. La base est en mode WAL — copier le seul fichier `.db`
+à chaud, sans ses fichiers `-wal` et `-shm`, donne une sauvegarde tronquée.
+
+**Nuance à ne pas écraser** : affecter quelqu'un à un salon ne lui en ouvre
+pas la porte. Il lui faut aussi le code de ce salon.
+
+**Clore la capsule 4 sur** : l'adresse de contact pour la licence,
+**+213 558 303 030** et **contact@hnaya.dz**, sans slogan.
+
+**Clore la série sur** : le logo, et une phrase unique. « Hnaya — votre
+messagerie reste chez vous. »
 
 ---
 
@@ -567,9 +741,13 @@ en tenant compte du sens de lecture pour l'arabe.
 
 1. Chaque écran reconstitué porte-t-il **toutes** les commandes de la §5 ?
 2. Chaque séquence atteint-elle son **nombre minimal de plans** (§6) ?
-3. Chaque texte affiché existe-t-il dans `locales/fr.json` ?
+3. Chaque texte affiché existe-t-il dans `locales/fr.json` **ou dans
+   `app/page.tsx`** ?
+4. Les icônes qui sont des **fichiers image** — `market.png`, `hnaya.png`,
+   les SVG de navigation — sont-elles reprises telles quelles, et non
+   redessinées ni remplacées par un pictogramme approchant ?
 
-Une réponse négative à l'une des trois se corrige avant montage.
+Une réponse négative à l'une des quatre se corrige avant montage.
 
 ---
 
@@ -582,6 +760,8 @@ docs\PRODUIT.md                     ← la fiche produit, pour le ton et les arg
 locales\                            ← les textes de l'interface, 3 langues
 components\Chat*.tsx                ← les treize composants de l'interface
 public\icons\icon.ico               ← le logo, 7 tailles de 16 à 256
+public\icons\market.png            ← l'icône du bouton « Achat » (PNG 172×172)
+app\page.tsx                       ← la console de recherche et SES libellés
 chat-module\mobile\                 ← l'interface téléphone
 chat-module\tools\demo.mjs          ← le jeu de démonstration
 ```
