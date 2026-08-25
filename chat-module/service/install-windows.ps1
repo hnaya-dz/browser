@@ -48,6 +48,27 @@ if ($nodeOk -ne '1') {
 # serve.js est à côté de ce script (../src/serve.js)
 $serveJs = Join-Path (Split-Path $PSScriptRoot -Parent) "src\serve.js"
 if (-not (Test-Path $serveJs)) { throw "src\serve.js introuvable ($serveJs)" }
+# ⚠️ DEUX PARCOURS D'INSTALLATION EXISTENT — ON N'EN VEUT QU'UN.
+# Le navigateur Hnaya sait installer ce même serveur depuis sa section
+# « Serveur permanent » : il emploie son propre exécutable comme moteur
+# (ELECTRON_RUN_AS_NODE), sans exiger Node. Mais il crée une AUTRE tâche
+# (« Hnaya Chat Serveur ») et un AUTRE répertoire de données
+# (« C:\ProgramData\Hnaya Chat Server »).
+#
+# Les deux services écouteraient les mêmes ports 4802/4803 avec deux bases
+# distinctes : le second démarrage échoue, et l'historique se retrouve
+# coupé en deux sans que personne ne comprenne pourquoi. On refuse donc,
+# en laissant le choix à l'administrateur.
+$tacheNavigateur = Get-ScheduledTask -TaskName "Hnaya Chat Serveur" -ErrorAction SilentlyContinue
+if ($tacheNavigateur) {
+  throw ("Un serveur Hnaya est deja installe depuis le NAVIGATEUR (tache " +
+         "'Hnaya Chat Serveur', donnees dans C:\ProgramData\Hnaya Chat Server). " +
+         "Les deux services se disputeraient les ports 4802 et 4803. " +
+         "Choisissez UN parcours : soit desinstallez celui du navigateur " +
+         "depuis sa section 'Serveur permanent', soit conservez-le et " +
+         "n'executez pas ce script.")
+}
+
 # ⚠️ LA LICENCE EST TROUVÉE AVANT DE TOUCHER AU SYSTÈME.
 # Même lacune que du côté Linux : la tâche planifiee était créée, le service
 # démarrait, et refusait de servir faute de licence. On refuse ici plutôt

@@ -358,12 +358,24 @@ Section *Serveur permanent* de l'écran d'accueil de la messagerie :
 Une tâche planifiée « Au démarrage » est créée. Le salon tourne dès
 l'allumage de la machine, **sans qu'une session soit ouverte**.
 
-> **Sur un vrai serveur, le navigateur n'est pas nécessaire.** La marche
-> ci-dessus installe le service depuis le navigateur, ce qui convient à un
-> poste dédié. Une organisation qui dispose d'un serveur — Windows ou
-> Linux — installe plutôt le **module seul**, 705 Ko sans navigateur :
-> prérequis, installation, licence et sauvegarde sont dans
-> [SERVEUR-MESSAGERIE.md](SERVEUR-MESSAGERIE.md).
+#### Deux façons d'installer — n'en choisir qu'une
+
+La marche ci-dessus passe par le navigateur. Elle a un avantage décisif
+pour une organisation sans informaticien : **rien d'autre à installer**.
+Le navigateur sert lui-même de moteur au serveur, si bien qu'un poste
+allumé en permanence suffit.
+
+Une organisation qui dispose d'un **vrai serveur**, Windows ou Linux,
+préférera le **module seul** — 705 Ko, sans navigateur. Il demande en
+revanche que **Node.js 22.5 ou plus** soit installé sur la machine.
+Prérequis, installation, licence et sauvegarde :
+[SERVEUR-MESSAGERIE.md](SERVEUR-MESSAGERIE.md).
+
+> ⚠️ **Ne faites pas les deux sur la même machine.** Les deux services
+> écouteraient les mêmes ports et tiendraient deux historiques séparés.
+> Choisissez le parcours qui correspond à votre situation ; le programme
+> d'installation du module refuse d'ailleurs de s'exécuter s'il détecte une
+> installation déjà faite depuis le navigateur.
 
 ### Ce que contient une licence
 

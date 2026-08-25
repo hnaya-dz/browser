@@ -507,7 +507,7 @@ comprend sans les avoir vues.
 | **1. Découvrir** | direction, décideur | ~1 min | comprendre que rien ne sort du réseau |
 | **2. Le salon et le mobile** | tout utilisateur | ~2 min | savoir s'en servir dès le lendemain |
 | **3. Décider dans le fil** | direction, encadrement | ~1 min 15 | voir la trace d'une décision |
-| **4. Serveur permanent et licence** | **administrateur informatique** | ~2 min | savoir l'installer et l'exploiter |
+| **4. Serveur permanent et licence** | **administrateur informatique** | ~3 min | savoir l'installer et l'exploiter |
 
 > **La capsule 4 ne s'adresse pas au même monde que les trois autres.**
 > Elle parle à quelqu'un qui installe et exploite, pas à quelqu'un qui
@@ -685,7 +685,7 @@ vaut autant que le report.
 
 ---
 
-## Capsule 4 — Serveur permanent et licence · ~2 min · administrateur informatique
+## Capsule 4 — Serveur permanent et licence · ~3 min · administrateur informatique
 
 > **Changement de public, changement de registre.** Cette capsule se
 > diffuse seule, à un service informatique, sans que les trois autres aient
@@ -716,19 +716,41 @@ ouvert n'est plus là. »
 > et seule une suppression explicite la détruit. Un argument de vente faux
 > se retourne à la première démonstration client.
 
-### 4.2 — Installer : prérequis et mise en service · 40 s · ≥ 10 plans
+### 4.2 — Deux façons d'installer, selon qui vous êtes · 30 s · ≥ 8 plans
 
-**À l'image** : d'abord `node --version` dans un terminal — c'est le
-premier geste. Puis les deux voies, côte à côte : sous Windows la commande
-PowerShell administrateur et la tâche planifiée `HnayaChatServer` créée ;
-sous Linux `sh install-linux.sh` et `systemctl status hnaya-chat` au vert.
+**Le plan le plus utile de toute la capsule** : montrer que le choix
+dépend du client, pas d'une préférence technique.
 
-**Narration** : « Le serveur est un service Node de 705 kilo-octets, avec
-une seule dépendance et aucune compilation. Il n'embarque pas le
-navigateur : on n'installe pas un navigateur sur un serveur. Node 22.5 ou
-plus est requis — le programme d'installation le vérifie et refuse d'aller
-plus loin sinon. Sous Windows, une tâche planifiée démarre le service au
-démarrage de la machine ; sous Linux, un service systemd. »
+**À l'image** : un écran partagé en deux. À gauche, une PME — la section
+**« Serveur permanent »** du navigateur, le fichier de licence choisi, la
+confirmation Windows, et c'est fini. À droite, un service informatique —
+un terminal, `node --version`, puis l'archive décompressée.
+
+**Narration** : « Deux chemins, deux situations. Une petite structure
+installe le serveur depuis le navigateur lui-même : rien d'autre à
+installer, le navigateur sert de moteur, et le poste toujours allumé
+devient le serveur. Une organisation qui possède un vrai serveur, Windows
+ou Linux, y dépose le module seul — sept cents kilo-octets, sans
+navigateur. »
+
+> ⚠️ **À dire explicitement, et ne pas laisser deviner** : on choisit
+> **l'un ou l'autre**, jamais les deux sur la même machine. Les deux
+> services écouteraient les mêmes ports et tiendraient deux historiques
+> séparés. Le programme d'installation du module refuse d'ailleurs de
+> s'exécuter s'il détecte celui du navigateur.
+
+### 4.3 — Le module autonome : mise en service · 35 s · ≥ 9 plans
+
+**À l'image** : `node --version` d'abord — c'est le premier geste. Puis
+les deux systèmes côte à côte : sous Windows la commande PowerShell
+administrateur et la tâche planifiée `HnayaChatServer` créée ; sous Linux
+`sh install-linux.sh` et `systemctl status hnaya-chat` au vert.
+
+**Narration** : « Le module est un service de sept cents kilo-octets, avec
+une seule dépendance et aucune compilation. Node 22.5 ou plus est requis —
+le programme d'installation le vérifie et refuse d'aller plus loin sinon.
+Il place la licence, crée le service, et le salon démarre avec la
+machine. »
 
 **Chiffres exacts, à ne pas arrondir** : 705 Ko, une dépendance (`ws`),
 Node **22.5+**, ports **4802** (WebSocket) et **4803** (page mobile).
@@ -737,7 +759,7 @@ Node **22.5+**, ports **4802** (WebSocket) et **4803** (page mobile).
 ancienne, avec son message et le lien de téléchargement. Un administrateur
 retient mieux l'erreur qu'il évitera que la réussite qu'il attend.
 
-### 4.3 — La licence : ce qu'elle fait, ce qu'elle ne fait pas · 35 s · ≥ 9 plans
+### 4.4 — La licence : ce qu'elle fait, ce qu'elle ne fait pas · 35 s · ≥ 9 plans
 
 **À l'image** : le fichier `licence.hnaya-lic` déposé dans le répertoire de
 données ; puis le tableau des états, animé état par état.
@@ -761,7 +783,7 @@ effacé. Le mode poste, lui, reste libre et sans licence. »
 ne demande aucune licence. Le taire ferait croire à un produit entièrement
 payant.
 
-### 4.4 — Plusieurs salons, un annuaire, une sauvegarde · 40 s · ≥ 10 plans
+### 4.5 — Plusieurs salons, un annuaire, une sauvegarde · 40 s · ≥ 10 plans
 
 **À l'image** : un serveur et trois salons qui en partent — Salon général,
 Direction, DRH. Un message écrit à la Direction qui **n'apparaît pas** dans

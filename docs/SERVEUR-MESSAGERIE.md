@@ -48,6 +48,36 @@ de ses membres.
 
 ---
 
+## 1 bis. Deux parcours d'installation — n'en choisir qu'un
+
+Le serveur permanent s'installe de **deux façons**, qui ne s'adressent pas
+au même client. Elles produisent le même service, mais elles **ne se
+connaissent pas**.
+
+| | Depuis le **navigateur** | Ce **module autonome** |
+|---|---|---|
+| Node.js à installer | **aucun** — le navigateur sert de moteur | **oui**, 22.5 ou plus |
+| Ligne de commande | non | oui |
+| Systèmes | Windows seulement | Windows **et Linux** |
+| Machine visée | un poste allumé en permanence | un serveur |
+| Interlocuteur | une PME sans informaticien | un service informatique |
+| Tâche planifiée | `Hnaya Chat Serveur` | `HnayaChatServer` |
+| Répertoire de données | `C:\ProgramData\Hnaya Chat Server` | `C:\ProgramData\HnayaChat` |
+
+Le parcours navigateur exécute le module avec **l'exécutable du navigateur
+lui-même** (`ELECTRON_RUN_AS_NODE`), dont le moteur embarqué est Node
+24.18 : aucune installation de Node n'est nécessaire. C'est ce qui permet
+au vieux poste toujours allumé d'une PME de devenir le serveur.
+
+> ⚠️ **N'installez pas les deux sur la même machine.** Les tâches et les
+> répertoires de données diffèrent, mais les **ports 4802 et 4803 sont les
+> mêmes** : le second service ne démarrerait pas, et l'historique se
+> retrouverait coupé en deux bases distinctes. Le script Windows de ce
+> module détecte une installation faite depuis le navigateur et **refuse**
+> de poursuivre.
+
+---
+
 ## 2. Prérequis
 
 | Élément | Exigence |
