@@ -165,6 +165,19 @@ export const ThemeSwitch: FC<ThemeSwitchProps> = ({ className }) => {
         .sunset .theme-menu .theme-row:hover{background:rgba(255,120,60,0.12)}
         .sunset .theme-menu .theme-row[data-actif="1"]{background:rgba(255,120,60,0.18);color:#fff}
       `}</style>
+      {/* ⚠️ text-white/70 EST NÉCESSAIRE, ce n'est pas de la décoration.
+          La barre est `bg-black/40` sur TOUS les thèmes, et tous les boutons
+          voisins portent cette couleur. L'emoji qui occupait cette place
+          avait ses couleurs propres et restait visible sans rien demander ;
+          une icône vectorielle suit `currentColor` et héritait donc d'une
+          teinte invisible — l'icône avait disparu sur « coucher de soleil »,
+          signalé en usage réel. La couleur est posée ici, et non au point
+          d'appel, pour qu'on ne puisse pas l'oublier.
+
+          ⚠️ Et ce commentaire est un commentaire JSX, PAS un « // ». Un
+          commentaire JavaScript glissé entre les attributs d'une balise JSX
+          est une erreur de syntaxe : elle passe `tsc --noEmit` et fait
+          tomber le serveur de développement en 500. Vécu ici même. */}
       <button
         onClick={() => setOuvert((v) => !v)}
         title={titre}
@@ -172,6 +185,7 @@ export const ThemeSwitch: FC<ThemeSwitchProps> = ({ className }) => {
         aria-haspopup="menu"
         aria-expanded={ouvert}
         className={`w-8 h-8 flex items-center justify-center rounded-lg
+          text-white/70 hover:text-white
           hover:bg-white/10 transition-all duration-200 hover:scale-110
           ${className ?? ""}`}
       >
