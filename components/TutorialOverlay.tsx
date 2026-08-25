@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from "react";
-import { X, ChevronLeft, ChevronRight } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, Star, BookMarked, KeyRound, Download } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { useLanguage } from "@/context/langcontext";
 import {
   useTutorialSnapshot,
@@ -192,69 +193,74 @@ const CONTENT: Record<Lang, Record<string, { title: string; body: string }>> = {
 // Légende de l'étape « toolbar » : chaque ligne reproduit l'icône telle
 // qu'elle apparaît réellement dans la barre d'adresse, pour que le lecteur
 // la reconnaisse même si le bouton n'est pas affiché au moment du guide.
-const LEGEND: Record<Lang, { icon: string; label: string; desc: string }[]> = {
+// ⚠️ Les icônes de cette légende sont les MÊMES COMPOSANTS que ceux de la
+// barre d'adresse (components/urlbar.tsx), et non des glyphes recopiés. Les
+// deux employaient les emoji ☆ 📑 🔐 ⬇️ ; le jour où la barre est passée à
+// lucide, une légende écrite en dur aurait décrit des boutons disparus.
+// Partager le composant rend la dérive impossible.
+const LEGEND: Record<Lang, { icon: LucideIcon; label: string; desc: string }[]> = {
   fr: [
     {
-      icon: "☆",
+      icon: Star,
       label: "Ajouter aux favoris",
       desc: "Enregistre la page ouverte. L'étoile devient dorée ; cliquez à nouveau pour la retirer.",
     },
     {
-      icon: "📑",
+      icon: BookMarked,
       label: "Liste des favoris",
       desc: "Vos favoris classés par dossier, et vos groupes d'onglets : enregistrez toutes les pages ouvertes d'un coup pour les rouvrir plus tard. « Sauvegarder mes favoris » les exporte dans un fichier, « Importer des favoris » les restaure sur un autre poste.",
     },
     {
-      icon: "🔐",
+      icon: KeyRound,
       label: "Mots de passe",
       desc: "Vos identifiants sont chiffrés sur ce poste (AES-256, clé protégée par Windows) : aucun compte, aucun serveur, rien n'est transmis. Ils restent masqués dans la liste et sont saisis directement dans la page, jamais par le presse-papier. Un point vert signale qu'un identifiant existe pour la page ouverte. Pour changer de machine, « Sauvegarder mes mots de passe » crée un fichier protégé par une phrase secrète que vous choisissez, et « Restaurer une sauvegarde » le relit sur le nouveau poste.",
     },
     {
-      icon: "⬇️",
+      icon: Download,
       label: "Télécharger la vidéo",
       desc: "N'apparaît que sur les sites de vidéo (plus de 30 plateformes). Deux qualités : Rapide (MP4 720p, lisible partout) ou Haute qualité. Vous choisissez le dossier, après acceptation de l'avertissement légal.",
     },
   ],
   en: [
     {
-      icon: "☆",
+      icon: Star,
       label: "Add to favorites",
       desc: "Saves the open page. The star turns gold; click again to remove it.",
     },
     {
-      icon: "📑",
+      icon: BookMarked,
       label: "Favorites list",
       desc: "Your favorites sorted into folders, plus tab groups: save every open page at once and reopen them later. “Back up my favorites” exports them to a file, “Import favorites” restores them on another machine.",
     },
     {
-      icon: "🔐",
+      icon: KeyRound,
       label: "Passwords",
       desc: "Your logins are encrypted on this machine (AES-256, key protected by Windows): no account, no server, nothing sent anywhere. They stay hidden in the list and are typed straight into the page, never through the clipboard. A green dot means a login exists for the open page. When you move to another computer, “Back up my passwords” writes a file protected by a passphrase you choose, and “Restore a backup” reads it back there.",
     },
     {
-      icon: "⬇️",
+      icon: Download,
       label: "Download the video",
       desc: "Only appears on video sites (over 30 platforms). Two qualities: Fast (MP4 720p, plays anywhere) or High quality. You pick the folder, once you have accepted the legal notice.",
     },
   ],
   ar: [
     {
-      icon: "☆",
+      icon: Star,
       label: "إضافة إلى المفضلة",
       desc: "يحفظ الصفحة المفتوحة. تصبح النجمة ذهبية؛ انقر مرة أخرى لإزالتها.",
     },
     {
-      icon: "📑",
+      icon: BookMarked,
       label: "قائمة المفضلة",
       desc: "مفضّلاتك مرتّبة في مجلدات، ومجموعات الألسنة: احفظ كل الصفحات المفتوحة دفعة واحدة لإعادة فتحها لاحقاً. «نسخ احتياطي للمفضلة» يصدّرها في ملف، و«استيراد المفضلة» يستعيدها على جهاز آخر.",
     },
     {
-      icon: "🔐",
+      icon: KeyRound,
       label: "كلمات المرور",
       desc: "بيانات دخولك مشفّرة على هذا الجهاز (AES-256، والمفتاح محمي بواسطة ويندوز): لا حساب، لا خادم، ولا شيء يُرسل. تبقى مخفيّة في القائمة وتُكتب مباشرة في الصفحة، لا عبر الحافظة. النقطة الخضراء تعني وجود بيانات محفوظة للصفحة الحالية. وعند الانتقال إلى جهاز آخر، «نسخ احتياطي لكلمات المرور» ينشئ ملفاً تحميه عبارة سرية تختارها، و«استعادة نسخة احتياطية» يقرأه هناك.",
     },
     {
-      icon: "⬇️",
+      icon: Download,
       label: "تحميل الفيديو",
       desc: "يظهر فقط في مواقع الفيديو (أكثر من 30 منصة). جودتان: «سريع» (MP4 بدقة 720p، يُقرأ في كل مكان) أو «جودة عالية». تختار المجلد، بعد الموافقة على التنبيه القانوني.",
     },
@@ -436,8 +442,9 @@ export const TutorialOverlay = () => {
     >
       <style>{`
         /* La couleur de base est indispensable : sans elle la carte hérite
-           d'un gris très sombre, et tout glyphe monochrome (l'étoile ☆ des
-           favoris) se dessinait en noir sur noir, donc invisible. */
+           d'un gris très sombre, et toute icône monochrome (l'étoile des
+           favoris) se dessinait en noir sur noir, donc invisible. Les icônes
+           lucide suivent currentColor : cette règle reste indispensable. */
         .tuto-card{position:absolute;pointer-events:auto;color:rgba(255,255,255,0.75);
           background:#0d1512;border:1px solid rgba(255,255,255,0.14);border-radius:6px;
           box-shadow:0 18px 48px rgba(0,0,0,0.55);padding:20px}
@@ -619,12 +626,12 @@ export const TutorialOverlay = () => {
 
             {isLegendStep && (
               <div className="tuto-legend">
-                {LEGEND[lang].map((row) => (
-                  <div className="tuto-legend-row" key={row.label}>
-                    <span className="tuto-ico" aria-hidden="true">{row.icon}</span>
+                {LEGEND[lang].map(({ icon: Ico, label, desc }) => (
+                  <div className="tuto-legend-row" key={label}>
+                    <span className="tuto-ico" aria-hidden="true"><Ico size={16} /></span>
                     <div>
-                      <b>{row.label}</b>
-                      <span className="tuto-legend-desc">{row.desc}</span>
+                      <b>{label}</b>
+                      <span className="tuto-legend-desc">{desc}</span>
                     </div>
                   </div>
                 ))}

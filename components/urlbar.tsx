@@ -9,7 +9,13 @@ import DownloadPanel from "./DownloadPanel";
 import dynamic from "next/dynamic";
 import { isDownloadableUrl as isDownloadable } from "@/shared/supportedHosts";
 import { useTranslation } from "@/hooks/useTranslation";
-import { MessageSquare, Shield, Bell } from "lucide-react";
+// ⚠️ Icônes VECTORIELLES, jamais d'emoji — même règle que components/navbar.tsx.
+// Un emoji est rendu par la police système : son dessin change entre
+// Windows 10 et 11, et certains ne sont pas rendus du tout (les drapeaux
+// apparaissent en deux lettres encadrées). Quatre boutons de cette barre
+// employaient encore ⬇️ ★ ☆ 📑 🔐 ; ils sont passés à lucide-react, qui
+// rend le même trait partout et suit la couleur du texte.
+import { MessageSquare, Shield, Bell, Download, Star, BookMarked, KeyRound } from "lucide-react";
 import { setPanelOpen, useChatSnapshot } from "@/context/chatstore";
 import { useNotifications } from "@/context/notifications";
 
@@ -332,7 +338,7 @@ export default function URLBar() {
               onClick={handleDownloadClick}
               title={t("URLBar.downloadTitle")}
             >
-              ⬇️ {t("URLBar.download")}
+              <Download size={14} /> {t("URLBar.download")}
             </button>
           </div>
         )}
@@ -342,9 +348,13 @@ export default function URLBar() {
           onClick={handleToggleFavorite}
           className="urlbar-btn"
           title={isFavorited ? t("Favorites.alreadySaved") : t("Favorites.addedToFavorites")}
-          style={{ color: isFavorited ? "#f5c518" : undefined, fontSize: 16 }}
+          style={{ color: isFavorited ? "#f5c518" : undefined }}
         >
-          {isFavorited ? "★" : "☆"}
+          {/* Les deux états restaient distincts par le glyphe (★ contre ☆) ;
+              ils le restent par le REMPLISSAGE, la couleur ambre ne venant
+              qu'en renfort — elle seule ne suffirait pas à qui la distingue
+              mal. */}
+          <Star size={16} fill={isFavorited ? "currentColor" : "none"} />
         </button>
 
         {/* Bouton favoris — ouvrir le panneau */}
@@ -352,9 +362,8 @@ export default function URLBar() {
           onClick={handleFavoritesClick}
           className="urlbar-btn"
           title={t("Favorites.title")}
-          style={{ fontSize: 15 }}
         >
-          📑
+          <BookMarked size={15} />
         </button>
 
         {/* Bouton vault */}
@@ -369,7 +378,7 @@ export default function URLBar() {
             onClick={handleVaultClick}
             title={hasCredentials ? t("URLBar.vaultTitleFound") : t("URLBar.vaultTitle")}
           >
-            🔐
+            <KeyRound size={15} />
             {hasCredentials && <span className="vault-dot" />}
           </button>
         </div>

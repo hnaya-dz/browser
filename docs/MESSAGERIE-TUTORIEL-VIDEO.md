@@ -68,12 +68,13 @@ nuage, de planète, de cadenas flottant ou de « cloud sécurisé ».
 - pas de personnages qui s'envoient des cœurs ou des émojis : le **panneau
   de messagerie** n'en emploie aucun, c'est un choix assumé.
 
-> ⚠️ **Mais n'en supprimez pas dans le reste du navigateur.** Contrairement
-> à ce que ce dossier affirmait, la **barre d'adresse** et la **page
-> d'accueil** utilisent bel et bien des émojis et des glyphes COMME ICÔNES
-> de boutons — ⬇️, ★/☆, 📑, 🔐, 🇩🇿. Ils font partie de l'interface réelle.
-> Les effacer par souci de sobriété, c'est faire disparaître les boutons
-> eux-mêmes. L'inventaire complet est en **§5.8**.
+> ⚠️ **Une exception subsiste : le sélecteur de thème.** La barre d'adresse
+> et l'accueil employaient eux aussi des émojis comme icônes — ⬇️, ★/☆, 📑,
+> 🔐, 🇩🇿 — et ce sont précisément les boutons qui disparaissaient des
+> reconstitutions : leur icône n'était ni un composant ni un fichier, mais
+> un caractère. **Ils sont passés aux icônes `lucide` le 18/08/2026.**
+> Seul le sélecteur de thème garde les siennes (☀️ 🌅 🖼️ 🎨 🌙) :
+> représentez-le tel quel. Inventaire complet en **§5.8**.
 
 ---
 
@@ -131,7 +132,7 @@ après la vidéo doit retrouver les mêmes signes.
 > |---|---|---|
 > | `public/icons/market.png` | PNG **172×172** | le bouton **Achat** de la console de recherche |
 > | `public/hnaya.png` | PNG | le logo, barre de navigation et page d'accueil |
-> | ⬇️ ★ ☆ 📑 🔐 🇩🇿 | **émojis et glyphes** | boutons de la barre d'adresse et de l'accueil — voir §5.8 |
+> | ☀️ 🌅 🖼️ 🎨 🌙 | **émojis** | le sélecteur de thème (`theme-switch.tsx`) — seul rescapé |
 >
 > Les fichiers `public/icons/arrow.*.svg`, `house.svg` et
 > `magnifyingglass.svg` existent mais **ne sont référencés nulle part** :
@@ -384,17 +385,20 @@ Leur inventaire complet est en **§5.8**.
 | 2 | → | « Page suivante » | SVG en ligne (`IconForward`) |
 | 3 | ↻ | « Actualiser la page » | SVG en ligne (`IconRefresh`) |
 | 4 | 🔍 | « Rechercher » | SVG en ligne (`IconSearch`) |
-| 5 | **⬇️** + « Télécharger » | « Télécharger la vidéo de cette page » | **émoji** |
-| 6 | **★** ou **☆** | « Retirer des favoris » / ajouter | **glyphe**, deux états |
-| 7 | **📑** | « Favoris » | **émoji** |
-| 8 | **🔐** | « Mots de passe » / « Identifiant enregistré pour ce site » | **émoji** + pastille `vault-dot` si identifiant connu |
+| 5 | `Download` + « Télécharger » | « Télécharger la vidéo de cette page » | lucide |
+| 6 | `Star` | « Retirer des favoris » / ajouter | lucide — **deux états par le remplissage**, ambre `#f5c518` quand la page est en favori |
+| 7 | `BookMarked` | « Favoris » | lucide |
+| 8 | `KeyRound` | « Mots de passe » / « Identifiant enregistré pour ce site » | lucide + pastille `vault-dot` si identifiant connu |
 | 9 | `MessageSquare` | « Messagerie locale » | lucide |
 | 10 | `Bell` | « Notifications » | lucide |
 | 11 | `Shield` | « Confidentialité » | lucide |
 
-**Les entrées 5 à 8 sont celles qui disparaissent le plus souvent.** Elles
-n'ont ni composant d'icône ni fichier : leur icône *est* un caractère.
-Cherchée comme un pictogramme, elle reste introuvable.
+**Les entrées 5 à 8 sont celles qui disparaissaient des reconstitutions.**
+Leur icône était un **caractère** — ⬇️ ★ ☆ 📑 🔐 — ni composant ni fichier,
+donc introuvable pour qui la cherchait comme un pictogramme. Elles sont
+passées à `lucide` le 18/08/2026 : elles se traitent désormais comme les
+autres. Vérifié à l'écran : `lucide-star`, `lucide-book-marked`,
+`lucide-key-round` présents dans la barre d'adresse.
 
 Les boutons 5 à 8 **n'apparaissent qu'une fois un site ouvert** — le
 tutoriel du produit le dit lui-même. Sur une page d'accueil vide, leur
@@ -433,13 +437,13 @@ liste latérale.
 | 3 | bouton de recherche Algérie | style `glass-btn-primary` |
 | 4 | **`market.png` + « Achat »** | style `glass-btn-amber` — **ambre**, voir §5.7 |
 | 5 | bouton de recherche Monde | |
-| 6 | **🇩🇿** + « Découvrir » | **émoji drapeau** |
+| 6 | `Compass` + « Découvrir » | lucide — **remplace l'émoji drapeau 🇩🇿** depuis le 18/08/2026 |
 
-> ⚠️ **Le drapeau 🇩🇿 ne s'affiche pas sous Windows.** Le système ne rend
-> pas les émojis de drapeau : il montre les deux lettres « DZ » encadrées.
-> Sur une capture d'écran Windows, c'est donc « DZ » que vous verrez, et
-> c'est le rendu réel pour l'utilisateur — ne le « corrigez » pas en
-> dessinant un drapeau qu'il ne verra jamais.
+> **Pourquoi le drapeau a été retiré** : Windows ne rend pas les émojis de
+> drapeau — il affichait deux lettres encadrées « DZ ». Le bouton ne
+> montrait donc aucun drapeau à personne. Si vous tombez sur une capture
+> d'écran antérieure au 18/08/2026, c'est « DZ » que vous y verrez : ne la
+> prenez pas pour référence.
 
 
 ---
