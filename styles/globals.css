@@ -28,6 +28,29 @@ html.light, html.light body { background-color: #f0f7f4 !important; }
 /* ── COUCHER DE SOLEIL ── */
 html.sunset, html.sunset body { background-color: #1a0005 !important; }
 
+/* ── TEINTES ─────────────────────────────────────────────────────────
+   Émeraude, gris et blanc ne sont PAS des thèmes de plus : ce sont des
+   fonds posés sur un thème existant, qui en conserve tout le style.
+
+   Pourquoi : les couleurs de l'interface ne vivent pas dans ce fichier
+   mais dans les composants — 45 règles « .light … », 41 règles
+   « .sunset … » réparties dans urlbar.tsx, page.tsx et
+   TutorialOverlay.tsx. Un vrai quatrième thème aurait exigé d'en écrire
+   une quarantaine de plus par couleur, avec la dérive visuelle que cela
+   suppose. Une teinte hérite au contraire de tout, et ne redéfinit que
+   le fond.
+
+   Émeraude et gris s'appuient sur SOMBRE (texte clair) ; blanc s'appuie
+   sur CLAIR (texte foncé). Croiser les deux familles donnerait du texte
+   clair sur fond blanc — illisible.
+
+   La classe de base est incluse dans le sélecteur À DESSEIN : à
+   spécificité égale, seul l'ordre du fichier départagerait, et un
+   déplacement de bloc suffirait à casser l'affichage sans prévenir. */
+html.dark[data-tint="emeraude"],  html.dark[data-tint="emeraude"] body  { background-color: #04261d !important; }
+html.dark[data-tint="gris"],      html.dark[data-tint="gris"] body      { background-color: #17191b !important; }
+html.light[data-tint="blanc"],    html.light[data-tint="blanc"] body    { background-color: #ffffff !important; }
+
 /* ── PERSONNALISÉ ── */
 html.custom {
   background-image: var(--custom-bg) !important;

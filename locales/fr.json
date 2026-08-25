@@ -133,7 +133,15 @@
     "apply": "Appliquer",
     "close": "Fermer",
     "formatError": "Format non supporté.",
-    "sizeError": "Image trop grande (max {max} Mo)."
+    "sizeError": "Image trop grande (max {max} Mo).",
+    "title": "Thème",
+    "dark": "Sombre",
+    "emerald": "Vert émeraude",
+    "grey": "Gris",
+    "sunset": "Coucher de soleil",
+    "light": "Clair",
+    "white": "Blanc",
+    "customImage": "Image personnalisée"
   },
   "Update": {
     "available": "Mise à jour disponible",

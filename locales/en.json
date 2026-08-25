@@ -133,7 +133,15 @@
     "apply": "Apply",
     "close": "Close",
     "formatError": "Unsupported format.",
-    "sizeError": "Image too large (max {max} MB)."
+    "sizeError": "Image too large (max {max} MB).",
+    "title": "Theme",
+    "dark": "Dark",
+    "emerald": "Emerald green",
+    "grey": "Grey",
+    "sunset": "Sunset",
+    "light": "Light",
+    "white": "White",
+    "customImage": "Custom image"
   },
   "Update": {
     "available": "Update available",
