@@ -113,6 +113,9 @@ export default function ChatServerSetup({ accent, muted, border, inputStyle, btn
         const connues: Record<string, string> = {
           pin: "serverErrPin", adminPin: "serverErrAdminPin", name: "serverErrName",
           "windows-only": "serverErrWindowsOnly",
+          // L'autre parcours d'installation occupe déjà la machine : on le
+          // dit en clair plutôt que de laisser remonter un code brut.
+          serverOtherInstall: "serverErrOtherInstall",
         };
         const cle = r?.error ? connues[r.error] : null;
         if (cle) setError(t(`Chat.${cle}`));

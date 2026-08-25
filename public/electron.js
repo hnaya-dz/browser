@@ -1665,13 +1665,20 @@ async function verifyLicenceFile(filePath) {
 // qu'elle a été installée depuis ce poste.
 const chatServerMarker = join(chatServerDataDir, "installed.json");
 
-const chatServerTaskExists = async () => {
+// Nom de la tâche créée par l'AUTRE parcours : l'archive du module serveur
+// installée par service/install-windows.ps1. Voir docs/SERVEUR-MESSAGERIE.md
+// §1 bis. Les deux tâches diffèrent, mais les ports 4802/4803 sont communs.
+const TACHE_MODULE_AUTONOME = "HnayaChatServer";
+
+const tacheExiste = async (nom) => {
   // schtasks plutôt que Get-ScheduledTask : sortie stable, pas de CIM
   // (dont la lecture est parfois refusée en session normale — cf. pare-feu)
   const { code } = await runPowerShell(["-Command",
-    `schtasks /Query /TN "${CHAT_SERVER_TASK}" *> $null; exit $LASTEXITCODE`]);
+    `schtasks /Query /TN "${nom}" *> $null; exit $LASTEXITCODE`]);
   return code === 0;
 };
+
+const chatServerTaskExists = () => tacheExiste(CHAT_SERVER_TASK);
 
 const chatServerPortAlive = () => new Promise((resolve) => {
   const s = net.connect({ host: "127.0.0.1", port: 4802 });
@@ -1774,6 +1781,18 @@ ipcMain.handle("chat-server-install", async (event, { licencePath, name, pin, ad
   // Le délai de grâce, lui, passe : un renouvellement est en cours.
   if (licCheck.mode === "readonly") {
     return { ok: false, error: licCheck.notice || "Licence expirée" };
+  }
+  // ⚠️ L'AUTRE PARCOURS D'INSTALLATION PEUT DÉJÀ ÊTRE EN PLACE.
+  // Le module serveur se distribue aussi seul (archive hnaya-serveur-*),
+  // installé par service/install-windows.ps1 sous la tâche
+  // « HnayaChatServer », avec son propre répertoire de données. Les deux
+  // services écouteraient les MÊMES ports 4802/4803 : le second ne
+  // démarrerait pas, et l'historique se retrouverait coupé en deux bases
+  // sans que rien ne l'explique.
+  // Le script autonome fait la vérification symétrique ; sans celle-ci, la
+  // protection n'existait que dans un sens.
+  if (await tacheExiste(TACHE_MODULE_AUTONOME)) {
+    return { ok: false, error: "serverOtherInstall" };
   }
   if (!/^\d{6}$/.test(String(pin || ""))) return { ok: false, error: "pin" };
   if (adminPin !== undefined && adminPin !== "" && !/^\d{6}$/.test(String(adminPin))) return { ok: false, error: "adminPin" };

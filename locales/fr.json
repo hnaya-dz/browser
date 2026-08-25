@@ -420,7 +420,8 @@
     "writeInPrefix": "Écrire dans",
     "writeToPrefix": "Écrire à",
     "roomBannerPeople": "en ligne",
-    "roomBannerAll": "tout le salon"
+    "roomBannerAll": "tout le salon",
+    "serverErrOtherInstall": "Un serveur Hnaya est déjà installé sur ce poste par le module autonome. Les deux services se disputeraient les mêmes ports. Retirez-le avant d'installer depuis le navigateur."
   },
   "Privacy": {
     "title": "Confidentialité",

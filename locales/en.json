@@ -420,7 +420,8 @@
     "writeInPrefix": "Write in",
     "writeToPrefix": "Write to",
     "roomBannerPeople": "online",
-    "roomBannerAll": "everyone in the room"
+    "roomBannerAll": "everyone in the room",
+    "serverErrOtherInstall": "A Hnaya server is already installed on this machine by the standalone module. The two services would compete for the same ports. Remove it before installing from the browser."
   },
   "Privacy": {
     "title": "Privacy",

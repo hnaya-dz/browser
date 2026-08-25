@@ -420,7 +420,8 @@
     "writeInPrefix": "الكتابة في",
     "writeToPrefix": "الكتابة إلى",
     "roomBannerPeople": "متصل",
-    "roomBannerAll": "كل الغرفة"
+    "roomBannerAll": "كل الغرفة",
+    "serverErrOtherInstall": "خادم حنايا مثبَّت مسبقاً على هذا الجهاز عبر الوحدة المستقلة. سيتنازع الخدمتان المنافذ نفسها. أزِل التثبيت السابق قبل التثبيت من المتصفّح."
   },
   "Privacy": {
     "title": "الخصوصية",

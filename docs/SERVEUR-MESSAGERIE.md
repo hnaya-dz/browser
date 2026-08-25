@@ -72,9 +72,12 @@ au vieux poste toujours allumé d'une PME de devenir le serveur.
 > ⚠️ **N'installez pas les deux sur la même machine.** Les tâches et les
 > répertoires de données diffèrent, mais les **ports 4802 et 4803 sont les
 > mêmes** : le second service ne démarrerait pas, et l'historique se
-> retrouverait coupé en deux bases distinctes. Le script Windows de ce
-> module détecte une installation faite depuis le navigateur et **refuse**
-> de poursuivre.
+> retrouverait coupé en deux bases distinctes.
+>
+> **La protection joue dans les deux sens** : le script du module refuse si
+> la tâche du navigateur existe, et le navigateur refuse si la tâche du
+> module existe. Aucun des deux ne désinstalle l'autre — le choix reste à
+> l'administrateur.
 
 ---
 
@@ -232,6 +235,28 @@ l'historique.
 La licence fixe aussi un **plafond d'appareils**, compté **une seule fois
 pour l'ensemble des salons du serveur**. Une place se libère depuis
 l'administration lorsqu'un poste est remplacé (« Libérer la place »).
+
+### Ce que la licence ne fait pas — à connaître avant de vendre
+
+**Une licence n'est attachée à aucune machine.** Le fichier signé contient
+l'organisation, les dates et le plafond d'appareils — *rien* qui identifie
+un poste. Le même `.hnaya-lic` est donc valide sur n'importe quelle
+machine : le vieux poste d'une PME comme un serveur d'administration.
+
+**Conséquence commerciale, et elle est réelle** : le plafond d'appareils
+est compté **par installation**, contre la base de données de cette
+installation. Une licence de 50 appareils déployée sur deux machines
+donne **deux compteurs de 50**, soit cent places.
+
+Ce n'est pas un défaut du contrôle — c'est la portée qu'il a. À l'intérieur
+d'un serveur, le plafond est bien compté une fois pour tous les salons ; il
+ne l'est pas *entre* deux serveurs, puisqu'ils ne se parlent pas et que
+l'un peut être hors ligne.
+
+En pratique, une organisation n'a qu'un serveur, et le cumul suppose un
+geste délibéré. Mais si vous devez couvrir plusieurs sites, **émettez une
+licence par site** plutôt que d'en dupliquer une : les compteurs seront
+justes, et l'échéance de chaque site se renouvellera séparément.
 
 Licence et renouvellement : **+213 558 303 030** · **contact@hnaya.dz**
 
