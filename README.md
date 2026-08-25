@@ -82,6 +82,7 @@ document sans traverser ceux des autres.
 |---|---|
 | [`docs/MESSAGERIE-GUIDE.md`](docs/MESSAGERIE-GUIDE.md) | Guide d'utilisation : salons, demandes qualifiées, réunions, annuaire, serveur permanent |
 | [`docs/MESSAGERIE-TUTORIEL-VIDEO.md`](docs/MESSAGERIE-TUTORIEL-VIDEO.md) | Dossier de production du tutoriel vidéo — découpage, narration, identité visuelle |
+| [`docs/SERVEUR-MESSAGERIE.md`](docs/SERVEUR-MESSAGERIE.md) | Serveur de messagerie autonome (sans navigateur) — prérequis, installation Windows et Linux, licence, sauvegarde |
 
 ### Pour développer
 
