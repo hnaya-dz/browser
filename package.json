@@ -15,6 +15,7 @@
     "dist:mac": "yarn build && electron-builder --mac",
     "dist:linux": "yarn build && electron-builder --linux",
     "dist:all": "yarn build && electron-builder --win --x64 --mac --linux",
+    "pack:serveur": "node scripts/pack-serveur.mjs",
     "kill-dev": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/kill-dev.ps1",
     "test": "node chat-module/test/run-all.mjs"
   },

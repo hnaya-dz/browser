@@ -62,6 +62,9 @@ yarn kill-dev   # arrêter les serveurs DE CE PROJET seulement (Windows)
 yarn dist         # Windows (.exe NSIS)
 yarn dist:mac     # macOS (.dmg x64 + arm64)
 yarn dist:linux   # Linux (AppImage)
+
+yarn pack:serveur # serveur de messagerie SEUL, sans navigateur
+                  # -> dist/hnaya-serveur-<version>.zip et .tar.gz
 ```
 
 > ⚠️ Ne jamais lancer `yarn dist` pendant qu'un `yarn dev` tourne — le

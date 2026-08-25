@@ -120,8 +120,9 @@ powershell -ExecutionPolicy Bypass -File service\install-windows.ps1 -Name "Salo
 ```
 
 Paramètres : `-Name` (nom du salon), `-DataDir` (répertoire de données),
-`-NodeExe` si `node` n'est pas dans le `PATH` du compte SYSTEM,
-`-TaskName` (défaut `HnayaChatServer`).
+`-Licence` (chemin du `.hnaya-lic` — facultatif si un seul est déposé à
+côté du module), `-NodeExe` si `node` n'est pas dans le `PATH` du compte
+SYSTEM, `-TaskName` (défaut `HnayaChatServer`).
 
 Vérifier, puis désinstaller le cas échéant :
 
@@ -143,27 +144,28 @@ shell** (`hnaya-chat`), avec les données dans `/var/lib/hnaya-chat`.
 En root :
 
 ```bash
-sh service/install-linux.sh "Salon Direction" 482017
+sh service/install-linux.sh "Salon Direction" 482017 ./votre-licence.hnaya-lic
 ```
 
 Le second argument est le code d'accès à six chiffres ; s'il est omis, un
-code est généré. Le script crée le compte, le répertoire de données,
+code est généré. Le troisième est la licence — **facultatif si un seul
+fichier `.hnaya-lic` est déposé à côté du module**, auquel cas le script le
+trouve seul. Le script crée le compte, le répertoire de données,
 l'unité `hnaya-chat.service`, puis l'active et la démarre.
 
 ```bash
 systemctl status hnaya-chat
 ```
 
-> ⚠️ **Un défaut connu du script Linux, à corriger avant toute livraison
-> à un partenaire** (le second de cette liste est déjà corrigé) **:**
+> **Les deux défauts signalés ici sont corrigés depuis le 18/08/2026 :**
 >
-> 1. **Le script ne place pas la licence.** Il configure le nom, le
->    répertoire de données et le code d'accès — jamais le fichier
->    `.hnaya-lic`. Déposez-le manuellement (§5) **avant** le premier
->    démarrage, sinon le service refuse de servir.
+> 1. ~~Le script ne place pas la licence.~~ **Corrigé** : il la cherche
+>    **avant de toucher au système**, la copie dans le répertoire de
+>    données sous le nom attendu, et refuse tout net si elle manque plutôt
+>    que de laisser une installation à moitié faite.
 > 2. ~~La version de Node n'est pas vérifiée.~~ **Corrigé** : les deux
->    scripts refusent désormais une version antérieure à 22.5 et indiquent
->    où télécharger Node.
+>    scripts refusent une version antérieure à 22.5 et indiquent où
+>    télécharger Node.
 
 ---
 
@@ -175,7 +177,10 @@ libre et sans licence.**
 
 Deux façons de la fournir, au choix :
 
-- déposer le fichier sous le nom exact **`licence.hnaya-lic`** dans le
+- **laisser le programme d'installation s'en charger** : déposez le
+  `.hnaya-lic` à côté du module avant de lancer le script, il le copie au
+  bon endroit avec les bons droits ;
+- ou le déposer soi-même sous le nom exact **`licence.hnaya-lic`** dans le
   répertoire de données (`/var/lib/hnaya-chat/licence.hnaya-lic`, ou le
   `-DataDir` choisi sous Windows) ;
 - ou indiquer son chemin au démarrage : `--licence /chemin/vers/le.hnaya-lic`.
@@ -270,17 +275,43 @@ cloisonnement n'est pas un filtrage applicatif.
 
 ## 9. Ce qui reste à faire pour la distribution
 
-Cette fiche décrit un module **déjà autonome**. Ce qui manque relève de
-l'emballage, non de l'architecture :
+Les trois points de cette liste sont **traités** depuis le 18/08/2026.
 
-1. **Un livrable séparé.** Aujourd'hui ces 705 Ko ne voyagent que dans
-   l'installateur du navigateur (102,7 Mo). Il faut une archive autonome,
-   déposable par un service informatique.
-2. **Corriger le défaut restant du §4** — la licence n'est pas placée par
-   `install-linux.sh`. Il casse la première installation.
+1. ~~Un livrable séparé manque.~~ **Fait.** `yarn pack:serveur` produit
+   deux archives dans `dist/` :
+
+   | Archive | Taille | Pour |
+   |---|---|---|
+   | `hnaya-serveur-<version>.zip` | ~206 Ko | serveur Windows |
+   | `hnaya-serveur-<version>.tar.gz` | ~181 Ko | serveur Linux |
+
+   Elles contiennent `src/`, `mobile/`, `service/`, `package.json`,
+   `README.md` et la seule dépendance `ws` — 41 fichiers. Elles
+   **excluent** `data/` (bases d'essai), `test/` et `tools/`, qui contient
+   l'outil d'émission des licences. Un contrôle refuse de construire si un
+   `.hnaya-lic`, un `.pem` ou une base de données s'y glissait.
+
+   `node scripts/pack-serveur.mjs --lister` montre le contenu sans rien
+   écrire.
+
+2. ~~La licence n'est pas placée par `install-linux.sh`.~~ **Corrigé** —
+   voir §4. Les deux scripts, Windows et Linux, la placent désormais.
+
 3. ~~Décider du moteur Node.~~ **Décidé** : le client installe **Node
    22.5+** (§2). Le moteur n'est pas embarqué — ses correctifs de sécurité
    restent à la charge du système du client, et non de Hnaya DZ. Le choix
    n'est pas irréversible : produire un exécutable autonome pour un client
    qui interdit l'installation d'un moteur d'exécution ne demanderait
    aucune réécriture du code.
+
+### Ce qui a été vérifié sur l'archive livrée
+
+Archive extraite dans un dossier neuf, puis :
+
+- les dépendances se résolvent — `node src/serve.js --help` répond ;
+- sans licence, le serveur **refuse proprement**, en indiquant le chemin
+  attendu et le contact ;
+- avec une licence valide, il **démarre** : salon ouvert, port WebSocket et
+  port mobile en écoute, page mobile en HTTP 200 ;
+- aucune fuite : ni `.hnaya-lic`, ni `.pem`, ni base d'essai dans l'une ou
+  l'autre archive.

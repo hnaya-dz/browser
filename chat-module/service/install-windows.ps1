@@ -21,7 +21,10 @@ param(
   [string]$Pin = "",
   [string]$DataDir = "$env:ProgramData\HnayaChat",
   [string]$NodeExe = "node",
-  [string]$TaskName = "HnayaChatServer"
+  [string]$TaskName = "HnayaChatServer",
+  # Chemin du fichier .hnaya-lic. Facultatif si un seul est déposé à côté
+  # du module.
+  [string]$Licence = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -45,7 +48,29 @@ if ($nodeOk -ne '1') {
 # serve.js est à côté de ce script (../src/serve.js)
 $serveJs = Join-Path (Split-Path $PSScriptRoot -Parent) "src\serve.js"
 if (-not (Test-Path $serveJs)) { throw "src\serve.js introuvable ($serveJs)" }
+# ⚠️ LA LICENCE EST TROUVÉE AVANT DE TOUCHER AU SYSTÈME.
+# Même lacune que du côté Linux : la tâche planifiee était créée, le service
+# démarrait, et refusait de servir faute de licence. On refuse ici plutôt
+# que de laisser une installation à moitié faite.
+$moduleDir = Split-Path $PSScriptRoot -Parent
+if (-not $Licence) {
+  $trouvees = @(Get-ChildItem -Path $moduleDir -Filter *.hnaya-lic -File -ErrorAction SilentlyContinue)
+  if ($trouvees.Count -eq 1) { $Licence = $trouvees[0].FullName }
+  elseif ($trouvees.Count -gt 1) {
+    throw "Plusieurs fichiers .hnaya-lic dans $moduleDir. Indiquez lequel avec -Licence <chemin>."
+  }
+}
+if (-not $Licence -or -not (Test-Path $Licence)) {
+  throw ("Licence introuvable. Deposez le fichier .hnaya-lic remis par Hnaya DZ dans {0}, " +
+         "ou indiquez son chemin avec -Licence <chemin>. Sans licence, le serveur permanent " +
+         "refuse de demarrer. Contact : +213 558 303 030 - contact@hnaya.dz") -f $moduleDir
+}
+
 New-Item -ItemType Directory -Force -Path $DataDir | Out-Null
+
+# Copiee, non deplacee : l'original reste a l'administrateur pour une
+# reinstallation.
+Copy-Item -Path $Licence -Destination (Join-Path $DataDir "licence.hnaya-lic") -Force
 
 $serveArgs = "`"$serveJs`" --name `"$Name`" --data `"$DataDir`""
 if ($Pin -match '^\d{6}$') { $serveArgs += " --pin $Pin" }

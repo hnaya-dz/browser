@@ -2,8 +2,11 @@
 # ═══════════════════════════════════════════════════════════════
 # Installation du salon permanent Hnaya en service systemd (Linux)
 # ═══════════════════════════════════════════════════════════════
-# Usage (root) :  sh install-linux.sh "Salon RH" 123456
-#   $1 = nom du salon (défaut "Salon Hnaya"), $2 = PIN 6 chiffres (optionnel)
+# Usage (root) :  sh install-linux.sh "Salon RH" 482017 ./hcn.hnaya-lic
+#   $1 = nom du salon (défaut "Salon Hnaya")
+#   $2 = PIN d'accès à 6 chiffres (optionnel, généré sinon)
+#   $3 = chemin du fichier .hnaya-lic (optionnel si un seul est déposé
+#        à côté du module)
 # Prérequis : Node.js 22+ (node dans le PATH), systemd.
 set -e
 
@@ -39,10 +42,47 @@ NODE_OK="$("$NODE_BIN" -p 'const [a,b]=process.versions.node.split(".").map(Numb
   exit 1
 }
 
+# ⚠️ LA LICENCE EST TROUVÉE AVANT DE TOUCHER AU SYSTÈME.
+# Le script créait le compte, le répertoire et l'unité systemd, puis
+# démarrait un service qui refusait de servir : la licence n'était jamais
+# placée. Le premier contact d'un partenaire avec le produit était une
+# panne. On la localise donc EN PREMIER, et l'on refuse tout net plutôt
+# que de laisser derrière soi une installation à moitié faite.
+#
+#   $3, s'il est fourni : chemin du fichier .hnaya-lic
+#   sinon : l'unique .hnaya-lic déposé à côté du module
+LICENCE="$3"
+if [ -z "$LICENCE" ]; then
+  # « set -- » plutôt qu'un tableau : ce script est en /bin/sh, pas en bash.
+  set -- "$MODULE_DIR"/*.hnaya-lic
+  if [ -f "$1" ] && [ "$#" -eq 1 ]; then
+    LICENCE="$1"
+  elif [ "$#" -gt 1 ]; then
+    echo "Plusieurs fichiers .hnaya-lic sont présents dans $MODULE_DIR."
+    echo "  Indiquez lequel employer :  sh install-linux.sh \"Nom du salon\" <PIN> <licence.hnaya-lic>"
+    exit 1
+  fi
+fi
+if [ ! -f "$LICENCE" ]; then
+  echo "Licence introuvable."
+  echo "  Déposez le fichier .hnaya-lic remis par Hnaya DZ dans $MODULE_DIR,"
+  echo "  ou indiquez son chemin :"
+  echo "    sh install-linux.sh \"Nom du salon\" <PIN> /chemin/licence.hnaya-lic"
+  echo "  Sans licence, le serveur permanent refuse de démarrer."
+  echo "  Contact : +213 558 303 030 · contact@hnaya.dz"
+  exit 1
+fi
+
 # Compte de service sans shell + répertoire de données
 id hnaya-chat >/dev/null 2>&1 || useradd --system --no-create-home --shell /usr/sbin/nologin hnaya-chat
 mkdir -p "$DATA_DIR"
-chown hnaya-chat:hnaya-chat "$DATA_DIR"
+
+# La licence est COPIÉE dans le répertoire de données, sous le nom exact
+# attendu par serve.js. La copier plutôt que la déplacer laisse l'original
+# à l'administrateur : il en aura besoin s'il réinstalle.
+cp "$LICENCE" "$DATA_DIR/licence.hnaya-lic"
+chown -R hnaya-chat:hnaya-chat "$DATA_DIR"
+chmod 600 "$DATA_DIR/licence.hnaya-lic"
 
 PIN_ARG=""
 case "$PIN" in [0-9][0-9][0-9][0-9][0-9][0-9]) PIN_ARG=" --pin $PIN";; esac
@@ -54,4 +94,5 @@ sed -e "s|^WorkingDirectory=.*|WorkingDirectory=$MODULE_DIR|" \
 systemctl daemon-reload
 systemctl enable --now hnaya-chat
 echo "✔ Service hnaya-chat installé et démarré."
+echo "  Licence     : $DATA_DIR/licence.hnaya-lic"
 echo "  PIN d'accès : journalctl -u hnaya-chat | grep 'PIN'"
