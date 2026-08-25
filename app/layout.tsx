@@ -37,7 +37,29 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html suppressHydrationWarning lang="ar" dir="rtl">
-      <head />
+      <head>
+        {/* ⚠️ POSER LA TEINTE AVANT LE PREMIER RENDU.
+            Les teintes (émeraude, gris, blanc) sont portées par data-tint,
+            hors de next-themes — voir components/theme-switch.tsx. Or
+            next-themes applique SA classe par un script en ligne exécuté
+            avant que la page ne s'affiche, tandis qu'un useEffect ne
+            s'exécute qu'APRÈS le premier rendu : le fond du thème de base
+            s'affichait donc une fraction de seconde avant de sauter à la
+            teinte, à chaque ouverture. Ce script fait pour data-tint ce que
+            next-themes fait pour la classe.
+
+            Il est volontairement minuscule et enfermé dans un try : il
+            s'exécute avant tout le reste, une erreur ici bloquerait
+            l'affichage de la page entière. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "try{var t=localStorage.getItem('hnaya-theme-tint');" +
+              "if(t==='emeraude'||t==='gris'||t==='blanc')" +
+              "document.documentElement.setAttribute('data-tint',t);}catch(e){}",
+          }}
+        />
+      </head>
       <body className={clsx("min-h-screen font-sans antialiased", fontSans.variable)}>
         <Providers themeProps={{ attribute: "class", defaultTheme: "dark" }}>
           <LanguageProvider>

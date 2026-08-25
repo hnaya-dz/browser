@@ -83,6 +83,7 @@ export const ThemeSwitch: FC<ThemeSwitchProps> = ({ className }) => {
   const [showPanel, setShowPanel] = useState(false);
   const [teinte, setTeinte] = useState<Teinte>(null);
   const boite = useRef<HTMLDivElement>(null);
+  const lignes = useRef<(HTMLButtonElement | null)[]>([]);
 
   // Restaurer la teinte enregistrée. next-themes ne connaît que le thème
   // de base ; la teinte est portée à part, sur data-tint.
@@ -111,6 +112,23 @@ export const ThemeSwitch: FC<ThemeSwitchProps> = ({ className }) => {
       document.removeEventListener("keydown", echap);
     };
   }, [ouvert]);
+
+  // Le bouton annonce aria-haspopup="menu" et le conteneur role="menu" :
+  // cela promet une navigation au clavier. Sans elle, l'annonce est fausse
+  // et la liste devient inutilisable sans souris.
+  const auClavier = (ev: React.KeyboardEvent) => {
+    const dispo = lignes.current.filter(Boolean) as HTMLButtonElement[];
+    if (!dispo.length) return;
+    const ici = dispo.indexOf(document.activeElement as HTMLButtonElement);
+    let cible = -1;
+    if (ev.key === "ArrowDown") cible = ici < 0 ? 0 : (ici + 1) % dispo.length;
+    else if (ev.key === "ArrowUp") cible = ici <= 0 ? dispo.length - 1 : ici - 1;
+    else if (ev.key === "Home") cible = 0;
+    else if (ev.key === "End") cible = dispo.length - 1;
+    else return;
+    ev.preventDefault();       // sinon la page défile sous le menu
+    dispo[cible]?.focus();
+  };
 
   const base = isSSR ? "dark" : (theme ?? "dark");
   const actif =
@@ -196,6 +214,7 @@ export const ThemeSwitch: FC<ThemeSwitchProps> = ({ className }) => {
         <div
           role="menu"
           className="theme-menu"
+          onKeyDown={auClavier}
           style={{
             position: "absolute", top: "calc(100% + 6px)", insetInlineEnd: 0,
             minWidth: 208, padding: 5, zIndex: 1000,
@@ -214,9 +233,19 @@ export const ThemeSwitch: FC<ThemeSwitchProps> = ({ className }) => {
             // bouton n'est pas du HTML valide.
             const reglable = e.base === "custom" && !!customBg;
             return (
-              <div key={e.id} style={{ display: "flex", alignItems: "center", gap: 2 }}>
+              // role="none" : ce conteneur n'existe que pour poser le
+              // crayon à côté de la ligne. Sans lui, un lecteur d'écran
+              // annoncerait un groupe intermédiaire entre le menu et ses
+              // entrées, et l'arborescence menu → menuitem serait rompue.
+              <div key={e.id} role="none" style={{ display: "flex", alignItems: "center", gap: 2 }}>
               <button
-                role="menuitem"
+                // menuitemradio, et non menuitem : ces sept lignes sont un
+                // choix EXCLUSIF. aria-checked dit laquelle est retenue —
+                // la coche visible ne se lit pas à voix haute.
+                role="menuitemradio"
+                aria-checked={estActif}
+                ref={(n) => { lignes.current[ENTREES.indexOf(e)] = n; }}
+                autoFocus={estActif}
                 className="theme-row"
                 data-actif={estActif ? "1" : "0"}
                 onClick={() => choisir(e)}
@@ -244,6 +273,7 @@ export const ThemeSwitch: FC<ThemeSwitchProps> = ({ className }) => {
               </button>
               {reglable && (
                 <button
+                  role="menuitem"
                   className="theme-row"
                   onClick={() => { setShowPanel(true); setOuvert(false); }}
                   title={t("Theme.changeImage")}
