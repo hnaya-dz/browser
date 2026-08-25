@@ -4,7 +4,7 @@ import { useTheme } from "next-themes";
 import { useIsSSR } from "@react-aria/ssr";
 import { useCustomTheme } from "@/context/customthemecontext";
 import { useTranslation } from "@/hooks/useTranslation";
-import { Moon, Sun, Sunset, Gem, Circle, Image as ImageIcon, Check } from "lucide-react";
+import { Moon, Sun, Sunset, Gem, Circle, Image as ImageIcon, Check, Pencil } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import dynamic from "next/dynamic";
 
@@ -206,15 +206,23 @@ export const ThemeSwitch: FC<ThemeSwitchProps> = ({ className }) => {
           {ENTREES.map((e) => {
             const Ico = e.icone;
             const estActif = e.id === actif.id;
+            // ⚠️ Le fond personnalisé est le SEUL thème qui possède un
+            // réglage : il faut pouvoir rouvrir le panneau pour changer
+            // d'image. Une image déjà posée ne pouvait plus être remplacée
+            // — signalé en usage réel. Le bouton ci-dessous rétablit cet
+            // accès, et il est SÉPARÉ de la ligne : un bouton dans un
+            // bouton n'est pas du HTML valide.
+            const reglable = e.base === "custom" && !!customBg;
             return (
+              <div key={e.id} style={{ display: "flex", alignItems: "center", gap: 2 }}>
               <button
-                key={e.id}
                 role="menuitem"
                 className="theme-row"
                 data-actif={estActif ? "1" : "0"}
                 onClick={() => choisir(e)}
                 style={{
-                  display: "flex", alignItems: "center", gap: 9, width: "100%",
+                  display: "flex", alignItems: "center", gap: 9,
+                  flex: 1, minWidth: 0,
                   padding: "7px 9px", borderRadius: 6, border: "none",
                   background: "transparent",
                   fontSize: 12.5, textAlign: "start", cursor: "pointer",
@@ -231,9 +239,26 @@ export const ThemeSwitch: FC<ThemeSwitchProps> = ({ className }) => {
                   }}
                 />
                 <Ico size={14} style={{ flexShrink: 0, opacity: 0.85 }} />
-                <span style={{ flex: 1 }}>{nom(e)}</span>
+                <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{nom(e)}</span>
                 {estActif && <Check size={13} style={{ flexShrink: 0 }} />}
               </button>
+              {reglable && (
+                <button
+                  className="theme-row"
+                  onClick={() => { setShowPanel(true); setOuvert(false); }}
+                  title={t("Theme.changeImage")}
+                  aria-label={t("Theme.changeImage")}
+                  style={{
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    width: 28, height: 28, flexShrink: 0,
+                    borderRadius: 6, border: "none", background: "transparent",
+                    cursor: "pointer",
+                  }}
+                >
+                  <Pencil size={13} />
+                </button>
+              )}
+              </div>
             );
           })}
         </div>
