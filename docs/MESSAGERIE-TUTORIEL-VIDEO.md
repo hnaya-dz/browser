@@ -65,9 +65,15 @@ nuage, de planète, de cadenas flottant ou de « cloud sécurisé ».
 - pas de globe, pas de nuage, pas de satellite — le produit est *local* ;
 - pas de bulles de conversation façon messagerie grand public : le ton est
   institutionnel, on parle de validations, de réunions, de directions ;
-- pas de personnages qui s'envoient des cœurs ou des émojis. Les émojis ont
-  été délibérément écartés du produit comme non conformes à un usage
-  professionnel.
+- pas de personnages qui s'envoient des cœurs ou des émojis : le **panneau
+  de messagerie** n'en emploie aucun, c'est un choix assumé.
+
+> ⚠️ **Mais n'en supprimez pas dans le reste du navigateur.** Contrairement
+> à ce que ce dossier affirmait, la **barre d'adresse** et la **page
+> d'accueil** utilisent bel et bien des émojis et des glyphes COMME ICÔNES
+> de boutons — ⬇️, ★/☆, 📑, 🔐, 🇩🇿. Ils font partie de l'interface réelle.
+> Les effacer par souci de sobriété, c'est faire disparaître les boutons
+> eux-mêmes. L'inventaire complet est en **§5.8**.
 
 ---
 
@@ -125,7 +131,14 @@ après la vidéo doit retrouver les mêmes signes.
 > |---|---|---|
 > | `public/icons/market.png` | PNG **172×172** | le bouton **Achat** de la console de recherche |
 > | `public/hnaya.png` | PNG | le logo, barre de navigation et page d'accueil |
-> | `public/icons/arrow.left.svg`, `arrow.right.svg`, `arrow.clockwise.svg`, `house.svg`, `magnifyingglass.svg` | SVG | la barre de navigation |
+> | ⬇️ ★ ☆ 📑 🔐 🇩🇿 | **émojis et glyphes** | boutons de la barre d'adresse et de l'accueil — voir §5.8 |
+>
+> Les fichiers `public/icons/arrow.*.svg`, `house.svg` et
+> `magnifyingglass.svg` existent mais **ne sont référencés nulle part** :
+> ce sont des ressources mortes. Les flèches de navigation sont des **SVG
+> écrits en ligne** dans `components/urlbar.tsx` (`IconBack`,
+> `IconForward`, `IconRefresh`, `IconSearch`). N'allez pas chercher les
+> fichiers.
 >
 > **C'est ce qui a empêché de reproduire le bouton « Achat »** : cherché
 > dans `lucide-react`, il n'existe pas ; interdit d'inventer, il ne pouvait
@@ -352,8 +365,82 @@ sélection de sites e-commerce algériens connus et fiables. »*
 > français — c'est « recherche pour achat ». Reprenez les trois libellés
 > tels quels.
 
-Le sélecteur **Algérie / Monde** et la barre d'adresse complètent l'écran ;
-leurs icônes de navigation sont les SVG de `public/icons/` (§3).
+Le sélecteur **Algérie / Monde** et la barre d'adresse complètent l'écran.
+Leur inventaire complet est en **§5.8**.
+
+---
+
+### 5.8 Écran H — Barre d'adresse, navigation et onglets *(hors messagerie)*
+
+> **Liste de contrôle.** À l'œil, un bouton manquant ne se voit pas : on
+> voit une interface plausible. Cochez donc les vingt-neuf entrées
+> ci-dessous une par une sur toute reconstitution montrant le navigateur.
+
+#### Barre d'adresse — 11 boutons (`components/urlbar.tsx`)
+
+| # | Icône | Infobulle | Nature de l'icône |
+|---|---|---|---|
+| 1 | ← | « Page précédente » | SVG **en ligne** (`IconBack`) |
+| 2 | → | « Page suivante » | SVG en ligne (`IconForward`) |
+| 3 | ↻ | « Actualiser la page » | SVG en ligne (`IconRefresh`) |
+| 4 | 🔍 | « Rechercher » | SVG en ligne (`IconSearch`) |
+| 5 | **⬇️** + « Télécharger » | « Télécharger la vidéo de cette page » | **émoji** |
+| 6 | **★** ou **☆** | « Retirer des favoris » / ajouter | **glyphe**, deux états |
+| 7 | **📑** | « Favoris » | **émoji** |
+| 8 | **🔐** | « Mots de passe » / « Identifiant enregistré pour ce site » | **émoji** + pastille `vault-dot` si identifiant connu |
+| 9 | `MessageSquare` | « Messagerie locale » | lucide |
+| 10 | `Bell` | « Notifications » | lucide |
+| 11 | `Shield` | « Confidentialité » | lucide |
+
+**Les entrées 5 à 8 sont celles qui disparaissent le plus souvent.** Elles
+n'ont ni composant d'icône ni fichier : leur icône *est* un caractère.
+Cherchée comme un pictogramme, elle reste introuvable.
+
+Les boutons 5 à 8 **n'apparaissent qu'une fois un site ouvert** — le
+tutoriel du produit le dit lui-même. Sur une page d'accueil vide, leur
+absence est normale : ne la reproduisez pas comme si elle était l'état
+courant.
+
+#### Barre de navigation — 6 boutons (`components/navbar.tsx`)
+
+| # | Contenu | Infobulle |
+|---|---|---|
+| 1 | logo `public/hnaya.png` | — |
+| 2 | libellé du raccourci (ex. **« Hnaya Market »**) | — |
+| 3 | `BookOpen` | « Tutoriel » |
+| 4 | `MessageSquare` | « Messagerie locale » |
+| 5 | `Bell` + pastille du nombre de notifications non lues | « Notifications » |
+| 6 | `Shield` | « Confidentialité » |
+
+> Le code porte ici une note explicite : *« Icône vectorielle : rendu
+> identique sur Windows 10 et 11, contrairement aux emoji »*. Cette barre a
+> donc **déjà** été migrée vers des icônes vectorielles — la barre
+> d'adresse, non. Représentez chacune telle qu'elle est aujourd'hui.
+
+#### Onglets — 6 boutons (`components/tabbar.tsx`)
+
+Fermer l'onglet (croix) · défilement des onglets (`ChevronLeft` /
+`ChevronRight`) · **« Nouvel onglet »** · **« Onglets à droite »**
+(`PanelRight`) · **« Onglets en haut »** (`PanelTop`) · nouvel onglet en
+liste latérale.
+
+#### Page d'accueil — 6 boutons (`app/page.tsx`)
+
+| # | Contenu | Note |
+|---|---|---|
+| 1 | **« Algérie »** | sélecteur de portée, état actif visible |
+| 2 | **« Monde »** | idem |
+| 3 | bouton de recherche Algérie | style `glass-btn-primary` |
+| 4 | **`market.png` + « Achat »** | style `glass-btn-amber` — **ambre**, voir §5.7 |
+| 5 | bouton de recherche Monde | |
+| 6 | **🇩🇿** + « Découvrir » | **émoji drapeau** |
+
+> ⚠️ **Le drapeau 🇩🇿 ne s'affiche pas sous Windows.** Le système ne rend
+> pas les émojis de drapeau : il montre les deux lettres « DZ » encadrées.
+> Sur une capture d'écran Windows, c'est donc « DZ » que vous verrez, et
+> c'est le rendu réel pour l'utilisateur — ne le « corrigez » pas en
+> dessinant un drapeau qu'il ne verra jamais.
+
 
 ---
 
@@ -739,7 +826,8 @@ en tenant compte du sens de lecture pour l'arabe.
 
 **Contrôle avant livraison** — trois questions, dans cet ordre :
 
-1. Chaque écran reconstitué porte-t-il **toutes** les commandes de la §5 ?
+1. Chaque écran reconstitué porte-t-il **toutes** les commandes de la §5 —
+   **y compris les 29 boutons hors messagerie des §5.7 et §5.8** ?
 2. Chaque séquence atteint-elle son **nombre minimal de plans** (§6) ?
 3. Chaque texte affiché existe-t-il dans `locales/fr.json` **ou dans
    `app/page.tsx`** ?
