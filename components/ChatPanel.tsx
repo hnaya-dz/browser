@@ -1731,12 +1731,33 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
               />
             )}
 
-            {/* Panneau QR d'invitation mobile */}
+            {/* Panneau QR d'invitation mobile.
+                ⚠️ CE PANNEAU DOIT PORTER SA PROPRE FERMETURE.
+                La bascule du bouton « Inviter un mobile » ne suffit pas :
+                ce bouton vit dans la rangée d'actions, conditionnée par
+                `plusOuvert`. Replier « Plus » pendant que le QR est
+                affiché laissait donc un bloc qui mange une grande partie
+                du fil, SANS aucun moyen de le fermer — signalé en usage
+                réel. La croix ci-dessous est toujours présente, quel que
+                soit l'état du reste de l'interface. */}
             {!showAdmin && showInvite && store.inviteUrl && (
               <div style={{
                 background: `${accent}12`, border: `1px solid ${accent}35`, borderRadius: 10,
-                padding: 10, textAlign: "center", flexShrink: 0,
+                padding: 10, textAlign: "center", flexShrink: 0, position: "relative",
               }}>
+                <button
+                  onClick={() => setShowInvite(false)}
+                  title={t("Chat.inviteClose")}
+                  aria-label={t("Chat.inviteClose")}
+                  style={{
+                    position: "absolute", top: 4, insetInlineEnd: 4,
+                    width: 22, height: 22, borderRadius: 4, border: "none",
+                    background: "transparent", color: muted, cursor: "pointer",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                  }}
+                >
+                  <X size={14} />
+                </button>
                 <div style={{
                   background: "#fff", borderRadius: 6, padding: 6,
                   display: "inline-block", lineHeight: 0,
