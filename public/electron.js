@@ -203,7 +203,9 @@ const NATIVE_LABELS = {
         chooseFolder: "اختر مجلد التحميل",
         noSuggestions: "لا توجد اقتراحات", addToDictionary: "إضافة إلى القاموس",
         adminExportTitle: "تصدير سجل المراسلة",
-        annotationSaveTitle: "حفظ الصفحة المُعلَّقة", annotationDefaultName: "تعليق" },
+        annotationSaveTitle: "حفظ الصفحة المُعلَّقة", annotationDefaultName: "تعليق",
+        savePagePdf: "حفظ الصفحة بصيغة PDF", savePagePdfDefaultName: "صفحة",
+        savePagePdfError: "تعذّر الحفظ بصيغة PDF. بعض الصفحات الديناميكية جدًّا لا يمكن طباعتها." },
   fr: { copy: "Copier", cut: "Couper", paste: "Coller", selectAll: "Tout sélectionner",
         saveImage: "Enregistrer l'image", copyImageUrl: "Copier l'adresse de l'image",
         openLinkNewTab: "Ouvrir le lien dans un nouvel onglet", copyLinkUrl: "Copier l'adresse du lien",
@@ -212,7 +214,9 @@ const NATIVE_LABELS = {
         chooseFolder: "Choisir le dossier de téléchargement",
         noSuggestions: "Aucune suggestion", addToDictionary: "Ajouter au dictionnaire",
         adminExportTitle: "Exporter l'historique de la messagerie",
-        annotationSaveTitle: "Enregistrer la page annotée", annotationDefaultName: "annotation" },
+        annotationSaveTitle: "Enregistrer la page annotée", annotationDefaultName: "annotation",
+        savePagePdf: "Enregistrer la page en PDF", savePagePdfDefaultName: "page",
+        savePagePdfError: "L'enregistrement en PDF a échoué. Les pages très dynamiques ne peuvent pas toujours être imprimées." },
   en: { copy: "Copy", cut: "Cut", paste: "Paste", selectAll: "Select all",
         saveImage: "Save image", copyImageUrl: "Copy image address",
         openLinkNewTab: "Open link in new tab", copyLinkUrl: "Copy link address",
@@ -221,7 +225,9 @@ const NATIVE_LABELS = {
         chooseFolder: "Choose download folder",
         noSuggestions: "No suggestions", addToDictionary: "Add to dictionary",
         adminExportTitle: "Export messaging history",
-        annotationSaveTitle: "Save annotated page", annotationDefaultName: "annotation" },
+        annotationSaveTitle: "Save annotated page", annotationDefaultName: "annotation",
+        savePagePdf: "Save page as PDF", savePagePdfDefaultName: "page",
+        savePagePdfError: "Saving as PDF failed. Highly dynamic pages cannot always be printed." },
 };
 const nativeT = (key) => (NATIVE_LABELS[appLang] || NATIVE_LABELS.fr)[key] || key;
 
@@ -2115,6 +2121,11 @@ ipcMain.on("open-tab", (event, newTab) => {
         { label: nativeT("copyPageUrl"), click: () => {
           clipboard.writeText(view.webContents.getURL());
         }},
+        // Export PDF de la page. Placé dans le menu contextuel et non dans
+        // la barre d'adresse : c'est la convention des navigateurs, et la
+        // barre est déjà chargée. Implémentation : enregistrerPageEnPdf,
+        // en fin de fichier.
+        { label: nativeT("savePagePdf"), click: () => { void enregistrerPageEnPdf(view); } },
       );
 
       const contextMenu = Menu.buildFromTemplate(menuItems);
@@ -2369,6 +2380,76 @@ ipcMain.handle("annotate-capture", async () => {
     return { ok: false, error: e?.message || "capture" };
   }
 });
+
+// ═══════════════════════════════════════════════════════════════
+// Enregistrer la page en PDF — fonction de navigateur, PAS d'annotation
+// ═══════════════════════════════════════════════════════════════
+// Appelée depuis le menu contextuel de la vue (voir open-tab).
+//
+// CE QUE ÇA PRODUIT, ET CE QUE ÇA NE PRODUIT PAS :
+//   `printToPDF` passe par le pipeline d'IMPRESSION de Chromium, donc la
+//   page est rendue sous `@media print` : barres de navigation masquées,
+//   colonnes réagencées, contenu déplié sur plusieurs pages. Le résultat
+//   est vectoriel, le texte reste sélectionnable et cherchable — c'est
+//   exactement ce qu'on veut pour archiver un arrêté, un formulaire ou un
+//   justificatif.
+//   Ce n'est PAS « la page telle que je la vois » : pour ça, c'est
+//   l'annotation (capture du viewport). Les deux sorties sont
+//   complémentaires et ne se remplacent pas.
+//
+// ⚠️ NE PAS tenter d'y poser les annotations. Les coordonnées des
+//    annotations vivent dans le repère de la capture d'écran ; la mise en
+//    page d'impression est une autre mise en page. La correspondance
+//    entre les deux n'existe pas — ce n'est pas une question d'effort.
+async function enregistrerPageEnPdf(view) {
+  const wc = view?.webContents;
+  if (!wc || wc.isDestroyed()) return;
+  try {
+    // Même leçon que la capture : imprimer une page en cours de
+    // chargement donne un PDF tronqué ou blanc. On laisse au chargement
+    // une chance de finir, sans bloquer indéfiniment si la page traîne.
+    if (wc.isLoadingMainFrame()) {
+      await new Promise((resolve) => {
+        const fini = () => { clearTimeout(t); resolve(); };
+        const t = setTimeout(() => { wc.off("did-stop-loading", fini); resolve(); }, 3000);
+        wc.once("did-stop-loading", fini);
+      });
+      if (wc.isDestroyed()) return;
+    }
+
+    const pdf = await wc.printToPDF({
+      // Sans lui, les fonds et aplats de couleur disparaissent : un
+      // en-tête d'administration ou un tableau tramé perdrait ce qui le
+      // rend reconnaissable.
+      printBackground: true,
+      pageSize: "A4",
+      margins: { marginType: "default" },
+    });
+
+    // Nom proposé à partir du titre de la page, nettoyé : il ne sert qu'à
+    // remplir le dialogue, jamais à construire un chemin.
+    const brut = (wc.getTitle() || nativeT("savePagePdfDefaultName")).trim();
+    const propre = brut.replace(/[\\/:*?"<>|]/g, "-").slice(0, 80) || nativeT("savePagePdfDefaultName");
+    const { filePath, canceled } = await dialog.showSaveDialog(mainWindow, {
+      title: nativeT("savePagePdf"),
+      defaultPath: `${propre}.pdf`,
+      filters: [{ name: "PDF", extensions: ["pdf"] }],
+    });
+    if (canceled || !filePath) return;
+
+    writeFileSync(filePath, pdf);
+    shell.showItemInFolder(filePath);
+  } catch (e) {
+    // Le menu contextuel n'a pas de canal de retour vers l'interface :
+    // l'échec se dit ici, dans la langue courante, ou il ne se dit pas.
+    console.error("[pdf] échec de printToPDF :", e?.message || e);
+    dialog.showMessageBox(mainWindow, {
+      type: "warning",
+      title: nativeT("savePagePdf"),
+      message: nativeT("savePagePdfError"),
+    });
+  }
+}
 
 // Enregistrer l'image annotée sur le disque de l'utilisateur. Utile SANS
 // aucun salon rejoint : annoter puis garder le PNG est un usage complet à
