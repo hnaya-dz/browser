@@ -204,7 +204,39 @@ redémarrage, et par défaut elles sont actives.
 
 ---
 
-## 14. Compatibilité multi-système
+## 14. Annoter une page, et l'envoyer
+
+Décrire une page à un collègue par écrit prend trois phrases et se comprend
+mal. Le bouton **crayon** de la barre d'adresse fige la page et ouvre une
+surface de dessin : **crayon, flèche, rectangle, ellipse, texte et
+caviardage**, en six couleurs et trois épaisseurs.
+
+L'image annotée part par la **Messagerie locale**, comme n'importe quelle
+pièce jointe — donc sur le réseau interne, sans passer par un service
+extérieur. Elle peut aussi être simplement **enregistrée en PNG**, sans
+qu'aucun salon soit ouvert.
+
+**Le caviardage détruit ce qu'il masque.** Un nom, un montant, une adresse
+ne sont pas recouverts : les pixels sont remplacés. Le destinataire ne peut
+pas les retrouver. C'est ce qui permet de faire circuler une capture sans
+faire circuler la donnée qu'elle portait — une exigence courante dans une
+administration.
+
+---
+
+## 15. La page ouverte, en PDF
+
+Un clic droit dans la page, ou un bouton dans le composeur de la
+messagerie : la page est imprimée en **PDF A4**, fonds compris, **texte
+sélectionnable et cherchable**. De quoi archiver un arrêté, un formulaire
+ou un justificatif, ou l'envoyer à un collègue en une fois.
+
+Le PDF rend la page *telle qu'elle s'imprime*. Pour la page *telle qu'on la
+voit*, c'est l'annotation ci-dessus : les deux sorties sont complémentaires.
+
+---
+
+## 16. Compatibilité multi-système
 
 | Système | Format distribué |
 |---|---|

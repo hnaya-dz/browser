@@ -100,6 +100,11 @@ suffit d'ailleurs pas : le code du salon reste exigé, et le QR ne le
 contient jamais. Tout rattachement est horodaté et attribué dans le
 registre de l'administrateur.
 
+> **Refermer le QR.** Le panneau occupe une bonne part du fil. Une **croix
+> en haut du panneau** le referme et rend la place. Elle est toujours
+> présente tant que le QR est affiché : inutile de retrouver le bouton qui
+> l'a ouvert.
+
 > **Limite du canal mobile.** La page doit **rester ouverte** pour recevoir
 > les messages. Les notifications d'écran verrouillé sont hors de portée :
 > la page est servie en `http` sur une adresse privée, ce qui interdit les
@@ -116,11 +121,64 @@ registre de l'administrateur.
   sous une autre demande.
 - **Pièce jointe** : le trombone. Images, PDF, Word, Excel, PowerPoint,
   OpenDocument, texte, CSV, ZIP, et fichiers audio.
+- **La page ouverte, en PDF** : le bouton en forme de document, à côté du
+  trombone. Il imprime la page de l'onglet actif et la joint au message.
+  Le texte du PDF reste sélectionnable et cherchable — c'est un document
+  d'archive, pas une image. *Ce bouton n'apparaît que si un onglet web est
+  ouvert : sur la page d'accueil, il n'y a rien à imprimer.*
 - **Message vocal** : voir la section suivante.
 
 **Limites** : 25 Mo par fichier ; 200 Mo et 60 fichiers par heure et par
 appareil. Ces plafonds protègent la machine hôte, qui est souvent un poste
 ordinaire.
+
+> **Ce que donne le PDF, et ce qu'il ne donne pas.** Il rend la page
+> **telle qu'elle s'imprime** : barres de navigation masquées, contenu
+> déplié sur plusieurs pages. Ce n'est pas la page telle que vous la
+> voyez — pour ça, c'est l'annotation (§4 bis). Les pages très dynamiques
+> (applications web, contenu qui se charge au défilement) s'impriment
+> mal : c'est une limite du procédé, pas un défaut de réglage.
+>
+> Le même document s'obtient hors messagerie : **clic droit dans la page →
+> *Enregistrer la page en PDF***.
+
+---
+
+## 4 bis. Annoter une page et l'envoyer
+
+Décrire une page par écrit prend trois phrases et se comprend mal.
+Entourez plutôt ce dont vous parlez.
+
+Le bouton **crayon** de la barre d'adresse fige la page et ouvre une
+surface de dessin. Vous disposez de six outils — **crayon, flèche,
+rectangle, ellipse, texte, caviardage** — de six couleurs, de trois
+épaisseurs, d'une annulation et d'un effacement complet.
+
+- **Envoyer** dépose l'image annotée dans la messagerie, prête à partir :
+  vous choisissez le fil et ajoutez un mot. *Une annotation ne part jamais
+  toute seule.*
+- **Enregistrer** garde l'image en PNG sur votre disque. Ce bouton
+  fonctionne **sans salon rejoint** : annoter pour soi est un usage
+  complet.
+
+> **Le caviardage détruit ce qu'il masque.** Un nom, un montant, une
+> adresse passés au caviardage ne sont pas recouverts : les pixels sont
+> remplacés. Le destinataire ne peut pas les retrouver. C'est ce qui
+> permet de faire circuler une capture d'écran sans faire circuler la
+> donnée qu'elle portait.
+>
+> Corollaire : le caviardage **prime sur ce qui est dessous**. Posé sur
+> une flèche ou un texte que vous veniez de tracer, il les efface aussi.
+> C'est voulu — masquer une donnée sensible ne doit jamais être empêché
+> par ce qui a été dessiné avant.
+
+L'annotation voyage comme une **image ordinaire**. Le destinataire n'a
+besoin d'aucune version particulière du navigateur pour la recevoir,
+l'ouvrir et l'enregistrer.
+
+Ce qui est capturé, c'est **la partie visible de la page** — ce que vous
+avez sous les yeux, pas la page entière. Faites défiler jusqu'à ce que
+vous voulez montrer, puis annotez.
 
 ---
 

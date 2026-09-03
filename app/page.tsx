@@ -6,7 +6,7 @@ import BuildStamp from "@/components/BuildStamp";
 // ⚠️ Icône VECTORIELLE plutôt qu'un emoji de drapeau : Windows ne rend pas
 // les drapeaux, il affiche les deux lettres encadrées « DZ ». Le bouton
 // portait 🇩🇿 et ne montrait donc aucun drapeau à personne sous Windows.
-import { Compass } from "lucide-react";
+import { Compass, ShoppingCart } from "lucide-react";
 
 const TR = {
   ar: {
@@ -518,7 +518,18 @@ export default function Home() {
                 <input type="text" value={algerieQuery} onChange={(e) => setAlgerieQuery(e.target.value)} onKeyDown={(e) => e.key === "Enter" && performAlgerieSearch()} placeholder={tr.algeriePlaceholder} className="glass-input flex-1 h-11 px-4 rounded text-[14px]" dir={isRTL ? "rtl" : "ltr"} />
                 <button onClick={performAlgerieSearch} className="glass-btn-primary h-11 px-5 rounded font-bold text-white text-[13px]">{tr.algerieButton}</button>
                 <button onClick={() => addTab(algerieQuery.trim() ? `https://hnaya.dz/boutique/?search=${encodeURIComponent(algerieQuery.trim())}` : "https://hnaya.dz/boutique/")} className="glass-btn-amber h-11 px-4 rounded font-bold text-white text-[13px] flex items-center gap-2" data-tutorial="shop-btn">
-                  <img src="/icons/market.png" alt="" className="w-5 h-5 object-contain" />
+                  {/* ⚠️ PICTOGRAMME VECTORIEL, PLUS UNE IMAGE.
+                      C'était `public/icons/market.png` : un rendu 3D brillant
+                      de 172 px, en VERT, réduit à 20 px sur un bouton AMBRE.
+                      À cette taille il n'en restait qu'une tache, et sa
+                      couleur jurait avec le bouton — personne n'y
+                      reconnaissait un panier. Le dossier vidéo notait déjà
+                      que ce n'était « pas un pictogramme de bibliothèque »,
+                      donc introuvable pour qui le cherchait comme tel.
+                      Même trajet que ⬇️ ★ ☆ 📑 🔐 et le drapeau 🇩🇿 avant lui :
+                      un glyphe lucide, net à toute taille, qui suit la
+                      couleur du texte — donc blanc sur l'ambre. */}
+                  <ShoppingCart size={18} />
                   {tr.shop}
                 </button>
               </div>

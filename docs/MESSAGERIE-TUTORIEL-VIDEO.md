@@ -31,19 +31,26 @@ et donne, écran par écran, la liste exhaustive des commandes dans leur
 ordre réel d'affichage. Une reconstitution qui omet un bouton de la §5 est
 à refaire.
 
-**Défaut 3 — le bouton « Achat » n'a jamais pu être reproduit.** Et la
-faute en revenait à ce dossier, non au concepteur : deux de ses règles
-l'interdisaient. La §3 imposait de n'employer que des icônes
-`lucide-react`, alors que celle-ci est une **image** (`market.png`) ; la §4
-affirmait qu'un texte absent de `locales/` n'existe pas, alors que le
-libellé « Achat » est écrit en dur dans `app/page.tsx`. Les deux règles
-sont désormais nuancées, et la console de recherche est décrite en **§5.7**.
+**Défaut 3 — le bouton « Achat » n'a jamais pu être reproduit. ✅ RÉSOLU À
+LA SOURCE le 04/09/2026.** La faute en revenait à ce dossier, non au
+concepteur : deux de ses règles l'interdisaient. La §3 imposait de
+n'employer que des icônes `lucide-react`, alors que celle-ci était une
+**image** (`market.png`) ; la §4 affirmait qu'un texte absent de
+`locales/` n'existe pas, alors que le libellé « Achat » est écrit en dur
+dans `app/page.tsx`.
+
+Les règles avaient d'abord été nuancées, et la console de recherche
+décrite en **§5.7** — mais le bouton restait irreproductible pour qui ne
+peut pas ouvrir un fichier binaire du dépôt. **Le produit a donc été
+changé** : l'icône est désormais `ShoppingCart` de `lucide-react`, comme
+tout le reste. Elle se cherche, se trouve et se dessine comme les autres.
+Il n'existe plus **aucune** icône bitmap dans une barre d'outils.
 
 **Pourquoi la deuxième omission était prévisible, et comment ne pas la répéter :**
-l'interface n'est pas dans un fichier mais dans **treize composants**. Les
+l'interface n'est pas dans un fichier mais dans **quinze composants**. Les
 boutons *Joindre un fichier* et *Enregistrer un message vocal* ne sont pas
 dans `ChatPanel.tsx` — ils vivent dans `ChatComposerMedia.tsx`. Qui n'ouvre
-que le panneau principal ne peut pas les voir. La liste des treize est en
+que le panneau principal ne peut pas les voir. La liste des quinze est en
 §5.0 : ouvrez-les tous.
 
 ---
@@ -90,16 +97,19 @@ soutenu. Pas de « révolutionnaire », pas de « incroyable ». Une
 démonstration vaut mieux qu'une promesse.
 
 **Langues** : français, arabe, anglais. Les trois fichiers de traduction
-comportent **exactement 264 clés `Chat.*` chacun** — aucune langue n'est en
-retard, vous pouvez produire les trois versions sans arbitrage.
+comportent **exactement 268 clés `Chat.*` chacun**, plus **23 clés
+`Annotation.*`** pour la capsule 5 — aucune langue n'est en retard, vous
+pouvez produire les trois versions sans arbitrage. *(Compté le 04/09/2026 ;
+le dossier annonçait 264 avant l'ajout des fonctions de la 0.8.0.)*
 
 **L'arabe est en écriture de droite à gauche** : l'interface bascule
 entièrement, y compris l'alignement des messages et la position des
 boutons. Une version arabe qui garderait la mise en page latine serait
 perçue comme un placage.
 
-**Durée visée** : trois à quatre minutes pour la vidéo complète, ou **quatre capsules**
-autonomes, adressées à des publics différents (§7).
+**Durée visée** : **cinq capsules** autonomes, adressées à des publics
+différents (§7), pour un total d'environ huit minutes. Chacune se diffuse
+seule.
 
 ---
 
@@ -131,7 +141,6 @@ après la vidéo doit retrouver les mêmes signes.
 >
 > | Fichier | Format | Où |
 > |---|---|---|
-> | `public/icons/market.png` | PNG **172×172** | le bouton **Achat** de la console de recherche |
 > | `public/hnaya.png` | PNG | le logo, barre de navigation et page d'accueil |
 > | émojis divers | **émojis** | uniquement À L'INTÉRIEUR des panneaux (`VaultPanel`, `FavoritesPanel`, `DownloadPanel`) — aucune barre d'outils |
 >
@@ -142,10 +151,13 @@ après la vidéo doit retrouver les mêmes signes.
 > `IconForward`, `IconRefresh`, `IconSearch`). N'allez pas chercher les
 > fichiers.
 >
-> **C'est ce qui a empêché de reproduire le bouton « Achat »** : cherché
-> dans `lucide-react`, il n'existe pas ; interdit d'inventer, il ne pouvait
-> qu'être omis. **Reprenez le fichier `market.png` tel quel** — ne le
-> redessinez pas, ne lui cherchez pas d'équivalent.
+> **`public/icons/market.png` a quitté cette liste le 04/09/2026.** C'est
+> lui qui avait empêché de reproduire le bouton « Achat » : cherché dans
+> `lucide-react` il n'existait pas, et il était interdit d'inventer — le
+> bouton ne pouvait qu'être omis. Le produit a été corrigé plutôt que la
+> consigne : l'icône est maintenant `ShoppingCart` de `lucide-react`. Le
+> fichier PNG dort encore dans le dépôt, **plus aucun code ne s'en sert** ;
+> si vous le croisez, ignorez-le.
 
 **Logo** : le fennec à la loupe, `public/icons/icon.ico` — sept tailles de
 16 à 256 px. Pour une animation, partez du 256.
@@ -200,7 +212,7 @@ section `Chat`. **Aucun texte affiché à l'image ne doit être inventé.**
 > commande visible. Une reconstitution qui en omet une est incomplète. Les
 > libellés sont donnés entre guillemets ; ce sont exactement ceux du produit.
 
-### 5.0 Les treize composants à ouvrir
+### 5.0 Les quinze composants à ouvrir
 
 Ne travaillez pas depuis le seul `ChatPanel.tsx` : c'est l'erreur qui a
 produit une interface amputée.
@@ -208,7 +220,7 @@ produit une interface amputée.
 | Composant | Ce qu'il dessine |
 |---|---|
 | `ChatPanel.tsx` | le panneau entier, l'accueil, le fil, la barre d'outils |
-| `ChatComposerMedia.tsx` | **pièce jointe, micro, aperçu avant envoi** |
+| `ChatComposerMedia.tsx` | **pièce jointe, page en PDF, micro, aperçu avant envoi** |
 | `ChatMediaBubble.tsx` | une pièce jointe reçue dans le fil |
 | `ChatRoster.tsx` | l'annuaire et « Mes appareils » |
 | `ChatIdentite.tsx` | le bloc « Vous êtes », pseudo et photo |
@@ -220,6 +232,8 @@ produit une interface amputée.
 | `ChatMeetingChip.tsx` | la pastille épinglée avec compte à rebours |
 | `ChatServerSetup.tsx` | l'installation du serveur permanent |
 | `ChatDockMount.tsx` | le point de montage (rien de visible) |
+| `AnnotationSurface.tsx` | **la surface d'annotation plein écran** *(hors messagerie, 04/09/2026)* |
+| `AnnotationMount.tsx` | son point de montage (rien de visible) |
 
 ### 5.1 Écran A — Accueil du panneau
 
@@ -282,10 +296,16 @@ produit une interface amputée.
    précis »**.
 3. Champ de texte. Son indication **nomme le salon** : **« Écrire dans »**
    *nom du salon*, ou **« Écrire à »** *personne* dans un fil privé.
-4. Bouton **« Joindre un fichier »** *(`ChatComposerMedia`)*.
-5. Bouton **« Enregistrer un message vocal »**, qui devient **« Arrêter
+4. Bouton **« Joindre un fichier »**, icône `Paperclip`
+   *(`ChatComposerMedia`)*.
+5. Bouton **« Joindre la page ouverte, en PDF »**, icône `FileText`
+   *(`ChatComposerMedia`, 04/09/2026)*. **Il n'apparaît que si un onglet
+   web est ouvert** : sur la page d'accueil, il n'y a rien à imprimer, et
+   le bouton est alors *absent*, pas grisé. Ne le dessinez donc pas sur un
+   plan où le navigateur est sur son accueil.
+6. Bouton **« Enregistrer un message vocal »**, qui devient **« Arrêter
    l'enregistrement »** pendant la prise *(`ChatComposerMedia`)*.
-6. Bouton **« Envoyer »**, icône `Send`.
+7. Bouton **« Envoyer »**, icône `Send`.
 
 **Aperçu avant envoi** *(à montrer, c'est un argument)* : le nom du fichier
 ou **« Message vocal · N s »**, le champ **« Ajouter un mot
@@ -352,7 +372,7 @@ Le bouton **Achat** se compose de deux éléments, dans cet ordre :
 
 | Élément | Valeur exacte |
 |---|---|
-| Icône | **`public/icons/market.png`**, PNG 172×172, affiché en 20×20 |
+| Icône | **`ShoppingCart` (lucide)**, taille 18, **blanche** — elle suit la couleur du texte |
 | Libellé `fr` | **« Achat »** |
 | Libellé `en` | **« Buy »** |
 | Libellé `ar` | **« بحث للتسوّق »** |
@@ -362,10 +382,19 @@ saisie. Le tutoriel intégré au produit le décrit ainsi : *« Ce bouton lance
 votre recherche sur Hnaya Market et affiche directement les résultats d'une
 sélection de sites e-commerce algériens connus et fiables. »*
 
-> **À ne pas rater** : l'icône est une **image**, pas un pictogramme de
-> bibliothèque, et le libellé arabe n'est pas la traduction littérale du
-> français — c'est « recherche pour achat ». Reprenez les trois libellés
-> tels quels.
+> **Corrigé le 04/09/2026 — ce point avait fait échouer une
+> reconstitution.** L'icône était `public/icons/market.png` : un rendu 3D
+> brillant de 172 px, **en vert**, réduit à 20 px sur un bouton **ambre**.
+> À cette taille il n'en restait qu'une tache, sa couleur jurait avec le
+> bouton, et surtout ce n'était **pas un pictogramme de bibliothèque** —
+> donc introuvable pour qui le cherchait comme tel. C'est désormais
+> `ShoppingCart` de lucide, comme ⬇️ ★ ☆ 📑 🔐 et le drapeau 🇩🇿 avant lui.
+> Le fichier PNG reste dans le dépôt mais **n'est plus utilisé** : si vous
+> le rencontrez, ignorez-le.
+>
+> **À ne pas rater** : le libellé arabe n'est pas la traduction littérale
+> du français — c'est « recherche pour achat ». Reprenez les trois
+> libellés tels quels.
 
 Le sélecteur **Algérie / Monde** et la barre d'adresse complètent l'écran.
 Leur inventaire complet est en **§5.8**.
@@ -375,10 +404,10 @@ Leur inventaire complet est en **§5.8**.
 ### 5.8 Écran H — Barre d'adresse, navigation et onglets *(hors messagerie)*
 
 > **Liste de contrôle.** À l'œil, un bouton manquant ne se voit pas : on
-> voit une interface plausible. Cochez donc les trente-trois entrées
+> voit une interface plausible. Cochez donc les trente-quatre entrées
 > ci-dessous une par une sur toute reconstitution montrant le navigateur.
 
-#### Barre d'adresse — 11 boutons (`components/urlbar.tsx`)
+#### Barre d'adresse — 12 boutons (`components/urlbar.tsx`)
 
 | # | Icône | Infobulle | Nature de l'icône |
 |---|---|---|---|
@@ -390,9 +419,15 @@ Leur inventaire complet est en **§5.8**.
 | 6 | `Star` | « Retirer des favoris » / ajouter | lucide — **deux états par le remplissage**, ambre `#f5c518` quand la page est en favori |
 | 7 | `BookMarked` | « Favoris » | lucide |
 | 8 | `KeyRound` | « Mots de passe » / « Identifiant enregistré pour ce site » | lucide + pastille `vault-dot` si identifiant connu |
-| 9 | `MessageSquare` | « Messagerie locale » | lucide |
-| 10 | `Bell` | « Notifications » | lucide |
-| 11 | `Shield` | « Confidentialité » | lucide |
+| 9 | **`PenLine`** | **« Annoter la page »** | lucide — **nouveau, 04/09/2026** |
+| 10 | `MessageSquare` | « Messagerie locale » | lucide |
+| 11 | `Bell` | « Notifications » | lucide |
+| 12 | `Shield` | « Confidentialité » | lucide |
+
+Le bouton **9** est nouveau et se place **juste avant** la messagerie :
+les deux se suivent dans l'usage — on annote, puis on envoie au collègue.
+Toute la barre ne s'affiche que sur une page web ; sur l'accueil, elle
+n'existe pas.
 
 **Les entrées 5 à 8 sont celles qui disparaissaient des reconstitutions.**
 Leur icône était un **caractère** — ⬇️ ★ ☆ 📑 🔐 — ni composant ni fichier,
@@ -440,13 +475,32 @@ active portant une **coche**.
 
 Quand une image de fond est déjà posée, cette dernière ligne porte en plus
 un bouton **crayon** (`Pencil`, « Changer l'image »). Le menu **suit le
-thème** : fond sombre sur les thèmes sombres, blanc sur les thèmes clairs
-— ne le dessinez pas systématiquement sombre.
+thème** : fond sombre sur les thèmes sombres, blanc sur les thèmes clairs,
+et une variante propre au **coucher de soleil** — ne le dessinez pas
+systématiquement sombre.
+
+**Trois détails ajoutés depuis, tous nés d'un défaut réel :**
+
+- **L'icône du bouton déclencheur est blanche à 70 %, posée
+  explicitement.** La barre est `bg-black/40` sur tous les thèmes ; un
+  pictogramme vectoriel suit `currentColor` et héritait donc d'une teinte
+  invisible. **L'icône avait purement disparu sur « coucher de soleil »**.
+  L'emoji qui occupait cette place avant avait ses couleurs propres et ne
+  posait pas le problème. Ne représentez jamais ce bouton sans son icône.
+- **Le contour des pastilles contraste avec le MENU, pas avec la couleur
+  montrée.** Sur le menu blanc, un contour blanc faisait disparaître les
+  pastilles « Clair » et « Blanc » — les deux seules concernées.
+- **Le menu est un vrai menu au sens de l'accessibilité** :
+  `aria-haspopup="menu"` sur le bouton, `role="menu"` sur la liste,
+  `aria-checked` sur la ligne active — c'est un choix **exclusif**, pas
+  une série de cases. Il se parcourt au clavier.
 
 > Le code porte ici une note explicite : *« Icône vectorielle : rendu
-> identique sur Windows 10 et 11, contrairement aux emoji »*. Cette barre a
-> donc **déjà** été migrée vers des icônes vectorielles — la barre
-> d'adresse, non. Représentez chacune telle qu'elle est aujourd'hui.
+> identique sur Windows 10 et 11, contrairement aux emoji »*. Cette barre
+> a **déjà** été migrée vers des icônes vectorielles, et la barre
+> d'adresse l'a été depuis (18/08/2026), tout comme le bouton « Achat »
+> (04/09/2026). **Il ne reste plus aucune icône bitmap ni emoji dans
+> l'interface.** Représentez chaque commande telle qu'elle est aujourd'hui.
 
 #### Onglets — 6 boutons (`components/tabbar.tsx`)
 
@@ -462,7 +516,7 @@ liste latérale.
 | 1 | **« Algérie »** | sélecteur de portée, état actif visible |
 | 2 | **« Monde »** | idem |
 | 3 | bouton de recherche Algérie | style `glass-btn-primary` |
-| 4 | **`market.png` + « Achat »** | style `glass-btn-amber` — **ambre**, voir §5.7 |
+| 4 | **`ShoppingCart` + « Achat »** | style `glass-btn-amber` — **ambre**, icône **blanche**, voir §5.7 |
 | 5 | bouton de recherche Monde | |
 | 6 | `Compass` + « Découvrir » | lucide — **remplace l'émoji drapeau 🇩🇿** depuis le 18/08/2026 |
 
@@ -471,6 +525,10 @@ liste latérale.
 > montrait donc aucun drapeau à personne. Si vous tombez sur une capture
 > d'écran antérieure au 18/08/2026, c'est « DZ » que vous y verrez : ne la
 > prenez pas pour référence.
+>
+> De même, toute capture antérieure au **04/09/2026** montre au bouton
+> « Achat » une petite image verte brillante au lieu du panier blanc :
+> même consigne, ne la prenez pas pour référence.
 
 
 ---
@@ -495,10 +553,10 @@ Elles ne sont pas indicatives.
 
 ---
 
-## 7. Découpage — quatre capsules
+## 7. Découpage — cinq capsules
 
 Le découpage n'est plus une suite de séquences interchangeables : il est
-organisé en **quatre capsules**, chacune **autonome** et adressée à un
+organisé en **cinq capsules**, chacune **autonome** et adressée à un
 **public différent**. Une capsule se diffuse seule, sans les autres, et se
 comprend sans les avoir vues.
 
@@ -508,6 +566,7 @@ comprend sans les avoir vues.
 | **2. Le salon et le mobile** | tout utilisateur | ~2 min | savoir s'en servir dès le lendemain |
 | **3. Décider dans le fil** | direction, encadrement | ~1 min 15 | voir la trace d'une décision |
 | **4. Serveur permanent et licence** | **administrateur informatique** | ~3 min | savoir l'installer et l'exploiter |
+| **5. Annoter une page, l'envoyer** | tout utilisateur | ~1 min 15 | montrer une page à un collègue sans la décrire |
 
 > **La capsule 4 ne s'adresse pas au même monde que les trois autres.**
 > Elle parle à quelqu'un qui installe et exploite, pas à quelqu'un qui
@@ -809,6 +868,82 @@ pas la porte. Il lui faut aussi le code de ce salon.
 **Clore la capsule 4 sur** : l'adresse de contact pour la licence,
 **+213 558 303 030** et **contact@hnaya.dz**, sans slogan.
 
+---
+
+## Capsule 5 — Annoter une page, l'envoyer · ~1 min 15 · tout utilisateur
+
+*Ajoutée le 04/09/2026, pour les fonctions livrées en 0.8.0.*
+
+**Le problème que cette capsule résout, et qu'il faut montrer avant la
+solution** : décrire une page à un collègue par écrit prend trois phrases
+et se comprend mal. « Le bouton en bas à droite, non, l'autre, celui sous
+le tableau. » C'est ce moment-là qu'il faut mettre à l'image en ouverture
+— pas l'outil.
+
+**Ce qui n'est pas à dire** : ne présentez pas ces fonctions comme une
+suite bureautique ni comme un concurrent d'un lecteur de PDF. Ce sont deux
+gestes courts, à l'intérieur du navigateur.
+
+### 5.1 — Entourer, et envoyer · 40 s · ≥ 10 plans
+
+**À l'image** : une page web ouverte. Le bouton **`PenLine`** de la barre
+d'adresse (le 9ᵉ, **juste avant** la messagerie). La page **se fige** et la
+surface d'annotation s'ouvre en plein écran. Une flèche tracée vers un
+élément, un rectangle, un mot écrit avec l'outil **Texte**. Puis
+**« Envoyer »**, et le dock de messagerie qui s'ouvre avec l'image déjà
+attachée, prête à partir.
+
+**Narration** : « Vous entourez ce dont vous parlez, et vous l'envoyez à
+votre collègue. Il reçoit l'image dans le salon, comme une pièce jointe
+ordinaire — sur votre réseau, comme le reste. »
+
+**Exactitudes à respecter, chacune vérifiée dans le produit :**
+
+- La barre d'outils comporte **six outils, dans cet ordre** : crayon,
+  flèche, rectangle, ellipse, texte, **caviardage** — puis six couleurs,
+  trois épaisseurs, annuler, tout effacer, et enfin **« Enregistrer »** et
+  **« Envoyer »**.
+- **Le bouton « Envoyer » est indisponible tant qu'aucun salon n'est
+  rejoint**, et une note ambre dit pourquoi. Si votre plan montre
+  « Envoyer » actif, le salon doit être ouvert à l'image. **« Enregistrer »
+  reste toujours disponible** : annoter puis garder l'image est un usage
+  complet à lui seul.
+- C'est une **capture figée**, pas un calque sur la page vivante. Ne
+  montrez pas la page qui continue de défiler sous les annotations.
+- L'annotation part comme **pièce jointe image ordinaire**. Le
+  destinataire n'a besoin d'aucune version particulière : un poste resté
+  en 0.7.7 la reçoit et l'ouvre normalement.
+
+### 5.2 — Le caviardage, et la page en PDF · 35 s · ≥ 9 plans
+
+**À l'image** : l'outil **caviardage** passé sur un nom ou un montant, et
+la zone qui devient illisible. Puis, dans le composeur, le bouton
+**`FileText`** à côté du trombone : la page part **en PDF**, texte
+sélectionnable, et la pièce jointe apparaît avec son nom et son poids.
+
+**Narration** : « Un nom, un montant, une adresse : vous les masquez avant
+d'envoyer. Et si c'est la page entière qui doit être archivée, elle part en
+PDF, avec son texte, prête à être classée. »
+
+**Exactitudes à respecter :**
+
+- **Le caviardage détruit les pixels, il ne les recouvre pas.** C'est
+  l'argument, et il est vrai : le destinataire ne peut pas les retrouver.
+  Dites-le.
+- **Le caviardage prime sur ce qui est dessous** : posé sur une annotation
+  antérieure, il l'efface. C'est voulu.
+- Le bouton PDF du composeur **n'existe que si un onglet web est ouvert**.
+- Le PDF est celui de la page **telle qu'elle s'imprime** (`@media print`)
+  — barres de navigation masquées, contenu déplié sur plusieurs pages. Ce
+  n'est pas la capture annotée, qui montre la page **telle qu'on la voit**.
+  **Les deux sorties sont complémentaires** : ne les présentez pas comme
+  deux façons de faire la même chose.
+- Le même document s'obtient aussi hors messagerie : **clic droit dans la
+  page → « Enregistrer la page en PDF »**.
+
+**Clore la capsule 5 sur** : l'image annotée reçue dans le fil, côté
+destinataire. Pas sur l'outil.
+
 **Clore la série sur** : le logo, et une phrase unique. « Hnaya — votre
 messagerie reste chez vous. »
 
@@ -867,11 +1002,11 @@ déception à la démonstration client :
 | Ce qu'il faut | Où le prendre |
 |---|---|
 | Interface poste | L'application, panneau latéral de messagerie |
-| Anatomie des commandes | Les treize composants de la §5.0 |
+| Anatomie des commandes | Les quinze composants de la §5.0 |
 | Interface mobile | `chat-module/mobile/index.html`, port 4803 |
 | Logo, toutes tailles | `public/icons/icon.ico` |
 | Écrans peuplés sans données réelles | `chat-module/tools/demo.mjs` |
-| Textes exacts, 3 langues | `locales/{fr,en,ar}.json`, section `Chat` — 264 clés chacune |
+| Textes exacts, 3 langues | `locales/{fr,en,ar}.json`, sections `Chat` (268 clés) et `Annotation` (23 clés) |
 
 Capturez en 1920×1080, thème sombre, langue française d'abord ; les
 versions arabe et anglaise se déclinent ensuite depuis le même découpage,
@@ -880,13 +1015,15 @@ en tenant compte du sens de lecture pour l'arabe.
 **Contrôle avant livraison** — trois questions, dans cet ordre :
 
 1. Chaque écran reconstitué porte-t-il **toutes** les commandes de la §5 —
-   **y compris les 33 boutons hors messagerie des §5.7 et §5.8** ?
+   **y compris les 34 boutons hors messagerie des §5.7 et §5.8** ?
 2. Chaque séquence atteint-elle son **nombre minimal de plans** (§6) ?
 3. Chaque texte affiché existe-t-il dans `locales/fr.json` **ou dans
    `app/page.tsx`** ?
-4. Les icônes qui sont des **fichiers image** — `market.png`, `hnaya.png`,
-   les SVG de navigation — sont-elles reprises telles quelles, et non
-   redessinées ni remplacées par un pictogramme approchant ?
+4. Les icônes qui sont des **fichiers image** — `hnaya.png`, les SVG de
+   navigation — sont-elles reprises telles quelles, et non redessinées ni
+   remplacées par un pictogramme approchant ? *(`market.png` ne figure plus
+   dans cette liste : le bouton « Achat » porte désormais un pictogramme
+   lucide — voir §5.7.)*
 
 Une réponse négative à l'une des quatre se corrige avant montage.
 
@@ -899,9 +1036,9 @@ docs\MESSAGERIE-TUTORIEL-VIDEO.md   ← ce document
 docs\MESSAGERIE-GUIDE.md            ← le guide d'utilisation
 docs\PRODUIT.md                     ← la fiche produit, pour le ton et les arguments
 locales\                            ← les textes de l'interface, 3 langues
-components\Chat*.tsx                ← les treize composants de l'interface
+components\Chat*.tsx                ← les composants de la messagerie
+components\Annotation*.tsx          ← la surface d'annotation (capsule 5)
 public\icons\icon.ico               ← le logo, 7 tailles de 16 à 256
-public\icons\market.png            ← l'icône du bouton « Achat » (PNG 172×172)
 app\page.tsx                       ← la console de recherche et SES libellés
 chat-module\mobile\                 ← l'interface téléphone
 chat-module\tools\demo.mjs          ← le jeu de démonstration
