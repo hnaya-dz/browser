@@ -202,7 +202,8 @@ const NATIVE_LABELS = {
         copyPageUrl: "نسخ عنوان الصفحة", images: "الصور", allFiles: "كل الملفات",
         chooseFolder: "اختر مجلد التحميل",
         noSuggestions: "لا توجد اقتراحات", addToDictionary: "إضافة إلى القاموس",
-        adminExportTitle: "تصدير سجل المراسلة" },
+        adminExportTitle: "تصدير سجل المراسلة",
+        annotationSaveTitle: "حفظ الصفحة المُعلَّقة", annotationDefaultName: "تعليق" },
   fr: { copy: "Copier", cut: "Couper", paste: "Coller", selectAll: "Tout sélectionner",
         saveImage: "Enregistrer l'image", copyImageUrl: "Copier l'adresse de l'image",
         openLinkNewTab: "Ouvrir le lien dans un nouvel onglet", copyLinkUrl: "Copier l'adresse du lien",
@@ -210,7 +211,8 @@ const NATIVE_LABELS = {
         copyPageUrl: "Copier l'URL de la page", images: "Images", allFiles: "Tous les fichiers",
         chooseFolder: "Choisir le dossier de téléchargement",
         noSuggestions: "Aucune suggestion", addToDictionary: "Ajouter au dictionnaire",
-        adminExportTitle: "Exporter l'historique de la messagerie" },
+        adminExportTitle: "Exporter l'historique de la messagerie",
+        annotationSaveTitle: "Enregistrer la page annotée", annotationDefaultName: "annotation" },
   en: { copy: "Copy", cut: "Cut", paste: "Paste", selectAll: "Select all",
         saveImage: "Save image", copyImageUrl: "Copy image address",
         openLinkNewTab: "Open link in new tab", copyLinkUrl: "Copy link address",
@@ -218,7 +220,8 @@ const NATIVE_LABELS = {
         copyPageUrl: "Copy page URL", images: "Images", allFiles: "All files",
         chooseFolder: "Choose download folder",
         noSuggestions: "No suggestions", addToDictionary: "Add to dictionary",
-        adminExportTitle: "Export messaging history" },
+        adminExportTitle: "Export messaging history",
+        annotationSaveTitle: "Save annotated page", annotationDefaultName: "annotation" },
 };
 const nativeT = (key) => (NATIVE_LABELS[appLang] || NATIVE_LABELS.fr)[key] || key;
 
@@ -2310,5 +2313,84 @@ ipcMain.on("navigate", (event, url) => {
       view.webContents.loadURL(finalUrl);
       mainWindow.webContents.send("update-url", activeTabId, finalUrl);
     }
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════
+// Annotation de pages (phase 1) — voir docs/ANNOTATION-CADRAGE.md
+// ═══════════════════════════════════════════════════════════════
+// POURQUOI UNE CAPTURE ET NON UN CALQUE SUR LA PAGE VIVANTE :
+//   une surface React ne peut PAS flotter au-dessus d'une
+//   WebContentsView — la vue recouvre nativement le DOM de l'interface
+//   (même raison qui fait que le dock de messagerie RÉTRÉCIT la vue au
+//   lieu de la survoler). On fige donc l'image, et on annote l'image.
+//   Bénéfice second, décisif : on ne se bat ni avec les CSP strictes, ni
+//   avec les applications monopage, ni avec le défilement infini.
+//
+// ⚠️ LA CAPTURE NE SORT JAMAIS D'ELLE-MÊME. Elle revient au renderer, et
+//    rien ne part tant que l'utilisateur n'a pas cliqué « Envoyer » ou
+//    « Enregistrer ». Aucune écriture disque ici.
+ipcMain.handle("annotate-capture", async () => {
+  try {
+    if (!activeTabId || !browserViews.has(activeTabId)) return { ok: false, error: "no-view" };
+    const view = browserViews.get(activeTabId);
+    const wc = view?.webContents;
+    if (!wc || wc.isDestroyed()) return { ok: false, error: "no-view" };
+
+    // Viewport visible seulement (décision produit, cadrage §9) : une
+    // capture pleine page peut dépasser le plafond du canal média et
+    // n'aboutit pas sur les pages à défilement infini.
+    //
+    // ⚠️ UNE VUE QUI N'A PAS ENCORE PEINT REND UNE IMAGE DE TAILLE NULLE.
+    // Observé en test : cliquer « Annoter » juste après avoir validé une
+    // adresse renvoyait un échec, alors que la même action une seconde
+    // plus tard fonctionnait. Une seule reprise suffit à absorber la
+    // course au premier affichage ; au-delà, c'est la page qui ne
+    // s'affiche pas, et il faut le dire plutôt que de boucler.
+    let image = await wc.capturePage();
+    if (!image.getSize().width || !image.getSize().height) {
+      await new Promise((r) => setTimeout(r, 400));
+      image = await wc.capturePage();
+    }
+    const size = image.getSize();
+    if (!size.width || !size.height) return { ok: false, error: "empty" };
+
+    return {
+      ok: true,
+      // Uint8Array : clone structuré natif d'Electron, bien plus efficace
+      // qu'une chaîne base64 — même choix que chat-media-download.
+      bytes: new Uint8Array(image.toPNG()),
+      w: size.width,
+      h: size.height,
+      url: wc.getURL(),
+      title: wc.getTitle(),
+    };
+  } catch (e) {
+    return { ok: false, error: e?.message || "capture" };
+  }
+});
+
+// Enregistrer l'image annotée sur le disque de l'utilisateur. Utile SANS
+// aucun salon rejoint : annoter puis garder le PNG est un usage complet à
+// lui seul (décision produit, cadrage §9).
+ipcMain.handle("annotate-save", async (event, { bytes, suggestedName }) => {
+  try {
+    if (!bytes) return { ok: false, error: "empty" };
+    // ⚠️ Le nom proposé vient du renderer : on n'en garde que la partie
+    // fichier, jamais un chemin. Un « ../.. » dans defaultPath ferait
+    // pointer le dialogue ailleurs que là où l'utilisateur croit être.
+    const brut = String(suggestedName || nativeT("annotationDefaultName"));
+    const propre = brut.replace(/[\\/:*?"<>|]/g, "-").slice(0, 80) || nativeT("annotationDefaultName");
+    const { filePath, canceled } = await dialog.showSaveDialog(mainWindow, {
+      title: nativeT("annotationSaveTitle"),
+      defaultPath: `${propre}.png`,
+      filters: [{ name: "PNG", extensions: ["png"] }],
+    });
+    if (canceled || !filePath) return { ok: false, error: "canceled" };
+    writeFileSync(filePath, Buffer.from(bytes));
+    shell.showItemInFolder(filePath);
+    return { ok: true, path: filePath };
+  } catch (e) {
+    return { ok: false, error: e?.message || "save" };
   }
 });

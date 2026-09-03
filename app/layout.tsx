@@ -14,6 +14,7 @@ import URLBar from "@/components/urlbar";
 import HtmlWrapper from "@/components/html-wrapper";
 import UpdateBannerClient from "@/components/UpdateBannerClient";
 import ChatDockMount from "@/components/ChatDockMount";
+import AnnotationMount from "@/components/AnnotationMount";
 import ExternalOpenNotice from "@/components/ExternalOpenNotice";
 import { TutorialOverlay } from "@/components/TutorialOverlay";
 import TutorialBootstrap from "@/components/TutorialBootstrap";
@@ -77,6 +78,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                         <UpdateBannerClient />
                         {/* ✅ Dock Messagerie locale — point de montage unique, piloté par le store global */}
                         <ChatDockMount />
+                        {/* ✅ Surface d'annotation de pages — point de montage unique,
+                            piloté par le store (voir docs/ANNOTATION-CADRAGE.md) */}
+                        <AnnotationMount />
                         {/* ✅ Bandeau « ouvert dans le navigateur système » (connexion Google).
                             Monté ICI et non dans la barre d'adresse : celle-ci se remonte au
                             changement d'onglet, ce qui effaçait le bandeau avant affichage. */}

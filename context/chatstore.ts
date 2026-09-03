@@ -12,6 +12,9 @@
 import { useEffect, useState } from "react";
 import { jouerSon, amorcerSon } from "./chat-sound";
 import { publier as publierNotif, viderSource } from "./notifications";
+// Import de TYPE uniquement (effacé à la compilation) : le store ne tire
+// pas le composant, il ne fait que décrire la forme de ce qu'on lui dépose.
+import type { PreparedMedia } from "@/components/ChatComposerMedia";
 
 export interface ChatMessage {
   id: string;
@@ -318,6 +321,14 @@ export interface ChatStore {
   adminAnnuaire: AdminDevice[];
   adminComposition: { fingerprint: string; lastNickname?: string | null; label?: string | null; role?: string | null }[];
   adminSalonCompose: string | null;
+  // ── Annotation de pages ──────────────────────────────────────────────
+  // Pièce jointe DÉPOSÉE DE L'EXTÉRIEUR du dock (aujourd'hui : la surface
+  // d'annotation). Elle transite par le store et non par une prop, parce
+  // que le déposant et le composeur ne se connaissent pas : la surface est
+  // montée dans la mise en page, le composeur vit au fond du dock.
+  // ChatPanel la consomme puis la remet à null — c'est un passage de
+  // relais, PAS un état durable.
+  pieceJointeDeposee: PreparedMedia | null;
 }
 
 export interface AdminDevice {
@@ -393,7 +404,25 @@ export const store: ChatStore = {
   adminAnnuaire: [],
   adminComposition: [],
   adminSalonCompose: null,
+  pieceJointeDeposee: null,
 };
+
+/**
+ * Dépose une pièce jointe dans le composeur et ouvre le dock.
+ *
+ * Utilisé par la surface d'annotation : l'image annotée devient une pièce
+ * jointe ORDINAIRE. Rien n'est ajouté au protocole — elle emprunte le
+ * canal média existant (chat-module/src/media.js), donc elle hérite sans
+ * rien redemander de l'empreinte sha256, du quota par appareil et de la
+ * purge de rétention.
+ *
+ * ⚠️ N'ENVOIE RIEN. L'utilisateur choisit le fil, ajoute son texte, et
+ *    clique Envoyer lui-même. Une annotation ne part jamais toute seule.
+ */
+export function deposerPieceJointe(media: PreparedMedia) {
+  patchStore({ pieceJointeDeposee: media });
+  setPanelOpen(true);
+}
 
 /** Envoie une commande admin au salon (réponse via l'événement
  *  "admin-result"). Le PIN est fourni à chaque appel — jamais persisté. */

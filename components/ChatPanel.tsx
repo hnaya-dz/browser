@@ -222,6 +222,17 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
   // aucune conversion, sinon avancement 0..1.
   const [converting, setConverting] = useState<number | null>(null);
   const [mediaError, setMediaError] = useState("");
+  // Annotation de pages — une image annotée déposée depuis la surface
+  // (hors du dock) transite par le store, faute de chemin direct entre
+  // deux composants qui ne se connaissent pas. On la reprend ici, puis on
+  // VIDE le dépôt : sans cela, refermer puis rouvrir le dock reproposerait
+  // indéfiniment la même pièce jointe.
+  useEffect(() => {
+    if (!store.pieceJointeDeposee) return;
+    setPendingMedia(store.pieceJointeDeposee);
+    setMediaError("");
+    patchStore({ pieceJointeDeposee: null });
+  }, [store.pieceJointeDeposee]);
   const [setupBusy, setSetupBusy] = useState(false);
   // false = masqué ; "guest" = inviter quelqu'un d'autre ; "mine" = lier
   // SON PROPRE téléphone (le QR emporte alors le pseudo courant)

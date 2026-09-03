@@ -53,6 +53,9 @@ const ALLOWED_INVOKE = [
   "chat-server-uninstall",
   // ✅ Confidentialité — interrupteurs utilisateur
   "privacy-get-settings",
+  // ✅ Annotation de pages (voir docs/ANNOTATION-CADRAGE.md)
+  "annotate-capture",
+  "annotate-save",
 ];
 
 const ALLOWED_SEND = [

@@ -15,8 +15,9 @@ import { useTranslation } from "@/hooks/useTranslation";
 // apparaissent en deux lettres encadrées). Quatre boutons de cette barre
 // employaient encore ⬇️ ★ ☆ 📑 🔐 ; ils sont passés à lucide-react, qui
 // rend le même trait partout et suit la couleur du texte.
-import { MessageSquare, Shield, Bell, Download, Star, BookMarked, KeyRound } from "lucide-react";
+import { MessageSquare, Shield, Bell, Download, Star, BookMarked, KeyRound, PenLine } from "lucide-react";
 import { setPanelOpen, useChatSnapshot } from "@/context/chatstore";
+import { ouvrirAnnotation } from "@/context/annotationstore";
 import { useNotifications } from "@/context/notifications";
 
 const VaultPanel = dynamic(() => import("./VaultPanel"), { ssr: false });
@@ -382,6 +383,21 @@ export default function URLBar() {
             {hasCredentials && <span className="vault-dot" />}
           </button>
         </div>
+
+        {/* Bouton annotation — capture la vue puis ouvre la surface de
+            dessin. Placé juste avant la messagerie : les deux se suivent
+            dans l'usage (annoter, puis envoyer au collègue). Il ne
+            s'affiche que sur une page web, comme toute cette barre.
+            L'annotation fonctionne SANS salon rejoint : on peut annoter
+            et enregistrer le PNG seul. */}
+        <button
+          onClick={() => { void ouvrirAnnotation(); }}
+          className="urlbar-btn"
+          title={t("Annotation.titre")}
+          data-tutorial="annotate-btn"
+        >
+          <PenLine size={16} />
+        </button>
 
         {/* Bouton messagerie locale (LAN) — icône vectorielle, rendu
             identique sur Windows 10 et 11 contrairement aux emoji.
