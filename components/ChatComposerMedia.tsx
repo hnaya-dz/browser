@@ -11,7 +11,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/hooks/useTranslation";
-import { Paperclip, Mic, Square, X } from "lucide-react";
+import { Paperclip, Mic, Square, X, FileText } from "lucide-react";
 
 // Une photo de téléphone fait 3 à 8 Mo ; réduite à 1600 px de côté et
 // réencodée en JPEG, elle tombe à 300-800 Ko sans différence visible à
@@ -233,6 +233,11 @@ interface Props {
   muted: string;
   border: string;
   disabled?: boolean;
+  /** Un onglet web est-il ouvert ? Le bouton « joindre la page en PDF »
+   *  n'apparaît que dans ce cas : sur la page d'accueil, il n'y a
+   *  simplement rien à imprimer. Masqué plutôt que grisé — un bouton
+   *  éteint en permanence finit par ne plus être lu. */
+  pageDisponible?: boolean;
   onPrepared: (m: PreparedMedia) => void;
   onError: (msg: string) => void;
   // Étape E (audio hors liste) — conversion en cours, avec avancement
@@ -242,8 +247,9 @@ interface Props {
   onConverting?: (fraction: number | null) => void;
 }
 
-export default function ChatComposerMedia({ accent, muted, border, disabled, onPrepared, onError, onConverting }: Props) {
+export default function ChatComposerMedia({ accent, muted, border, disabled, pageDisponible, onPrepared, onError, onConverting }: Props) {
   const { t } = useTranslation();
+  const [pdfEnCours, setPdfEnCours] = useState(false);
   const fileInput = useRef<HTMLInputElement | null>(null);
   const recorder = useRef<MediaRecorder | null>(null);
   const chunks = useRef<Blob[]>([]);
@@ -253,6 +259,37 @@ export default function ChatComposerMedia({ accent, muted, border, disabled, onP
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const pick = () => fileInput.current?.click();
+
+  /** Joint la page ouverte, imprimée en PDF. Le document est produit par le
+   *  process principal (même moteur que « Enregistrer la page en PDF », donc
+   *  les deux sorties ne peuvent pas diverger), puis déposé comme une pièce
+   *  jointe ORDINAIRE : rien n'est envoyé, l'utilisateur rédige et valide.
+   *  `application/pdf` est déjà admis par l'hôte — aucun changement de
+   *  protocole. */
+  const joindrePagePdf = async () => {
+    if (pdfEnCours) return;
+    setPdfEnCours(true);
+    try {
+      const res = await (window as any)?.electronAPI?.invoke("page-to-pdf");
+      if (!res?.ok) {
+        onError(res?.error === "no-view" ? t("Chat.pdfNoPage") : t("Chat.pdfFailed"));
+        return;
+      }
+      const bytes: ArrayBuffer = (res.bytes as Uint8Array).slice().buffer;
+      onPrepared({
+        kind: "file",
+        mime: "application/pdf",
+        bytes,
+        size: bytes.byteLength,
+        name: res.name,
+        thumb: null,
+      });
+    } catch {
+      onError(t("Chat.pdfFailed"));
+    } finally {
+      setPdfEnCours(false);
+    }
+  };
 
   const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -344,6 +381,20 @@ export default function ChatComposerMedia({ accent, muted, border, disabled, onP
       <button onClick={pick} disabled={disabled} style={btn} title={t("Chat.mediaAttach")} aria-label={t("Chat.mediaAttach")}>
         <Paperclip size={15} />
       </button>
+      {/* Joindre la page ouverte, imprimée en PDF. À côté du trombone :
+          c'est la même action — attacher un document — appliquée à ce
+          qu'on est en train de regarder. */}
+      {pageDisponible && (
+        <button
+          onClick={joindrePagePdf}
+          disabled={disabled || pdfEnCours}
+          style={{ ...btn, opacity: disabled || pdfEnCours ? 0.4 : 1 }}
+          title={t("Chat.attachPagePdf")}
+          aria-label={t("Chat.attachPagePdf")}
+        >
+          <FileText size={15} />
+        </button>
+      )}
       <button
         onClick={toggleRecord}
         disabled={disabled}

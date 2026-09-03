@@ -421,7 +421,10 @@
     "writeToPrefix": "Write to",
     "roomBannerPeople": "online",
     "roomBannerAll": "everyone in the room",
-    "serverErrOtherInstall": "A Hnaya server is already installed on this machine by the standalone module. The two services would compete for the same ports. Remove it before installing from the browser."
+    "serverErrOtherInstall": "A Hnaya server is already installed on this machine by the standalone module. The two services would compete for the same ports. Remove it before installing from the browser.",
+    "attachPagePdf": "Attach the open page as PDF",
+    "pdfNoPage": "No web page open to attach.",
+    "pdfFailed": "Creating the PDF failed. Highly dynamic pages cannot always be printed."
   },
   "Annotation": {
     "titre": "Annotate page",

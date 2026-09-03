@@ -146,7 +146,10 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
   const { t } = useTranslation();
   const { isRTL } = useLanguage();
   const { position } = useTabPosition();
-  const { addTab } = useTabContext();
+  const { addTab, tabs, activeTab } = useTabContext();
+  // Un onglet WEB est-il ouvert ? Conditionne le bouton « joindre la page
+  // en PDF » : sur l'accueil, il n'y a rien à imprimer.
+  const pageDisponible = tabs.some((o) => o.id === activeTab && !o.isHome);
   const dir = isRTL ? "rtl" : "ltr";
   useChatSnapshot();
 
@@ -2415,6 +2418,7 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
                 <ChatComposerMedia
                   accent={accent} muted={muted} border={border}
                   disabled={store.licenceReadOnly || mediaBusy || !!pendingMedia || converting !== null}
+                  pageDisponible={pageDisponible}
                   onPrepared={(m) => { setPendingMedia(m); setMediaError(""); }}
                   onError={(msg) => setMediaError(msg)}
                   onConverting={setConverting}

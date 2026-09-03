@@ -421,7 +421,10 @@
     "writeToPrefix": "Écrire à",
     "roomBannerPeople": "en ligne",
     "roomBannerAll": "tout le salon",
-    "serverErrOtherInstall": "Un serveur Hnaya est déjà installé sur ce poste par le module autonome. Les deux services se disputeraient les mêmes ports. Retirez-le avant d'installer depuis le navigateur."
+    "serverErrOtherInstall": "Un serveur Hnaya est déjà installé sur ce poste par le module autonome. Les deux services se disputeraient les mêmes ports. Retirez-le avant d'installer depuis le navigateur.",
+    "attachPagePdf": "Joindre la page ouverte, en PDF",
+    "pdfNoPage": "Aucune page web ouverte à joindre.",
+    "pdfFailed": "La création du PDF a échoué. Les pages très dynamiques ne peuvent pas toujours être imprimées."
   },
   "Annotation": {
     "titre": "Annoter la page",

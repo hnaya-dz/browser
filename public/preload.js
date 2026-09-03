@@ -56,6 +56,8 @@ const ALLOWED_INVOKE = [
   // ✅ Annotation de pages (voir docs/ANNOTATION-CADRAGE.md)
   "annotate-capture",
   "annotate-save",
+  // ✅ Joindre la page en PDF à un message
+  "page-to-pdf",
 ];
 
 const ALLOWED_SEND = [

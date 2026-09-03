@@ -2401,35 +2401,60 @@ ipcMain.handle("annotate-capture", async () => {
 //    annotations vivent dans le repère de la capture d'écran ; la mise en
 //    page d'impression est une autre mise en page. La correspondance
 //    entre les deux n'existe pas — ce n'est pas une question d'effort.
+// Génère le PDF de la vue. Partagé par les deux sorties — enregistrer sur
+// le disque, et joindre à un message — pour qu'elles ne puissent pas
+// diverger : même moteur, mêmes réglages, même document.
+async function genererPdfDeLaVue(wc) {
+  // Même leçon que la capture : imprimer une page en cours de chargement
+  // donne un PDF tronqué ou blanc. On laisse au chargement une chance de
+  // finir, sans bloquer indéfiniment si la page traîne.
+  if (wc.isLoadingMainFrame()) {
+    await new Promise((resolve) => {
+      const fini = () => { clearTimeout(t); resolve(); };
+      const t = setTimeout(() => { wc.off("did-stop-loading", fini); resolve(); }, 3000);
+      wc.once("did-stop-loading", fini);
+    });
+  }
+  return wc.printToPDF({
+    // Sans lui, les fonds et aplats de couleur disparaissent : un en-tête
+    // d'administration ou un tableau tramé perdrait ce qui le rend
+    // reconnaissable.
+    printBackground: true,
+    pageSize: "A4",
+    margins: { marginType: "default" },
+  });
+}
+
+/** Nom de fichier proposé, dérivé du titre. Le nom ne sert qu'à remplir un
+ *  dialogue ou une pièce jointe — jamais à construire un chemin. */
+function nomDeFichierPdf(wc) {
+  const brut = (wc.getTitle() || nativeT("savePagePdfDefaultName")).trim();
+  return brut.replace(/[\\/:*?"<>|]/g, "-").slice(0, 80) || nativeT("savePagePdfDefaultName");
+}
+
+// Joindre la page en PDF à un message : renvoie les octets au renderer, qui
+// les dépose dans le composeur. AUCUNE écriture disque, AUCUN envoi — c'est
+// l'utilisateur qui rédige et envoie, comme pour toute pièce jointe.
+ipcMain.handle("page-to-pdf", async () => {
+  try {
+    if (!activeTabId || !browserViews.has(activeTabId)) return { ok: false, error: "no-view" };
+    const wc = browserViews.get(activeTabId)?.webContents;
+    if (!wc || wc.isDestroyed()) return { ok: false, error: "no-view" };
+    const pdf = await genererPdfDeLaVue(wc);
+    return { ok: true, bytes: new Uint8Array(pdf), name: `${nomDeFichierPdf(wc)}.pdf` };
+  } catch (e) {
+    console.error("[pdf] échec de printToPDF (pièce jointe) :", e?.message || e);
+    return { ok: false, error: "print" };
+  }
+});
+
 async function enregistrerPageEnPdf(view) {
   const wc = view?.webContents;
   if (!wc || wc.isDestroyed()) return;
   try {
-    // Même leçon que la capture : imprimer une page en cours de
-    // chargement donne un PDF tronqué ou blanc. On laisse au chargement
-    // une chance de finir, sans bloquer indéfiniment si la page traîne.
-    if (wc.isLoadingMainFrame()) {
-      await new Promise((resolve) => {
-        const fini = () => { clearTimeout(t); resolve(); };
-        const t = setTimeout(() => { wc.off("did-stop-loading", fini); resolve(); }, 3000);
-        wc.once("did-stop-loading", fini);
-      });
-      if (wc.isDestroyed()) return;
-    }
-
-    const pdf = await wc.printToPDF({
-      // Sans lui, les fonds et aplats de couleur disparaissent : un
-      // en-tête d'administration ou un tableau tramé perdrait ce qui le
-      // rend reconnaissable.
-      printBackground: true,
-      pageSize: "A4",
-      margins: { marginType: "default" },
-    });
-
-    // Nom proposé à partir du titre de la page, nettoyé : il ne sert qu'à
-    // remplir le dialogue, jamais à construire un chemin.
-    const brut = (wc.getTitle() || nativeT("savePagePdfDefaultName")).trim();
-    const propre = brut.replace(/[\\/:*?"<>|]/g, "-").slice(0, 80) || nativeT("savePagePdfDefaultName");
+    const pdf = await genererPdfDeLaVue(wc);
+    if (wc.isDestroyed()) return;
+    const propre = nomDeFichierPdf(wc);
     const { filePath, canceled } = await dialog.showSaveDialog(mainWindow, {
       title: nativeT("savePagePdf"),
       defaultPath: `${propre}.pdf`,
