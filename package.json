@@ -1,6 +1,6 @@
 {
   "name": "hnaya-dz-browser",
-  "version": "0.8.1",
+  "version": "0.8.2",
   "description": "Hnaya DZ Browser — Votre navigateur, votre réseau, vos données",
   "author": "Hnaya DZ",
   "license": "UNLICENSED",
@@ -40,7 +40,8 @@
       "public/chat-session.js",
       "public/favorites.js",
       "public/favorites-ipc.js",
-      "public/update-check.js"
+      "public/update-check.js",
+      "!node_modules/**"
     ],
     "extraResources": [
       {
