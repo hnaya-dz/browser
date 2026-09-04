@@ -1,5 +1,10 @@
 "use client";
 import { useEffect, useState } from "react";
+// ⚠️ Icônes VECTORIELLES, jamais d'emoji — invariant §16. La bannière
+// portait 🚀 et ✕ en caractères : dessinés par la police du système, ils
+// changent entre Windows 10 et 11. Ironique sur l'écran même qui doit
+// inspirer confiance pour installer une mise à jour.
+import { CircleArrowUp, X } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useLanguage } from "@/context/langcontext";
 
@@ -74,14 +79,23 @@ export default function UpdateBanner() {
         color: "#fff",
       }}
     >
-      <span style={{ fontSize: 20 }}>🚀</span>
+      <CircleArrowUp size={20} style={{ flexShrink: 0, color: "#00c853" }} />
       <div style={{ display: "flex", flexDirection: "column", gap: 2, maxWidth: 360 }}>
         <span style={{ fontSize: 13, fontWeight: 700 }}>
           {t("Update.available")} — v{update.newVersion}
         </span>
         {/* ✅ Résumé des nouveautés dans la langue active */}
+        {/* ⚠️ NOTES BORNÉES À QUATRE LIGNES.
+            Sans cette limite, la bannière grandit à la mesure du texte : les
+            notes de la 0.8.1 la faisaient monter à 216 px sur douze lignes,
+            écrasant le bouton d'action — constaté à l'écran. Le détail
+            complet est sur la page de la release, à un clic. */}
         {update.notes && (
-          <span style={{ fontSize: 11, color: "rgba(255,255,255,0.6)", lineHeight: 1.4 }}>
+          <span style={{
+            fontSize: 11, color: "rgba(255,255,255,0.6)", lineHeight: 1.4,
+            display: "-webkit-box", WebkitLineClamp: 4, WebkitBoxOrient: "vertical",
+            overflow: "hidden",
+          }}>
             {update.notes}
           </span>
         )}
@@ -100,8 +114,10 @@ export default function UpdateBanner() {
       <button
         onClick={handleDismiss}
         style={{ background: "none", border: "none", color: "rgba(255,255,255,0.4)", fontSize: 16, cursor: "pointer", padding: 4, flexShrink: 0 }}
+        title={t("Update.dismiss")}
+        aria-label={t("Update.dismiss")}
       >
-        ✕
+        <X size={16} />
       </button>
     </div>
   );

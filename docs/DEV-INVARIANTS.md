@@ -698,14 +698,28 @@ Histoire complète : [`DEV-RETOUR-EXPERIENCE.md`](DEV-RETOUR-EXPERIENCE.md) §9.
 
 ### Ce qui est en place
 
-Toutes les icônes de boutons viennent de **`lucide-react`**. Deux
-exceptions assumées, qui sont des **fichiers image** et non des
-pictogrammes de bibliothèque :
+Toutes les icônes de boutons viennent de **`lucide-react`**. Il reste
+**une seule exception assumée**, qui est un fichier image et non un
+pictogramme de bibliothèque :
 
 | Fichier | Où |
 |---|---|
-| `public/icons/market.png` (PNG 172×172) | bouton **Achat** de la console de recherche |
 | `public/hnaya.png` | logo, barre de navigation et accueil |
+
+**`public/icons/market.png` a quitté cette liste le 04/09/2026.** Ce
+rendu 3D vert de 172 px, réduit à 20 px sur un bouton ambre, n'était
+reconnaissable par personne — et, n'étant pas un pictogramme de
+bibliothèque, il était introuvable pour qui le cherchait comme tel : le
+bouton « Achat » n'a jamais pu être reproduit dans le dossier vidéo. Il
+est passé à `ShoppingCart` de lucide. Le fichier dort encore dans le
+dépôt, **plus aucun code ne s'en sert**.
+
+La bannière de mise à jour (`components/UpdateBanner.tsx`) portait
+encore `🚀` et `✕` en caractères ; elle est passée à `CircleArrowUp` et
+`X` le même jour. **Il ne reste aucun emoji dans une surface de
+commande.** Ceux qui subsistent sont à l'INTÉRIEUR de panneaux
+(`VaultPanel`, `FavoritesPanel`, `DownloadPanel`) et dans quelques
+libellés de `locales/`.
 
 Les flèches de navigation sont des **SVG écrits en ligne** dans
 `components/urlbar.tsx` (`IconBack`, `IconForward`, `IconRefresh`,

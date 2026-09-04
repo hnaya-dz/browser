@@ -147,7 +147,8 @@
     "available": "Mise à jour disponible",
     "download": "Télécharger la mise à jour",
     "buildDev": "version de développement",
-    "buildHint": "Version installée et date de sa construction — à comparer entre postes lors d'un test."
+    "buildHint": "Version installée et date de sa construction — à comparer entre postes lors d'un test.",
+    "dismiss": "Masquer cette annonce"
   },
   "Notifications": {
     "title": "Notifications",

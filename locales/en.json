@@ -147,7 +147,8 @@
     "available": "Update available",
     "download": "Download update",
     "buildDev": "development version",
-    "buildHint": "Installed version and the date it was built - compare across machines when testing."
+    "buildHint": "Installed version and the date it was built - compare across machines when testing.",
+    "dismiss": "Dismiss this notice"
   },
   "Notifications": {
     "title": "Notifications",
