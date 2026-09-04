@@ -816,3 +816,64 @@ depuis la copie de travail (`extraResources`). Sans cette règle, un
 contact avec le produit.
 
 Ne pas ajouter `* text=auto` : cela renormaliserait tout le dépôt d'un coup.
+
+---
+
+## 20. Recette du paquet avant publication — `yarn recette`
+
+### Ce qui est en place
+
+```
+yarn dist       construit dist\Hnaya DZ Browser Setup X.Y.Z.exe
+yarn recette    lance l'application EMPAQUETÉE et la contrôle — 21 points
+```
+
+La recette (`scripts/recette-paquet.mjs`) sort en **code 1** dès qu'un
+point échoue, et affiche « NE PAS PUBLIER ». Elle couvre le paquet sur le
+disque (`ws` présent, chat-module complet, `app.asar` mince, worker
+démarrable hors Electron), puis l'application lancée : origine du serveur
+statique, version, rendu de l'interface, absence d'icône bitmap,
+coffre-fort, favoris, groupes d'onglets, confidentialité, sessions,
+**ouverture d'un salon de messagerie**, annotation, export PDF, absence
+d'erreur console.
+
+### Pourquoi
+
+**La 0.8.0 a été publiée avec la Messagerie locale entièrement hors
+service.** Aucune ligne de `chat-module` n'avait changé : la montée
+d'electron-builder 25 → 26 avait cessé d'embarquer `ws`, et le worker
+mourait sur `Cannot find package 'ws'`. À l'écran, `chat-start-host`
+répondait `{ok:true}` puis plus aucun événement n'arrivait — une création
+de salon qui ne se termine jamais, sans message d'erreur. Deux personnes
+ont téléchargé ce paquet avant que le défaut ne soit trouvé.
+
+La vérification d'alors avait contrôlé ce que la version **ajoutait**
+— annotation, export PDF, icône, confidentialité — et rien de ce qu'elle
+avait **déjà**.
+
+> **La règle qui en découle : une fonction existante peut être cassée par
+> un changement d'outillage sans qu'une ligne de son code ne bouge.** Une
+> recette de paquet contrôle donc les fonctions ANCIENNES autant que les
+> nouvelles, en priorité quand la chaîne de construction a changé.
+
+Le garde-fou a été éprouvé : en écartant `ws` du paquet, la recette
+signale l'échec à **trois niveaux indépendants** — fichier absent, worker
+qui ne démarre pas, salon qui ne s'ouvre pas.
+
+### ⚠️ Ne pas faire
+
+- **Ne pas publier sans avoir lancé `yarn recette` sur le paquet livré.**
+  Construire ne suffit pas : la 0.8.0 se construisait parfaitement.
+- **Ne jamais supposer qu'`extraResources` embarque un `node_modules`.**
+  electron-builder 26 l'exclut inconditionnellement : ni `**/*`, ni un
+  `node_modules/ws/**` explicite ne le ramènent. Seule une entrée
+  `extraResources` dont le `from` pointe DIRECTEMENT dans le dossier
+  fonctionne — c'est ce que fait `package.json`, ne pas le « simplifier ».
+- **Ne pas retirer le contrôle de taille d'`app.asar`.** L'archive ne
+  contient que `out/` et `public/` (3,3 Mo) ; `node_modules` en est exclu
+  car rien ne l'exécute — le renderer charge l'export Next, et le process
+  principal n'utilise que des modules natifs de Node. Si l'asar repasse
+  au-dessus de 12 Mo, c'est que l'exclusion a sauté.
+- **Ne pas prendre la recette pour un test complet.** Elle ne couvre ni
+  l'installateur NSIS lui-même, ni les dialogues natifs d'enregistrement,
+  ni les essais multi-machines. Ceux-là restent manuels.
