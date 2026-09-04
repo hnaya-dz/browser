@@ -131,6 +131,21 @@ try {
     fs.copyFileSync(path.join(MODULE, f), dest);
   }
 
+  // ⚠️ ESTAMPILLER LA VERSION DANS L'ARCHIVE.
+  // Le package.json de chat-module porte sa propre version (0.1.0), qui
+  // n'a jamais bougé et ne veut rien dire pour un client. L'archive, elle,
+  // s'appelle hnaya-serveur-0.8.0. Une fois extraite, le nom disparaît :
+  // l'administrateur n'avait plus AUCUN moyen de savoir ce qu'il exploite,
+  // et c'est la première question que pose le support. On aligne donc la
+  // version déclarée sur celle du produit.
+  const pkgArchive = path.join(base, "package.json");
+  const pkg = JSON.parse(fs.readFileSync(pkgArchive, "utf8"));
+  pkg.version = version;
+  fs.writeFileSync(pkgArchive, JSON.stringify(pkg, null, 2) + "\n");
+  // Relu : un package.json cassé rendrait l'archive inexploitable, et
+  // l'erreur ne se verrait qu'à l'installation chez le client.
+  JSON.parse(fs.readFileSync(pkgArchive, "utf8"));
+
   for (const { nom, args } of [
     { nom: `${racineArchive}.tar.gz`, args: ["-czf"] },
     { nom: `${racineArchive}.zip`, args: ["-a", "-cf"] },
