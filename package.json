@@ -1,6 +1,6 @@
 {
   "name": "hnaya-dz-browser",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "description": "Hnaya DZ Browser — Votre navigateur, votre réseau, vos données",
   "author": "Hnaya DZ",
   "license": "UNLICENSED",
@@ -52,10 +52,12 @@
           "!test/**",
           "!tools/**",
           "!yarn.lock",
-          "!node_modules/esbuild/**",
-          "!node_modules/@esbuild/**",
-          "!node_modules/@noble/**"
+          "!node_modules/**"
         ]
+      },
+      {
+        "from": "chat-module/node_modules/ws",
+        "to": "chat-module/node_modules/ws"
       }
     ],
     "win": {
