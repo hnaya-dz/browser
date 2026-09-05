@@ -533,6 +533,121 @@ liste latérale.
 
 ---
 
+### 5.9 Écran I — Le serveur autonome, qui n'a pas d'écran
+
+> **La question a été posée : « à quoi ressemble une installation de
+> hnaya-server ? ». Réponse : à une console, puis à rien.**
+>
+> **N'INVENTEZ PAS D'INTERFACE GRAPHIQUE POUR LE SERVEUR.** Il n'en a
+> aucune. C'est un processus Node qui tourne en service Windows ou en
+> unité systemd. Une reconstitution qui lui prête une fenêtre, un tableau
+> de bord ou un assistant d'installation montre un produit qui n'existe
+> pas.
+
+Le serveur permanent est le module `chat-module` livré **sans le
+navigateur** — une organisation n'installe pas un navigateur sur son
+serveur. Il se déploie depuis l'archive `hnaya-serveur-<version>.zip` ou
+`.tar.gz`, jamais publiée sur GitHub, remise au client avec sa licence.
+
+#### Trois moments, trois écrans de terminal
+
+**1. L'installation.** Une console d'administrateur. Sous Windows, à la
+fin d'une installation réussie :
+
+```
+✔ Tâche 'HnayaChat' installée et démarrée.
+  Données : C:\ProgramData\HnayaChat
+  PIN : voir le premier journal (Get-ScheduledTaskInfo HnayaChat) ou la console :
+  C:\Program Files\nodejs\node.exe ...
+```
+
+Sous Linux :
+
+```
+✔ Service hnaya-chat installé et démarré.
+  Licence     : /var/lib/hnaya-chat/licence.hnaya-lic
+  PIN d'accès : journalctl -u hnaya-chat | grep 'PIN'
+```
+
+**2. Le démarrage du serveur.** Toutes les lignes sont préfixées
+`[hnaya-serve]` :
+
+```
+[hnaya-serve] Licence « Direction des Systèmes d'Information » — 50 appareils, échéance 31/12/2026
+[hnaya-serve] Salon permanent "Direction Générale"
+[hnaya-serve] Données : /var/lib/hnaya-chat
+[hnaya-serve] PIN d'accès (stable) : 483920 — PIN admin : 771205
+[hnaya-serve] Postes : découverte automatique ou « Rejoindre par IP » ; mobiles : http://<ip>:4803
+```
+
+Quand le serveur porte **plusieurs salons** :
+
+```
+[hnaya-serve] 3 salons permanents sur le port 4802
+[hnaya-serve] Données : /var/lib/hnaya-chat
+[hnaya-serve] Mobiles : http://<ip>:4803 — le salon se choisit sur la page.
+[hnaya-serve]   « Direction Générale » — code 483920 — admin 771205
+```
+
+**3. Le refus sans licence** — à montrer, c'est le modèle commercial en une
+image. Sortie réelle, relevée sur l'archive 0.8.1 :
+
+```
+[hnaya-serve] Licence introuvable (/var/lib/hnaya-chat/licence.hnaya-lic).
+Le serveur permanent est réservé aux organisations disposant d'une licence
+Hnaya DZ. Placez le fichier .hnaya-lic remis à l'installation dans le
+répertoire de données, ou indiquez son chemin avec --licence.
+Le mode poste (salon créé depuis le navigateur) reste libre et sans licence.
+Hnaya DZ — +213558303030 — contact@hnaya.dz
+```
+
+#### Puis plus rien — et c'est l'argument
+
+Une fois installé, **le serveur est invisible**. Aucune icône, aucune
+fenêtre, aucune barre des tâches. Il redémarre avec la machine. Un
+administrateur qui veut le voir consulte le planificateur de tâches
+Windows ou `systemctl status hnaya-chat`.
+
+**C'est un point de scénario, pas une lacune** : ce serveur tourne sur une
+machine qui n'a ni écran ni utilisateur. Le montrer comme tel — une
+console, puis un rack ou un poste éteint dans un local technique — dit
+mieux la nature du produit qu'une interface inventée.
+
+#### L'administration se fait depuis le NAVIGATEUR
+
+C'est là que l'interface graphique réapparaît, et c'est un écran déjà
+décrit : le **panneau d'administration** de la §5.5. L'administrateur
+ouvre Hnaya sur son propre poste, va dans la messagerie, et rejoint le
+serveur par **« Rejoindre par IP »** — l'indication exacte est :
+
+> *« Salon introuvable ? Saisissez l'adresse IP du serveur, avec port si
+> besoin — ex. 192.168.1.10:4812 (multi-sites, VPN, serveur permanent). »*
+
+Puis il saisit le **PIN admin** relevé dans le journal du serveur, et
+retrouve les quatre onglets d'administration.
+
+**Enchaînement à filmer** : console du serveur → PIN lu dans le journal →
+le même PIN saisi dans le navigateur d'un poste → le panneau
+d'administration s'ouvre. C'est ce plan qui fait comprendre que le serveur
+n'a pas besoin d'écran parce que son écran, c'est le navigateur des
+administrateurs.
+
+#### Comment filmer un terminal
+
+- Police à chasse fixe, corps généreux — un terminal illisible ne
+  s'enseigne pas.
+- **Ne composez pas de fausses sorties.** Les blocs ci-dessus sont les
+  chaînes réelles du code ; les valeurs (noms d'organisation, PIN,
+  chemins) sont des exemples à remplacer, le reste est littéral.
+- Le préfixe `[hnaya-serve]` est constant : il ne s'invente pas et ne se
+  traduit pas.
+- Sources : `chat-module/src/serve.js`,
+  `chat-module/service/install-windows.ps1`,
+  `chat-module/service/install-linux.sh`. Le guide de déploiement complet
+  est `docs/SERVEUR-MESSAGERIE.md`.
+
+---
+
 ## 6. Règles de rythme *(défaut 1)*
 
 Elles ne sont pas indicatives.
@@ -800,6 +915,11 @@ navigateur. »
 
 ### 4.3 — Le module autonome : mise en service · 35 s · ≥ 9 plans
 
+> ⚠️ **Lisez la §5.9 avant de dessiner quoi que ce soit ici.** Le serveur
+> n'a **aucune interface graphique** : cette séquence se filme en
+> terminal, et les sorties exactes y sont relevées. N'inventez ni fenêtre,
+> ni assistant d'installation, ni tableau de bord.
+
 **À l'image** : `node --version` d'abord — c'est le premier geste. Puis
 les deux systèmes côte à côte : sous Windows la commande PowerShell
 administrateur et la tâche planifiée `HnayaChatServer` créée ; sous Linux
@@ -1015,7 +1135,8 @@ en tenant compte du sens de lecture pour l'arabe.
 **Contrôle avant livraison** — trois questions, dans cet ordre :
 
 1. Chaque écran reconstitué porte-t-il **toutes** les commandes de la §5 —
-   **y compris les 34 boutons hors messagerie des §5.7 et §5.8** ?
+   **y compris les 34 boutons hors messagerie des §5.7 et §5.8, et le
+   caractère SANS INTERFACE du serveur autonome (§5.9)** ?
 2. Chaque séquence atteint-elle son **nombre minimal de plans** (§6) ?
 3. Chaque texte affiché existe-t-il dans `locales/fr.json` **ou dans
    `app/page.tsx`** ?
