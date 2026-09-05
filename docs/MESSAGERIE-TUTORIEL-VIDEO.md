@@ -648,6 +648,116 @@ administrateurs.
 
 ---
 
+### 5.10 Écran J — La surface d'annotation *(hors messagerie)*
+
+> **Écran plein cadre, ajouté en 0.8.0.** Il recouvre tout : ni barre
+> d'adresse, ni onglets, ni dock. Il s'ouvre par le **9ᵉ bouton de la barre
+> d'adresse** (`PenLine`, §5.8) et se ferme par sa croix.
+>
+> **La page est FIGÉE.** C'est une capture, pas un calque : rien ne défile,
+> rien ne bouge sous les annotations. Ne montrez jamais la page continuer
+> de vivre pendant qu'on dessine dessus.
+
+Source : `components/AnnotationSurface.tsx`. Libellés : `Annotation.*`
+dans `locales/`.
+
+#### Barre d'outils — l'ordre exact, de gauche à droite
+
+**Six outils**, en un seul groupe. L'outil actif porte un fond vert et un
+liseré :
+
+| # | Icône lucide | Infobulle |
+|---|---|---|
+| 1 | `Pen` | « Crayon » |
+| 2 | `ArrowUpRight` | « Flèche » |
+| 3 | `Square` | « Rectangle » |
+| 4 | `Circle` | « Ellipse » |
+| 5 | `Type` | « Texte » |
+| 6 | `EyeOff` | « Caviarder — masque définitivement la zone » |
+
+*Séparateur.* **Six pastilles de couleur**, carrées, coin arrondi 4 px, la
+couleur active cerclée de blanc :
+
+`#ff3b30` rouge · `#ff9500` ambre · `#00c853` vert · `#0a84ff` bleu ·
+`#ffffff` blanc · `#111111` noir
+
+*Séparateur.* **Trois épaisseurs** — **2, 4 et 8 px** —, chacune dessinée
+comme un trait de son épaisseur réelle, pas comme un chiffre.
+
+*Séparateur.* **Deux commandes** : `Undo2` « Annuler la dernière
+opération » et `Trash2` « Tout effacer ». Toutes deux **grisées tant que
+rien n'a été dessiné**.
+
+*Espace souple*, puis **trois actions à droite** :
+
+| Bouton | Icône | Note |
+|---|---|---|
+| **« Enregistrer »** | `Download` | garde l'image en PNG. **Toujours disponible** |
+| **« Envoyer »** | `Send` | fond vert plein. **Indisponible hors salon** — voir ci-dessous |
+| *(croix)* | `X` | « Fermer » |
+
+#### Les états à ne pas confondre
+
+**Hors salon rejoint** — c'est l'état le plus probable à l'image : le
+bouton « Envoyer » est **grisé**, et un bandeau **ambre** s'affiche sous la
+barre :
+
+> *« Rejoignez un salon de la Messagerie locale pour envoyer cette
+> annotation. Vous pouvez l'enregistrer en image dès maintenant. »*
+
+Si votre plan montre « Envoyer » actif, **un salon doit être ouvert dans la
+même séquence**. C'est une incohérence facile à commettre et impossible à
+rattraper au montage.
+
+**Pendant la capture** — un texte centré, « Capture en cours… », avant
+l'apparition de la toile.
+
+**En erreur** — un bandeau **rouge** sous la barre. Les messages réels :
+« La capture de la page a échoué. », « Ouvrez une page web avant
+d'annoter. », « La page n'est pas encore affichée. Attendez qu'elle
+apparaisse, puis réessayez. », « Trop d'annotations sur cette page —
+effacez-en avant d'en ajouter. »
+
+#### La saisie de texte
+
+L'outil **Texte** n'écrit pas directement : un clic pose un petit champ à
+l'endroit cliqué, bordé de vert, avec l'indication **« Votre texte, puis
+Entrée »**. Entrée valide, Échap annule. Le texte apparaît alors sur
+l'image, dans la couleur choisie, **cerné d'un liseré sombre** — sans quoi
+un texte blanc disparaîtrait sur un fond clair.
+
+#### Le pied de la surface
+
+L'**adresse de la page annotée** s'affiche en bas, en petit, **toujours de
+gauche à droite** — même en interface arabe. Une URL n'est pas un texte
+arabe.
+
+#### Ce que le caviardage fait vraiment
+
+Il ne pose pas un rectangle opaque : il **remplace les pixels** par une
+version floutée de l'image d'origine. Le rayon du flou est proportionnel à
+la zone. À l'image, on doit voir la zone devenir **illisible mais encore
+colorée**, pas un pavé noir.
+
+Deux règles à respecter dans le scénario :
+
+- **Le caviardage prime sur ce qui est dessous.** Posé sur une flèche
+  tracée avant, il l'efface. C'est voulu.
+- **Il est destructif dans l'image exportée.** C'est l'argument, et il est
+  vrai : le destinataire ne peut pas retrouver ce qui a été masqué.
+
+#### Les deux boutons associés, ailleurs
+
+- **Barre d'adresse**, 9ᵉ bouton, `PenLine`, « Annoter la page » — §5.8.
+- **Composeur de la messagerie**, à côté du trombone, `FileText`,
+  « Joindre la page ouverte, en PDF » — §5.3. **N'existe que si un onglet
+  web est ouvert.**
+- **Menu contextuel de la page**, dernière entrée : « Enregistrer la page
+  en PDF ». C'est un menu **natif Windows**, pas un menu dessiné par
+  l'application : ne lui donnez pas le style de l'interface.
+
+---
+
 ## 6. Règles de rythme *(défaut 1)*
 
 Elles ne sont pas indicatives.
@@ -992,6 +1102,11 @@ pas la porte. Il lui faut aussi le code de ce salon.
 
 ## Capsule 5 — Annoter une page, l'envoyer · ~1 min 15 · tout utilisateur
 
+> ⚠️ **Lisez la §5.10 avant de dessiner cette surface.** Elle donne la
+> liste exhaustive de ses commandes — six outils, six couleurs, trois
+> épaisseurs, et les états dans lesquels « Envoyer » est grisé. Une
+> reconstitution qui en omet est à refaire, comme pour tout écran de la §5.
+
 *Ajoutée le 04/09/2026, pour les fonctions livrées en 0.8.0.*
 
 **Le problème que cette capsule résout, et qu'il faut montrer avant la
@@ -1135,8 +1250,9 @@ en tenant compte du sens de lecture pour l'arabe.
 **Contrôle avant livraison** — trois questions, dans cet ordre :
 
 1. Chaque écran reconstitué porte-t-il **toutes** les commandes de la §5 —
-   **y compris les 34 boutons hors messagerie des §5.7 et §5.8, et le
-   caractère SANS INTERFACE du serveur autonome (§5.9)** ?
+   **y compris les 34 boutons hors messagerie des §5.7 et §5.8, le
+   caractère SANS INTERFACE du serveur autonome (§5.9), et la surface
+   d'annotation au complet (§5.10)** ?
 2. Chaque séquence atteint-elle son **nombre minimal de plans** (§6) ?
 3. Chaque texte affiché existe-t-il dans `locales/fr.json` **ou dans
    `app/page.tsx`** ?
