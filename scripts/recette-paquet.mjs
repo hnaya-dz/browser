@@ -23,6 +23,7 @@
 
 import { createRequire } from "node:module";
 import { spawn, execSync } from "node:child_process";
+import fs from "node:fs";
 import { existsSync, statSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
@@ -63,6 +64,24 @@ V("chat-module embarque `ws`",
 V("chat-module est complet",
   existsSync(join(RESSOURCES, "chat-module", "src", "server.js")) &&
   existsSync(join(RESSOURCES, "chat-module", "mobile", "index.html")));
+
+// Aucune documentation interne ne doit partir chez l'utilisateur. Le
+// dossier docs/ contient le guide de production vidéo, les invariants et
+// les retours d'expérience — de l'outillage d'atelier, pas du produit.
+// Seul README.md de chat-module est légitime : il est destiné au client
+// qui déploie le serveur.
+const docsFuites = [];
+(function balayer(dir, rel = "") {
+  for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+    const p = join(dir, e.name);
+    const r = rel ? rel + "/" + e.name : e.name;
+    if (e.isDirectory()) { if (e.name !== "node_modules") balayer(p, r); }
+    else if (/TUTORIEL|DEV-INVARIANTS|DEV-RETOUR|ANNOTATION-CADRAGE|MESSAGERIE-GUIDE|PRODUIT|RELEASE-/i.test(e.name))
+      docsFuites.push(r);
+  }
+})(RESSOURCES);
+V("Aucune documentation interne dans le paquet", docsFuites.length === 0,
+  docsFuites.length ? docsFuites.join(", ") : "");
 
 // Garde-fou de taille : l'asar ne contient que out/ et public/. S'il
 // regonfle, c'est que node_modules y est revenu (44 Mo pour rien).
@@ -116,13 +135,36 @@ await new Promise((r) => ws.once("open", r));
 let id = 0;
 const attente = new Map();
 const erreurs = [];
+
+// ⚠️ BRUIT INTERNE D'ELECTRON, filtré nommément — pas un assouplissement.
+// Les vues de navigation sont créées avec `sandbox: true` et SANS script de
+// préchargement (voir open-tab dans public/electron.js) : Electron émet
+// alors, par intermittence, « sandboxed_renderer.bundle.js script failed to
+// run » et un TypeError sur `binding.startupData`. Message interne au
+// moteur, sans effet — la navigation fonctionne. Mesuré : absent d'un essai
+// isolé, présent d'un passage complet.
+//
+// On le filtre PAR SON TEXTE, jamais en relâchant le contrôle : un
+// garde-fou qui échoue au hasard pour une raison bénigne finit par être
+// ignoré, et c'est ainsi qu'un vrai défaut passe. Toute autre erreur reste
+// bloquante.
+const BRUIT_ELECTRON = [
+  /sandboxed_renderer\.bundle\.js/i,
+  /preloadScripts.*startupData/i,
+];
+const estDuBruit = (m) => BRUIT_ELECTRON.some((r) => r.test(m));
 ws.on("message", (m) => {
   const o = JSON.parse(m);
   if (o.id && attente.has(o.id)) { attente.get(o.id)(o); attente.delete(o.id); }
-  if (o.method === "Runtime.consoleAPICalled" && o.params.type === "error")
-    erreurs.push((o.params.args || []).map((a) => a.value || a.description || "").join(" ").slice(0, 110));
-  if (o.method === "Runtime.exceptionThrown")
-    erreurs.push("EXCEPTION " + ((o.params.exceptionDetails || {}).text || "").slice(0, 110));
+  if (o.method === "Runtime.consoleAPICalled" && o.params.type === "error") {
+    const m = (o.params.args || []).map((a) => a.value || a.description || "").join(" ");
+    if (!estDuBruit(m)) erreurs.push(m.slice(0, 110));
+  }
+  if (o.method === "Runtime.exceptionThrown") {
+    const d = o.params.exceptionDetails || {};
+    const m = (d.text || "") + " " + ((d.exception || {}).description || "");
+    if (!estDuBruit(m)) erreurs.push("EXCEPTION " + m.slice(0, 110));
+  }
 });
 const cmd = (methode, params = {}) => new Promise((res, rej) => {
   const i = ++id;
