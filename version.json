@@ -1,8 +1,9 @@
 {
-  "version": "0.8.3",
+  "version": "0.8.5",
   "url": "https://github.com/hnaya-dz/browser/releases/latest",
   "notes": {
-    "ar": "الغرف تظهر من جديد بين حاسوبين. الهاتف يعيد الاتصال وحده ويمكنه تذكّر الغرفة، وملفات m4a تُرسَل دون خطأ. الرسائل الصوتية بصيغة M4A. التفاصيل في صفحة الإصدار.",
-    "fr": "Les salons réapparaissent entre deux PC. Le téléphone se reconnecte seul, peut mémoriser le salon, et envoie ses .m4a sans erreur. Vocaux du PC en M4A. Détail sur la page."
+    "ar": "أمان: صفحة ويب لم تعد قادرة على احتلال النافذة. النتائج تُفتح على وجهتها الحقيقية وتبقى القائمة معروضة. بحث «العالم» صار عبر Brave. شريط العنوان يفتح العنوان بدل البحث عنه. ملء الشاشة في الفيديو يعمل. التفاصيل في صفحة الإصدار.",
+    "fr": "Sécurité : une page web ne peut plus remplacer la fenêtre. Les résultats s'ouvrent sur leur vraie destination et la liste reste affichée. Recherche « Monde » : Brave remplace Startpage. La barre d'adresse suit une adresse au lieu de la chercher. Le plein écran des vidéos fonctionne. Détail sur la page.",
+    "en": "Security: a web page can no longer take over the window. Results open on their real destination and the list stays on screen. World search now uses Brave. The address bar follows an address instead of searching for it. Video full screen works. Details on the release page."
   }
 }
