@@ -1,9 +1,9 @@
 {
-  "version": "0.8.6",
+  "version": "0.8.7",
   "url": "https://github.com/hnaya-dz/browser/releases/latest",
   "notes": {
-    "ar": "لسانان جديدان في الصفحة الرئيسية: أخبار وخدمات. محرّك البحث باختيارك (Brave افتراضيًا، Qwant، DuckDuckGo)، ودون Google. سياسة الخصوصية وشروط الاستخدام داخل البرنامج. فتح ملفّات PDF وحفظها أوضح. التفاصيل في صفحة الإصدار.",
-    "fr": "Deux onglets nouveaux sur l'accueil : Actualités et Démarches. Le moteur de recherche au choix (Brave par défaut, Qwant, DuckDuckGo), sans Google. Politique de confidentialité et conditions d'utilisation dans le logiciel. Ouverture et enregistrement des PDF plus clairs. Détail sur la page.",
-    "en": "Two new tabs on the home page: News and Services. Your choice of search engine (Brave by default, Qwant, DuckDuckGo), without Google. Privacy policy and terms of use inside the software. Clearer PDF opening and saving. Details on the release page."
+    "ar": "الآجال: تذكّر أجلًا من أيّ صفحة، وتصلك التذكرة في الوقت حتى وحنايا مغلق. الكاميرا والميكروفون والشاشة بإذنك، موقعًا موقعًا. بحث أدقّ في «ملفاتي». قبول الشروط. تصحيحات أمنية. التفاصيل في صفحة الإصدار.",
+    "fr": "Échéances : retenez une échéance depuis n'importe quelle page, le rappel arrive à temps, même Hnaya fermé. Caméra, micro et écran sur votre accord, site par site. Recherche plus juste dans « Mes fichiers ». Acceptation des conditions. Correctifs de sécurité. Détail sur la page.",
+    "en": "Deadlines: remember a deadline from any page, and the reminder arrives in time, even when Hnaya is closed. Camera, microphone and screen with your consent, site by site. More accurate search in \"My files\". Terms acceptance. Security fixes. Details on the release page."
   }
 }
